@@ -72,4 +72,4 @@ make sandbox    # Interactive testing CLI
 
 ## License
 
-MIT
+[MIT](LICENSE)
