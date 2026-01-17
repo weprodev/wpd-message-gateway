@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 env:
   GO_VERSION: "1.25"
@@ -76,16 +76,16 @@ jobs:
         run: |
           echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Extract test stats
           PASSED=$(grep -c "^--- PASS" test-output.txt 2>/dev/null || echo "0")
           FAILED=$(grep -c "^--- FAIL" test-output.txt 2>/dev/null || echo "0")
-          
+
           echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
           echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
-          
+
           # Show coverage if available
           if [ -f coverage.out ]; then
             COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
@@ -166,7 +166,7 @@ jobs:
         run: |
           go build -o bin/server ./cmd/server
           CONFIG_PATH=configs/local.example.yml ./bin/server &
-          
+
           # Wait for server
           for i in {1..30}; do
             if curl -s http://localhost:10101/health > /dev/null 2>&1; then
