@@ -2,6 +2,48 @@
 
 CI/CD pipeline, commit conventions, and release process.
 
+## Workflow Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         PULL REQUEST                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ci.yml (runs on PR only)                                      │
+│   ┌────────┬────────┬──────────┬──────────┬──────────┬────────┐ │
+│   │ 🔍Lint │ 🧪Test │ 🔨Build  │ 🔒Security│ 🌐Bruno  │ 🎨Web  │ │
+│   └────────┴────────┴──────────┴──────────┴──────────┴────────┘ │
+│                            │                                    │
+│                       📊 Summary                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                         [MERGE PR]
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      PUSH TO MASTER                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   release.yml                                                   │
+│   ┌──────────────┐                                              │
+│   │ 📦 Release   │ ──(creates tag)──▶ outputs: new_version      │
+│   └──────────────┘                                              │
+│          │                                                      │
+│     needs: release                                              │
+│          ▼                                                      │
+│   ┌──────────────┐                                              │
+│   │ 🐳 Docker    │ ──(builds & pushes image with version tag)   │
+│   └──────────────┘                                              │
+│          │                                                      │
+│          ▼                                                      │
+│   ┌──────────────┐                                              │
+│   │ 📊 Summary   │                                              │
+│   └──────────────┘                                              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## Commit Conventions
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) for automatic versioning.
@@ -19,7 +61,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) for automati
 
 ## CI Pipeline
 
-Every push triggers:
+Runs on **pull requests** to `master`:
 
 | Job | What it does |
 |-----|--------------|
@@ -27,7 +69,7 @@ Every push triggers:
 | 🧪 Test | `go test -race` + coverage |
 | 🔨 Build | Compile binary |
 | 🔒 Security | `govulncheck` |
-| 🌐 API Test | Bruno tests |
+| 🌐 API Test | Bruno CLI tests (`bru run --env memory`) |
 | 🎨 Web UI | Build DevBox frontend |
 
 ```bash
@@ -37,7 +79,7 @@ make audit
 
 ## Release Process
 
-Automatic on `main` when CI passes. Manual trigger available in Actions → Release.
+Automatic on push to `master`. Manual trigger available in Actions → Release.
 
 | Commits contain | Version bump |
 |-----------------|--------------|
@@ -53,6 +95,24 @@ On release, the Docker image is published to:
 ghcr.io/weprodev/wpd-message-gateway:latest
 ghcr.io/weprodev/wpd-message-gateway:v1.0.0
 ```
+
+## Cleanup
+
+Old container images are automatically cleaned up **monthly**:
+
+- 🗑️ Delete untagged images
+- 📦 Keep last 10 tagged versions
+- 🏷️ Keep last 5 pre-release versions
+
+Manual trigger: Actions → Cleanup → Run workflow
+
+## Dependabot
+
+Dependencies are checked **weekly** for security updates:
+
+- ✅ Minor and patch updates only
+- ❌ Major versions require manual review
+- 📦 Covers: Go modules, npm, GitHub Actions
 
 ## E2E Testing
 
@@ -80,7 +140,7 @@ steps:
 ## Branch Strategy
 
 ```
-main ─────●─────●─────●───── (releases)
+master ───●─────●─────●───── (releases)
           │     │
           │     └── feat/sendgrid
           └── fix/rate-limit
