@@ -105,7 +105,8 @@ audit:
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🎨 Formatting code...$(RESET)\n"
-	@goimports -local github.com/weprodev/wpd-message-gateway -w . 2>/dev/null || gofmt -w .
+	@find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' | xargs goimports -local github.com/weprodev/wpd-message-gateway -w 2>/dev/null || \
+		find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' | xargs gofmt -w
 	@go mod tidy
 	@printf "$(GREEN)✅ Code formatted!$(RESET)\n"
 	@printf "\n"
