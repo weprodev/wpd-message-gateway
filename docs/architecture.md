@@ -16,41 +16,41 @@ The gateway follows **Clean Architecture** principles with clear separation betw
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                           │
 │                  (internal/presentation/)                       │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │   Router    │  │  Gateway    │  │   DevBox    │             │
+│  ┌─────────────┐   ┌─────────────┐  ┌─────────────┐             │
+│  │   Router    │   │  Gateway    │  │   DevBox    │             │
 │  │             │──▶│  Handler    │  │   Handler   │             │
-│  └─────────────┘  └──────┬──────┘  └──────┬──────┘             │
+│  └─────────────┘   └─────┬───────┘  └─────┬───────┘             │
 └──────────────────────────┼────────────────┼─────────────────────┘
                            │                │
                            ▼                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Core Layer                                 │
 │                    (internal/core/)                             │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                 GatewayService                          │   │
-│  │  - SendEmail()   - SendSMS()                            │   │
-│  │  - SendPush()    - SendChat()                           │   │
-│  └────────────────────────┬────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                 GatewayService                          │    │
+│  │  - SendEmail()   - SendSMS()                            │    │
+│  │  - SendPush()    - SendChat()                           │    │
+│  └────────────────────────┬────────────────────────────────┘    │
 │                           │                                     │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Registry                             │   │
-│  │  (Thread-safe provider management)                      │   │
-│  └────────────────────────┬────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                    Registry                             │    │
+│  │  (Thread-safe provider management)                      │    │
+│  └────────────────────────┬────────────────────────────────┘    │
 │                           │                                     │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  Ports (Interfaces)                     │   │
-│  │  EmailSender | SMSSender | PushSender | ChatSender      │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                  Ports (Interfaces)                     │    │
+│  │  EmailSender | SMSSender | PushSender | ChatSender      │    │
+│  └─────────────────────────────────────────────────────────┘    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ (implements)
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  Infrastructure Layer                           │
 │               (internal/infrastructure/)                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │   Memory    │  │   Mailgun   │  │  SendGrid   │             │
-│  │  Provider   │  │  Provider   │  │  Provider   │  ...        │
-│  └──────┬──────┘  └─────────────┘  └─────────────┘             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Memory    │  │   Mailgun   │  │  SendGrid   │              │
+│  │  Provider   │  │  Provider   │  │  Provider   │  ...         │
+│  └──────┬──────┘  └─────────────┘  └─────────────┘              │
 │         │                                                       │
 │         │ (if mailpit.enabled)                                  │
 │         ▼                                                       │
@@ -109,11 +109,11 @@ GET /api/v1/emails   [ Mailpit ]      (via EventSource)
 
 ```text
 ┌──────────────────────┬──────────────┬─────────────┐
-│ Config               │ DevBox UI    │ Mailpit     │
+│ Config                │ DevBox UI    │ Mailpit     │
 ├──────────────────────┼──────────────┼─────────────┤
-│ memory only          │ ✅ Yes       │ ❌ No       │
-│ memory + mailpit     │ ✅ Yes       │ ✅ Yes      │
-│ mailgun (production) │ ❌ No        │ ❌ No       │
+│ memory only          │ ✅ Yes       │ ❌ No        │
+│ memory + mailpit     │ ✅ Yes       │ ✅ Yes       │
+│ mailgun (production) │ ❌ No        │ ❌ No        │
 └──────────────────────┴──────────────┴─────────────┘
 ```
 
@@ -132,9 +132,13 @@ wpd-message-gateway/
 ├── internal/                # Private application code
 │   ├── app/                 # Application bootstrap
 │   │   ├── config.go        # Configuration structs & loading
-│   │   ├── providers.go     # Provider factory
+│   │   ├── providers.go     # Provider factory (uses registry)
 │   │   ├── validation.go    # Configuration validation
 │   │   └── wire.go          # Dependency injection
+│   │
+│   │
+│   │   └── registry/        # Provider registration (sub-package)
+│   │       └── registry.go  # RegisterEmailProvider, etc.
 │   │
 │   ├── core/                # Business logic (domain)
 │   │   ├── port/            # Interface definitions
@@ -218,6 +222,29 @@ The Registry manages provider instances with thread-safe access.
 - **Location**: `internal/core/service/registry.go`
 - **Responsibility**: Store and retrieve providers by name
 - **Benefit**: Safe concurrent access in HTTP server context
+
+### 6. Provider Self-Registration Pattern
+
+Providers register themselves via Go's `init()` mechanism, following the **Open/Closed Principle**:
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│  Adding a new provider requires NO modifications to existing code     │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────┐         init()           ┌────────────────────────┐
+│  Provider Package   │─────────────────────────▶│  Provider Registry     │
+│  (register.go)      │   RegisterEmailProvider  │ (internal/app/registry)│
+│                     │                          │                        │
+│  sendgrid/          │                          │  emailFactories[       │
+│   ├── sendgrid.go   │                          │    "sendgrid"          │
+│   └── register.go ◄─┤                          │  ] = factory           │
+└─────────────────────┘                          └────────────────────────┘
+```
+
+- **Location**: `internal/app/registry/` (sub-package), `provider/*/register.go` (registrations)
+- **Mechanism**: Each provider has a `register.go` with `init()` that calls `registry.RegisterEmailProvider()`
+- **Benefit**: Add providers by creating files, not modifying config or factory code
 
 ## Design Principles
 

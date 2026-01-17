@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -57,13 +56,14 @@ type ProviderDefaults struct {
 	Chat  string `yaml:"chat"`
 }
 
-// Intermediate maps for YAML parsing
+// Intermediate maps for YAML parsing (allows any key-value pairs)
 type EmailConfigMap map[string]string
 type SMSConfigMap map[string]string
 type PushConfigMap map[string]string
 type ChatConfigMap map[string]string
 
 // CommonConfig shared fields across all providers.
+// The Extra map captures any additional fields not explicitly defined.
 type CommonConfig struct {
 	APIKey    string
 	APISecret string
@@ -219,7 +219,7 @@ func (c *Config) parseProviderConfigs() {
 	}
 }
 
-// --- Provider Type and Capabilities ---
+// --- Provider Type (for documentation/validation purposes) ---
 
 // ProviderType defines the type of message provider.
 type ProviderType string
@@ -230,47 +230,3 @@ const (
 	ProviderTypePush  ProviderType = "push"
 	ProviderTypeChat  ProviderType = "chat"
 )
-
-// ProviderCapabilities lists supported message types per provider.
-type ProviderCapabilities struct {
-	SupportedTypes []ProviderType
-}
-
-var knownProviders = map[string]ProviderCapabilities{
-	"memory":   {SupportedTypes: []ProviderType{ProviderTypeEmail, ProviderTypeSMS, ProviderTypePush, ProviderTypeChat}},
-	"mailgun":  {SupportedTypes: []ProviderType{ProviderTypeEmail}},
-	"sendgrid": {SupportedTypes: []ProviderType{ProviderTypeEmail}},
-	"smtp":     {SupportedTypes: []ProviderType{ProviderTypeEmail}},
-	"twilio":   {SupportedTypes: []ProviderType{ProviderTypeSMS}},
-	"firebase": {SupportedTypes: []ProviderType{ProviderTypePush}},
-	"whatsapp": {SupportedTypes: []ProviderType{ProviderTypeChat}},
-	"telegram": {SupportedTypes: []ProviderType{ProviderTypeChat}},
-}
-
-var providerLookup map[string]ProviderCapabilities
-var providerMu sync.RWMutex
-
-func init() {
-	providerLookup = make(map[string]ProviderCapabilities)
-	for k, v := range knownProviders {
-		providerLookup[strings.ToUpper(k)] = v
-	}
-}
-
-// RegisterProvider registers a new provider.
-func RegisterProvider(name string, capabilities ProviderCapabilities) {
-	providerMu.Lock()
-	defer providerMu.Unlock()
-
-	lower := strings.ToLower(name)
-	knownProviders[lower] = capabilities
-	providerLookup[strings.ToUpper(name)] = capabilities
-}
-
-// IsKnownProvider checks if a provider name is registered.
-func IsKnownProvider(name string) bool {
-	providerMu.RLock()
-	defer providerMu.RUnlock()
-	_, ok := providerLookup[strings.ToUpper(name)]
-	return ok
-}

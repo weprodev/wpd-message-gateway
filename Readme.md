@@ -170,6 +170,34 @@ make start
 #   - Mailpit:   http://localhost:10103 (email preview)
 ```
 
+## E2E Testing in CI
+
+Use the gateway to **capture and verify** all messages your app sends during tests. No mocks needed.
+
+**Benefits:**
+- ✅ Test real HTTP calls, not mocks
+- ✅ Verify exact message content (subject, body, recipients)
+- ✅ Test all channels: Email + SMS + Push + Chat
+- ✅ Zero external dependencies (no Mailgun/Twilio accounts needed)
+
+```yaml
+services:
+  gateway:
+    image: ghcr.io/weprodev/wpd-message-gateway:latest
+    ports:
+      - 10101:10101
+
+steps:
+  - run: npm test  # Your app sends to http://localhost:10101
+  
+  - name: Verify welcome email
+    run: |
+      curl -s http://localhost:10101/api/v1/emails | \
+        jq -e '.emails[0].email.subject == "Welcome!"'
+```
+
+→ See [E2E Testing Guide](docs/e2e-testing.md) for complete examples.
+
 ## Provider Status
 
 | Type | Provider | Status |
@@ -231,12 +259,13 @@ wpd-message-gateway/
 
 | Document | Description |
 |----------|-------------|
-| [Usage Guide](docs/usage.md) | How to install, configure, and send messages |
+| [Usage Guide](docs/usage.md) | Install, configure, and send messages |
+| [E2E Testing](docs/e2e-testing.md) | Test your app's messages in CI |
 | [Architecture](docs/architecture.md) | System design and principles |
-| [DevBox](docs/devbox.md) | Development inbox for testing |
-| [Contributing](docs/contributing.md) | How to add new providers |
-| [Workflow](docs/workflow.md) | CI/CD and release process |
-| [Code Conventions](docs/code-conventions.md) | Coding style guide |
+| [DevBox](docs/devbox.md) | Development inbox UI |
+| [Contributing](docs/contributing.md) | Add new providers |
+| [Workflow](docs/workflow.md) | CI/CD and releases |
+| [Code Conventions](docs/code-conventions.md) | Coding standards |
 
 ## License
 

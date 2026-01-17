@@ -1,212 +1,99 @@
 # Development Workflow
 
-This guide covers the CI/CD pipeline, commit conventions, and release process.
+CI/CD pipeline, commit conventions, and release process.
 
 ## Commit Conventions
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) for automatic versioning.
 
-### Format
-
 ```
 <type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
 ```
 
-### Types
-
-| Type | Description | Version Bump |
-|------|-------------|--------------|
-| `feat` | New feature | Minor |
-| `fix` | Bug fix | Patch |
-| `docs` | Documentation only | Patch |
-| `chore` | Maintenance tasks | Patch |
-| `refactor` | Code refactoring | Patch |
-| `test` | Adding tests | Patch |
-| `feat!` | Breaking change | Major |
-
-### Scopes
-
-Common scopes for this project:
-
-| Scope | Description |
-|-------|-------------|
-| `config` | Configuration changes |
-| `mailgun` | Mailgun provider |
-| `memory` | Memory provider |
-| `devbox` | DevBox UI/API |
-| `gateway` | SDK package |
-| `api` | HTTP endpoints |
-
-### Examples
-
-```bash
-# Patch release (v1.0.0 → v1.0.1)
-git commit -m "fix(mailgun): resolve rate limit handling"
-git commit -m "docs: update README"
-git commit -m "chore: update dependencies"
-
-# Minor release (v1.0.0 → v1.1.0)
-git commit -m "feat(sendgrid): add email provider"
-git commit -m "feat(api): add batch send endpoint"
-
-# Major release (v1.0.0 → v2.0.0)
-git commit -m "feat!: change API response format"
-git commit -m "refactor!: rename contracts.Email.Body to contracts.Email.HTML
-
-BREAKING CHANGE: Email.Body field renamed to Email.HTML"
-```
+| Type | Bump | Example |
+|------|------|---------|
+| `feat` | Minor | `feat(sendgrid): add provider` |
+| `fix` | Patch | `fix(mailgun): handle rate limit` |
+| `feat!` | Major | `feat!: new API format` |
+| `docs`, `chore`, `refactor` | Patch | `docs: update readme` |
 
 ## CI Pipeline
 
-Every push and pull request triggers the CI workflow:
+Every push triggers:
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    CI Pipeline                           │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
-│  │   Lint &    │  │    Unit     │  │   Build     │      │
-│  │   Format    │  │   Tests     │  │   Check     │      │
-│  └─────────────┘  └─────────────┘  └─────────────┘      │
-│                                                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
-│  │  Security   │  │    API      │  │  Frontend   │      │
-│  │    Scan     │  │   Tests     │  │   Build     │      │
-│  └─────────────┘  └─────────────┘  └─────────────┘      │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Jobs
-
-| Job | Description | Tools |
-|-----|-------------|-------|
-| **Lint & Format** | Code style check | `gofmt`, `goimports`, `golangci-lint` |
-| **Unit Tests** | Run Go tests | `go test -race` |
-| **Build** | Compile binaries | `go build` |
-| **Security Scan** | Vulnerability check | `govulncheck` |
-| **API Tests** | Run Bruno tests | `bru run` |
-| **Frontend Build** | Build React UI | `npm run build` |
-
-### Running Locally
+| Job | What it does |
+|-----|--------------|
+| 🔍 Lint | `gofmt`, `golangci-lint` |
+| 🧪 Test | `go test -race` + coverage |
+| 🔨 Build | Compile binary |
+| 🔒 Security | `govulncheck` |
+| 🌐 API Test | Bruno tests |
+| 🎨 Web UI | Build DevBox frontend |
 
 ```bash
-# Run all checks (same as CI)
+# Run locally
 make audit
-
-# Individual checks
-make lint
-make test
-make build
 ```
 
 ## Release Process
 
-Releases are created automatically when CI passes on `main`.
+Automatic on `main` when CI passes. Manual trigger available in Actions → Release.
+
+| Commits contain | Version bump |
+|-----------------|--------------|
+| `BREAKING CHANGE` or `feat!:` | Major (v1 → v2) |
+| `feat:` | Minor (v1.0 → v1.1) |
+| `fix:`, `docs:`, etc. | Patch (v1.0.0 → v1.0.1) |
+
+## Docker Image
+
+On release, the Docker image is published to:
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  CI Passes  │ ──▶ │  Detect     │ ──▶ │  Create     │
-│  on main    │     │  Version    │     │  Release    │
-└─────────────┘     └─────────────┘     └─────────────┘
+ghcr.io/weprodev/wpd-message-gateway:latest
+ghcr.io/weprodev/wpd-message-gateway:v1.0.0
 ```
 
-### Automatic Versioning
+## E2E Testing
 
-The release workflow:
+Use the gateway Docker image to capture and verify messages in your CI tests.
 
-1. Gets the latest Git tag (e.g., `v1.2.3`)
-2. Analyzes commits since last tag
-3. Determines version bump type from commit messages
-4. Creates new tag and GitHub release
+→ See **[E2E Testing Guide](./e2e-testing.md)** for complete examples.
 
-### Version Detection
+Quick example:
 
-| Commits contain | Bump | Example |
-|-----------------|------|---------|
-| `BREAKING CHANGE` or `feat!:` | Major | `v1.0.0` → `v2.0.0` |
-| `feat:` | Minor | `v1.0.0` → `v1.1.0` |
-| `fix:`, `docs:`, etc. | Patch | `v1.0.0` → `v1.0.1` |
+```yaml
+services:
+  gateway:
+    image: ghcr.io/weprodev/wpd-message-gateway:latest
+    ports:
+      - 10101:10101
 
-### Manual Release
-
-You can trigger a release manually:
-
-1. Go to **Actions** → **Release**
-2. Click **Run workflow**
-3. Select version type: `patch`, `minor`, or `major`
-4. Click **Run workflow**
+steps:
+  - run: npm test
+    env:
+      EMAIL_API: http://localhost:10101
+  
+  - run: curl http://localhost:10101/api/v1/emails | jq '.emails[0].email.subject'
+```
 
 ## Branch Strategy
 
 ```
-main ─────●─────●─────●─────●───── (releases)
-          │     │     │
-          │     │     └── fix/mailgun-rate-limit
-          │     └── feat/sendgrid-provider
-          └── docs/update-architecture
+main ─────●─────●─────●───── (releases)
+          │     │
+          │     └── feat/sendgrid
+          └── fix/rate-limit
 ```
 
-- **main**: Production-ready code, releases are tagged here
-- **feature branches**: `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`
+## PR Checklist
 
-## Pull Request Workflow
+- [ ] `make audit` passes
+- [ ] Tests added
+- [ ] Commits follow conventions
 
-1. Create branch from `main`
-2. Make changes with conventional commits
-3. Push and create PR
-4. CI runs automatically
-5. Get review and approval
-6. Merge to `main`
-7. Release is created automatically
+## Related
 
-### PR Checklist
-
-```markdown
-- [ ] `make audit` passes locally
-- [ ] Tests added for new features
-- [ ] Documentation updated if needed
-- [ ] Commit messages follow conventions
-```
-
-## Troubleshooting
-
-### CI Failed
-
-```bash
-# Check formatting
-gofmt -d .
-goimports -local github.com/weprodev/wpd-message-gateway -d .
-
-# Check linting
-golangci-lint run ./...
-
-# Run tests
-go test -v ./...
-```
-
-### Release Not Created
-
-1. Check if CI passed on `main`
-2. Verify commit messages follow conventions
-3. Check Actions tab for errors
-
-### Manual Tag Creation
-
-If automatic release fails:
-
-```bash
-# Create tag manually
-git tag -a v1.2.3 -m "Release v1.2.3"
-git push origin v1.2.3
-```
-
-## Related Documentation
-
-- [Contributing Guide](./contributing.md) — How to contribute code
+- [E2E Testing](./e2e-testing.md) — Test your app's messages
+- [Contributing](./contributing.md) — Add new providers
 - [Code Conventions](./code-conventions.md) — Coding standards

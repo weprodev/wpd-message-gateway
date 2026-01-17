@@ -3,13 +3,14 @@
 ## Quick Start
 
 ```bash
-git clone https://github.com/weprodev/wpd-message-gateway.git
+git clone git@github.com:weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
 make install
-make test
 ```
 
 ## Adding a New Provider
+
+Adding a new provider **does not require modifying existing code** — just create your provider files. This follows the Open/Closed Principle (OCP).
 
 ### 1. Create the Provider
 
@@ -25,14 +26,10 @@ import (
     "context"
     "fmt"
 
-    "github.com/weprodev/wpd-message-gateway/internal/core/port"
     "github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
 const ProviderName = "sendgrid"
-
-// Compile-time interface check
-var _ port.EmailSender = (*Provider)(nil)
 
 // Config holds SendGrid configuration.
 type Config struct {
@@ -69,47 +66,64 @@ func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts
 }
 ```
 
-### 2. Add Configuration
+### 2. Register the Provider (Self-Registration)
 
-Update `internal/app/config.go`:
-
-```go
-type EmailConfig struct {
-    // ... existing fields
-    SendGrid SendGridConfig `yaml:"sendgrid"`
-}
-
-type SendGridConfig struct {
-    APIKey    string `yaml:"api_key"`
-    FromEmail string `yaml:"from_email"`
-    FromName  string `yaml:"from_name"`
-}
-```
-
-### 3. Register in Provider Factory
-
-Update `internal/app/providers.go`:
+Create a `register.go` file that uses `init()` to self-register:
 
 ```go
-import "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid"
+// internal/infrastructure/provider/sendgrid/register.go
+package sendgrid
 
-func (f *ProviderFactory) createEmailProvider(name string) (port.EmailSender, error) {
-    switch name {
-    // ... existing cases
-    case "sendgrid":
-        cfg := f.config.Providers.Email.SendGrid
-        return sendgrid.New(sendgrid.Config{
+import (
+    "github.com/weprodev/wpd-message-gateway/internal/core/port"
+    "github.com/weprodev/wpd-message-gateway/internal/app/registry"
+)
+
+func init() {
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ port.MessageStore, _ registry.MailpitConfig) (port.EmailSender, error) {
+        return New(Config{
             APIKey:    cfg.APIKey,
             FromEmail: cfg.FromEmail,
             FromName:  cfg.FromName,
         })
-    default:
-        return nil, fmt.Errorf("unknown email provider: %s", name)
-    }
+    })
 }
 ```
 
-### 4. Add Tests
+### 3. Add Import in imports.go
+
+Add a blank import to `internal/app/imports.go`:
+
+```go
+// internal/app/imports.go
+package app
+
+import (
+    // Built-in providers
+    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
+    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid"  // ← Add this
+)
+```
+
+### 4. Configure in YAML
+
+The configuration system already supports any key-value pairs. Just add to your `configs/local.yml`:
+
+```yaml
+providers:
+  defaults:
+    email: sendgrid
+  email:
+    sendgrid:
+      api_key: "your-api-key"
+      from_email: "noreply@example.com"
+      from_name: "My App"
+```
+
+**Note:** No changes to `config.go` are needed! The `CommonConfig.Extra` map captures any additional fields.
+
+### 5. Add Tests
 
 ```go
 // internal/infrastructure/provider/sendgrid/sendgrid_test.go
@@ -137,27 +151,46 @@ func TestNew(t *testing.T) {
 }
 ```
 
-### 5. Run Quality Checks
+### 6. Run Quality Checks
 
 ```bash
 make audit  # Runs fmt, lint, test, vulncheck
 ```
 
-## Project Structure
+## Architecture: Why Self-Registration?
 
-When adding a new provider, follow this structure:
+The registry pattern follows **SOLID principles**:
+
+| Principle | How We Apply It |
+|-----------|-----------------|
+| **Open/Closed** | Add providers without modifying existing code |
+| **Single Responsibility** | Each provider manages only its registration |
+| **Dependency Inversion** | Providers depend on `port` interfaces, not concrete types |
+
+```
+┌─────────────────┐     registers      ┌──────────────┐
+│ sendgrid/       │─────────────────►  │ app/         │
+│  register.go    │   via init()       │  providers   │
+│  sendgrid.go    │                    │  (registry)  │
+└─────────────────┘                    └──────────────┘
+```
+
+## Project Structure
 
 ```
 internal/infrastructure/provider/
 ├── mailgun/
-│   └── mailgun.go      # Mailgun implementation
+│   ├── mailgun.go      # Implementation
+│   └── register.go     # Self-registration
 ├── memory/
 │   ├── store.go        # Shared message store
 │   ├── email.go        # Memory email provider
+│   ├── register.go     # Self-registration
 │   └── ...
 └── sendgrid/           # Your new provider
-    ├── sendgrid.go
-    └── sendgrid_test.go
+    ├── sendgrid.go     # Implementation
+    ├── sendgrid_test.go
+    └── register.go     # Self-registration ← KEY FILE
 ```
 
 ## Pull Request
@@ -180,8 +213,8 @@ See [Workflow Guide](./workflow.md) for full details.
 - [ ] `make audit` passes
 - [ ] Tests added with good coverage
 - [ ] Interface check: `var _ port.EmailSender = (*Provider)(nil)`
-- [ ] Configuration added to `internal/app/config.go`
-- [ ] Provider registered in `internal/app/providers.go`
+- [ ] `register.go` with `init()` for self-registration
+- [ ] Blank import added to `internal/app/imports.go`
 - [ ] Commit messages follow [conventions](./workflow.md#commit-conventions)
 
 ## Related Documentation

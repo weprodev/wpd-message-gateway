@@ -46,6 +46,37 @@ var _ port.EmailSender = (*Provider)(nil)
 
 Define interfaces in `internal/core/port/`, not alongside implementations.
 
+## Provider Registration
+
+Use the **self-registration pattern** via `init()`:
+
+```go
+// internal/infrastructure/provider/sendgrid/register.go
+package sendgrid
+
+import (
+    "github.com/weprodev/wpd-message-gateway/internal/core/port"
+    "github.com/weprodev/wpd-message-gateway/internal/app/registry"
+)
+
+func init() {
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ port.MessageStore, _ registry.MailpitConfig) (port.EmailSender, error) {
+        return New(Config{
+            APIKey:    cfg.APIKey,
+            FromEmail: cfg.FromEmail,
+        })
+    })
+}
+```
+
+**Why:** Follows Open/Closed Principle — add providers without modifying business logic.
+
+**Required:** Add blank import in `internal/app/imports.go`:
+
+```go
+_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid"
+```
+
 ## Context
 
 First parameter for any I/O operation:

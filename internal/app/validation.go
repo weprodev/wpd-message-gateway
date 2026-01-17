@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 	"strings"
+
+	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
 )
 
 // ValidateConfig validates required configuration.
@@ -12,7 +14,7 @@ func ValidateConfig(cfg *Config) error {
 	// At least one default provider should be configured
 	if cfg.DefaultEmailProvider() == "" {
 		missingProviders = append(missingProviders, "EMAIL")
-	} else if !IsKnownProvider(cfg.DefaultEmailProvider()) {
+	} else if !registry.IsEmailProviderRegistered(cfg.DefaultEmailProvider()) {
 		return fmt.Errorf(
 			"missing or invalid required configuration: MESSAGE_DEFAULT_EMAIL_PROVIDER (unknown provider: %s)",
 			cfg.DefaultEmailProvider(),
@@ -21,7 +23,7 @@ func ValidateConfig(cfg *Config) error {
 
 	if cfg.DefaultSMSProvider() == "" {
 		missingProviders = append(missingProviders, "SMS")
-	} else if !IsKnownProvider(cfg.DefaultSMSProvider()) {
+	} else if !registry.IsSMSProviderRegistered(cfg.DefaultSMSProvider()) {
 		return fmt.Errorf(
 			"missing or invalid required configuration: MESSAGE_DEFAULT_SMS_PROVIDER (unknown provider: %s)",
 			cfg.DefaultSMSProvider(),
@@ -30,7 +32,7 @@ func ValidateConfig(cfg *Config) error {
 
 	if cfg.DefaultPushProvider() == "" {
 		missingProviders = append(missingProviders, "PUSH")
-	} else if !IsKnownProvider(cfg.DefaultPushProvider()) {
+	} else if !registry.IsPushProviderRegistered(cfg.DefaultPushProvider()) {
 		return fmt.Errorf(
 			"missing or invalid required configuration: MESSAGE_DEFAULT_PUSH_PROVIDER (unknown provider: %s)",
 			cfg.DefaultPushProvider(),
@@ -39,7 +41,7 @@ func ValidateConfig(cfg *Config) error {
 
 	if cfg.DefaultChatProvider() == "" {
 		missingProviders = append(missingProviders, "CHAT")
-	} else if !IsKnownProvider(cfg.DefaultChatProvider()) {
+	} else if !registry.IsChatProviderRegistered(cfg.DefaultChatProvider()) {
 		return fmt.Errorf(
 			"missing or invalid required configuration: MESSAGE_DEFAULT_CHAT_PROVIDER (unknown provider: %s)",
 			cfg.DefaultChatProvider(),
