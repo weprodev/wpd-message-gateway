@@ -1,0 +1,43 @@
+name: Cleanup
+
+on:
+    schedule:
+        # Run monthly on the 1st at 00:00 UTC
+        - cron: "0 0 1 * *"
+    workflow_dispatch:
+
+jobs:
+    cleanup-ghcr:
+        name: 🧹 Clean Old Container Images
+        runs-on: ubuntu-latest
+
+        permissions:
+            packages: write
+
+        steps:
+            - name: Delete old container versions
+              uses: actions/delete-package-versions@v5
+              with:
+                  package-name: wpd-message-gateway
+                  package-type: container
+                  min-versions-to-keep: 10
+                  delete-only-untagged-versions: true
+
+            - name: Delete old pre-release versions
+              uses: actions/delete-package-versions@v5
+              with:
+                  package-name: wpd-message-gateway
+                  package-type: container
+                  min-versions-to-keep: 5
+                  delete-only-pre-release-versions: true
+
+            - name: Summary
+              run: |
+                  echo "## 🧹 Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "✅ Old container images cleaned up" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Policy:**" >> $GITHUB_STEP_SUMMARY
+                  echo "- Keep last 10 tagged versions" >> $GITHUB_STEP_SUMMARY
+                  echo "- Delete untagged images" >> $GITHUB_STEP_SUMMARY
+                  echo "- Keep last 5 pre-release versions" >> $GITHUB_STEP_SUMMARY
