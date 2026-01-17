@@ -1,0 +1,65 @@
+meta {
+  name: Get Rich Push
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/push/{{richPushId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should have all push notification fields", function() {
+    const push = res.body.push;
+    
+    // Device tokens
+    expect(push.device_tokens).to.be.an("array");
+    expect(push.device_tokens.length).to.equal(2);
+    
+    // Title with emoji
+    expect(push.title).to.include("Flash Sale");
+    expect(push.title).to.include("🎁");
+    expect(push.title).to.include("50%");
+    
+    // Body
+    expect(push.body).to.include("Don't miss out");
+    expect(push.body).to.include("2 hours");
+  });
+
+  test("should have rich data payload", function() {
+    const data = res.body.push.data;
+    
+    expect(data).to.be.an("object");
+    
+    // Promotion info
+    expect(data.type).to.equal("promotion");
+    expect(data.promotion_id).to.equal("FLASH-SALE-2026");
+    expect(data.discount_percent).to.equal("50");
+    
+    // Deep link
+    expect(data.deep_link).to.include("myapp://");
+    expect(data.deep_link).to.include("promotions");
+    
+    // Image URL
+    expect(data.image_url).to.include("https://");
+    expect(data.image_url).to.include("picsum.photos");
+    
+    // Action and category
+    expect(data.action).to.equal("open_promotion");
+    expect(data.category).to.equal("sales");
+    expect(data.priority).to.equal("high");
+  });
+
+  test("should have badge and sound", function() {
+    const push = res.body.push;
+    
+    expect(push.badge).to.equal(5);
+    expect(push.sound).to.equal("promotion_alert.wav");
+  });
+}

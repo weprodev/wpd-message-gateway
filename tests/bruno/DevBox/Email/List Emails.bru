@@ -1,0 +1,30 @@
+meta {
+  name: List Emails
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/emails
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return array", function() {
+    expect(res.body).to.be.an("array");
+  });
+
+  test("should have email with required fields", function() {
+    if (res.body.length > 0) {
+      const email = res.body[0];
+      expect(email).to.have.property("id");
+      expect(email).to.have.property("email");
+      expect(email).to.have.property("created_at");
+    }
+  });
+}

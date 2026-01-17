@@ -4,9 +4,9 @@ import "context"
 
 // SMS represents an SMS message to be sent
 type SMS struct {
-	From    string   // Sender phone number or alphanumeric ID
-	To      []string // Recipient phone numbers (E.164 format recommended)
-	Message string   // SMS content (max 160 chars for single SMS)
+	From    string   `json:"from,omitempty"` // Sender phone number or alphanumeric ID
+	To      []string `json:"to"`             // Recipient phone numbers (E.164 format recommended)
+	Message string   `json:"message"`        // SMS content (max 160 chars for single SMS)
 }
 
 // SMSSender defines the contract for sending SMS messages

@@ -1,34 +1,21 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to Go Message Gateway!
-
-## Getting Started
+## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
-
-# Install dependencies and tools
-make setup
-
-# Run tests
+make install
 make test
-
-# Run all quality checks
-make audit
 ```
 
 ## Adding a New Provider
 
-### 1. Create Provider Directory
+### 1. Create the Provider
 
 ```bash
-mkdir -p providers/{type}/{provider}
-# Example: providers/email/sendgrid
+mkdir -p providers/email/sendgrid
 ```
-
-### 2. Implement the Contract
 
 ```go
 // providers/email/sendgrid/sendgrid.go
@@ -38,7 +25,6 @@ import (
     "context"
     "github.com/weprodev/wpd-message-gateway/config"
     "github.com/weprodev/wpd-message-gateway/contracts"
-    msgerrors "github.com/weprodev/wpd-message-gateway/errors"
 )
 
 const ProviderName = "sendgrid"
@@ -47,15 +33,14 @@ const ProviderName = "sendgrid"
 var _ contracts.EmailSender = (*Provider)(nil)
 
 type Provider struct {
-    config config.ProviderConfig
-    // ... provider-specific fields
+    apiKey string
 }
 
-func New(cfg config.ProviderConfig) (*Provider, error) {
+func New(cfg config.EmailConfig) (*Provider, error) {
     if cfg.APIKey == "" {
-        return nil, msgerrors.NewConfigError(ProviderName, "APIKey", "required")
+        return nil, fmt.Errorf("sendgrid: API key required")
     }
-    return &Provider{config: cfg}, nil
+    return &Provider{apiKey: cfg.APIKey}, nil
 }
 
 func (p *Provider) Name() string {
@@ -63,170 +48,61 @@ func (p *Provider) Name() string {
 }
 
 func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-    // Validate input
-    if len(email.To) == 0 {
-        return nil, msgerrors.NewProviderError(ProviderName, "recipient required", 400, nil)
-    }
-    
-    // Implementation here...
-    
-    return &contracts.SendResult{
-        ID:         "message-id",
-        StatusCode: 200,
-        Message:    "Email sent successfully",
-    }, nil
+    // Your implementation here
+    return &contracts.SendResult{ID: "msg-123"}, nil
 }
 ```
 
-### 3. Add Tests
+### 2. Add Tests
 
 ```go
 // providers/email/sendgrid/sendgrid_test.go
-package sendgrid
-
-import (
-    "context"
-    "testing"
-    "github.com/weprodev/wpd-message-gateway/config"
-    "github.com/weprodev/wpd-message-gateway/contracts"
-)
-
 func TestNew(t *testing.T) {
-    tests := []struct {
-        name    string
-        cfg     config.ProviderConfig
-        wantErr bool
-    }{
-        {"valid config", config.ProviderConfig{APIKey: "key"}, false},
-        {"missing API key", config.ProviderConfig{}, true},
-    }
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            _, err := New(tt.cfg)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
-}
-
-func TestProvider_Send_Validation(t *testing.T) {
-    p, _ := New(config.ProviderConfig{APIKey: "key"})
-    
-    _, err := p.Send(context.Background(), &contracts.Email{})
+    _, err := New(config.EmailConfig{})
     if err == nil {
-        t.Error("expected error for empty recipients")
+        t.Error("expected error for missing API key")
     }
 }
 ```
 
-### 4. Register in Manager
+### 3. Register in Factory
 
-Add to `manager/manager.go`:
-
-```go
-import "github.com/weprodev/wpd-message-gateway/providers/email/sendgrid"
-
-func (m *Manager) initializeProviders() error {
-    for name, cfg := range m.config.Providers {
-        switch name {
-        case mailgun.ProviderName:
-            // existing...
-        case sendgrid.ProviderName:  // Add this
-            provider, err := sendgrid.New(cfg)
-            if err != nil {
-                return msgerrors.NewProviderError(name, "failed to initialize", 0, err)
-            }
-            m.emailProviders[name] = provider
-        }
-    }
-    return nil
-}
-```
-
-### 5. Add Example
+Add your provider to `manager/factory.go`:
 
 ```go
-// examples/email/sendgrid/main.go
-package main
-
-// Example code...
+case "sendgrid":
+    return sendgrid.New(cfg)
 ```
 
-## Pull Request Process
-
-### PR Title Format
-
-```
-feat(provider): add SendGrid email provider
-fix(mailgun): handle rate limit errors
-docs: update architecture diagram
-test: add integration tests for Twilio
-```
-
-### PR Checklist
-
-- [ ] Code follows [code conventions](./code-conventions.md)
-- [ ] Interface compliance check: `var _ contracts.X = (*Provider)(nil)`
-- [ ] Unit tests with >80% coverage
-- [ ] `make audit` passes (fmt, lint, test, vulncheck)
-- [ ] Documentation updated if needed
-- [ ] Example added for new provider
-
-### Review Process
-
-1. Create feature branch from `main`
-2. Make changes with atomic commits
-3. Run `make audit` locally
-4. Open PR with description
-5. Address review feedback
-6. Squash merge when approved
-
-## Testing Guidelines
-
-### Unit Tests
+### 4. Run Quality Checks
 
 ```bash
-make test          # All tests
-make test-cover    # With coverage
+make audit  # Runs fmt, lint, test, vulncheck
 ```
 
-### Mock Testing
+## Pull Request
 
-Use mock implementations for testing:
+### Commit Message Format
 
-```go
-type mockEmailSender struct {
-    sendCalled bool
-    lastEmail  *contracts.Email
-}
+We use [Conventional Commits](https://www.conventionalcommits.org/) for automatic versioning:
 
-func (m *mockEmailSender) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-    m.sendCalled = true
-    m.lastEmail = email
-    return &contracts.SendResult{ID: "mock-id"}, nil
-}
-
-func (m *mockEmailSender) Name() string { return "mock" }
+```
+feat(sendgrid): add email provider    → Minor release
+fix(mailgun): handle rate limits      → Patch release
+docs: update usage guide              → Patch release
+feat!: change API response format     → Major release
 ```
 
-### Integration Tests
+See [Workflow Guide](./workflow.md) for full details on commit conventions.
 
-Tag integration tests to run separately:
+### Checklist
 
-```go
-//go:build integration
-
-func TestSendGrid_Integration(t *testing.T) {
-    // Real API calls...
-}
-```
-
-```bash
-go test -tags=integration ./...
-```
+- [ ] `make audit` passes
+- [ ] Tests added
+- [ ] Interface check: `var _ contracts.X = (*Provider)(nil)`
+- [ ] Commit messages follow [conventions](./workflow.md#commit-conventions)
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - Understand the design
 - [Code Conventions](./code-conventions.md) - Coding standards
+- [Workflow Guide](./workflow.md) - CI/CD, commits, and releases

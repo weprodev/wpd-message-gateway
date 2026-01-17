@@ -41,16 +41,21 @@ This diagram shows how your application connects to the Gateway, how the Gateway
              /   \
             /_____\
                |
-      +--------+--------+
-      |                 |
-+------------+   +-------------+
-|   Mailgun  |   |  SendGrid   |
-+------------+   +-------------+
-| - apiKey   |   | - apiKey    |
-| - domain   |   |             |
-|            |   |             |
-| + Send()   |   | + Send()    |
-+------------+   +-------------+
+      +----------+---------------+---------+
+      |                  |                |
++------------+   +---------------+   +-------------+
+|   Memory   |   |    Mailgun    |   |  SendGrid   |
++------------+   +---------------+   +-------------+
+| - store    |   | - apiKey      |   | - apiKey    |
+| - forwarder|   | - domain      |   |             |
+| + Send()   |   | + Send()      |   | + Send()    |
++-----+------+   +---------------+   +-------------+
+      |
+      | (if MAILPIT_ENABLED=true)
+      v
++------------+
+|  Mailpit   |
++------------+
 ```
 
 ## Lifecycle Explanation
@@ -68,11 +73,13 @@ This diagram shows how your application connects to the Gateway, how the Gateway
     *   **Routing:** `Manager` looks up the correct `EmailSender` (the interface).
 
 4.  **Implementation (The Triangle)**
-    *   **Polymorphism:** The `Triangle` symbol (`/_\`) represents inheritance or implementation. `Mailgun` and `SendGrid` **implement** the `EmailSender` interface.
+    *   **Polymorphism:** The `Triangle` symbol (`/_\`) represents inheritance or implementation. `Memory`, `Mailgun`, and `SendGrid` all **implement** the `EmailSender` interface.
+    *   **Memory Provider:** Special development provider that stores messages in RAM (visible in DevBox UI) and optionally forwards to Mailpit.
     *   **Result:** The Manager accepts any provider that fits the "shape" of the interface, without knowing the specific details of the provider.
 
 ## Request Flow
 
+### Production Flow (Real Provider)
 ```text
 [ Your App ]
      |
@@ -80,13 +87,56 @@ This diagram shows how your application connects to the Gateway, how the Gateway
      v
 [ Manager ]
      |
-     | 1. Find Provider ("mailgun")
+     | MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun
      v
 [ Mailgun Provider ]
      |
-     | 2. Convert to API Request
+     | Convert to API Request
      v
-( Internet / External API )
+( Mailgun API → Email Delivered )
+```
+
+### Development Flow (Memory Provider)
+```text
+[ Your App ]
+     |
+     | SendEmail(email)
+     v
+[ Manager ]
+     |
+     | MESSAGE_DEFAULT_EMAIL_PROVIDER=memory
+     v
+[ Memory Provider ]
+     |
+     +------------------+------------------+
+     |                                     |
+     v                                     v
+[ RAM Storage ]                    [ SMTP Forwarder ]
+     |                              (if MAILPIT_ENABLED=true)
+     v                                     |
+[ DevBox UI ]                              v
+http://localhost:5173              [ Mailpit ]
+(all message types)                http://localhost:10103
+                                   (email preview)
+```
+
+### Memory Provider Configuration
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                        .env Config                          │
+├─────────────────────────────────────────────────────────────┤
+│ MESSAGE_DEFAULT_EMAIL_PROVIDER=memory   ← Required          │
+│ MAILPIT_ENABLED=true                    ← Optional          │
+└─────────────────────────────────────────────────────────────┘
+
+┌──────────────────────┬──────────────┬─────────────┐
+│ Config               │ DevBox UI    │ Mailpit     │
+├──────────────────────┼──────────────┼─────────────┤
+│ memory only          │ ✅ Yes       │ ❌ No       │
+│ memory + MAILPIT     │ ✅ Yes       │ ✅ Yes      │
+│ mailgun              │ ❌ No        │ ❌ No       │
+│ (not configured)     │ ❌ Error     │ ❌ Error    │
+└──────────────────────┴──────────────┴─────────────┘
 ```
 
 ## Core Concepts
@@ -154,7 +204,7 @@ We adhere strictly to the following engineering principles:
 
 ## Related Documentation
 
-- **[System Design & Lifecycle](./system-design.md)** - Visual diagrams of the architecture.
-- **[Usage Guide](./usage.md)** - How to use the package in your code.
-- **[Contributing](./contributing.md)** - Guide for adding new providers.
-1
+- [Usage Guide](./usage.md) - How to use the package
+- [Contributing](./contributing.md) - Guide for adding new providers
+- [Workflow](./workflow.md) - CI/CD and release process
+- [DevBox](./devbox.md) - Development UI for testing

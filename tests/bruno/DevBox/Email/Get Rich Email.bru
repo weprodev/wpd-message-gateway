@@ -1,0 +1,79 @@
+meta {
+  name: Get Rich Email
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/emails/{{richEmailId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should have all email fields populated", function() {
+    const email = res.body.email;
+    
+    // Sender fields
+    expect(email.from).to.equal("notifications@mycompany.com");
+    expect(email.from_name).to.equal("MyCompany Notifications");
+    
+    // Recipients
+    expect(email.to).to.be.an("array");
+    expect(email.to.length).to.equal(2);
+    expect(email.cc).to.be.an("array");
+    expect(email.cc.length).to.equal(1);
+    expect(email.bcc).to.be.an("array");
+    expect(email.bcc.length).to.equal(1);
+    
+    // Reply-to
+    expect(email.reply_to).to.equal("support@mycompany.com");
+    
+    // Subject with emoji
+    expect(email.subject).to.include("Order #12345");
+    expect(email.subject).to.include("🎉");
+  });
+
+  test("should have HTML content with tables and images", function() {
+    const html = res.body.email.html;
+    
+    // Check for table structure
+    expect(html).to.include("<table");
+    expect(html).to.include("</table>");
+    
+    // Check for images (placehold.co and picsum.photos)
+    expect(html).to.include("<img");
+    expect(html).to.include("placehold.co");
+    expect(html).to.include("picsum.photos");
+    
+    // Check for links
+    expect(html).to.include("<a href=");
+    expect(html).to.include("Track Your Order");
+    
+    // Check for styling
+    expect(html).to.include("style=");
+    expect(html).to.include("background-color");
+  });
+
+  test("should have plain text fallback", function() {
+    const plainText = res.body.email.plain_text;
+    
+    expect(plainText.length).to.be.greaterThan(100);
+    expect(plainText).to.include("Order Summary");
+    expect(plainText).to.include("$99.97");
+    expect(plainText).to.include("https://mycompany.com/track/12345");
+  });
+
+  test("should have custom headers", function() {
+    const headers = res.body.email.headers;
+    
+    expect(headers).to.be.an("object");
+    expect(headers["X-Priority"]).to.equal("1");
+    expect(headers["X-Campaign-ID"]).to.equal("order-shipped-2026");
+    expect(headers["List-Unsubscribe"]).to.include("unsubscribe");
+  });
+}

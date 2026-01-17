@@ -6,17 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "20"
+
 jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.22'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Check formatting
         run: |
@@ -33,21 +37,140 @@ jobs:
           version: latest
 
   test:
-    name: Test
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.22'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Run tests
-        run: go test -race -coverprofile=coverage.out ./...
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
           fail_ci_if_error: false
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: Build server binary
+        run: go build -o bin/server ./cmd/server
+
+      - name: Build sandbox binary
+        run: go build -o bin/sandbox ./cmd/sandbox
+
+  vulnerability:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run vulnerability check
+        run: govulncheck ./...
+
+  api-tests:
+    name: API Tests (Bruno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      - name: Start server
+        run: |
+          # Set memory providers for all message types
+          export MESSAGE_DEFAULT_EMAIL_PROVIDER=memory
+          export MESSAGE_DEFAULT_SMS_PROVIDER=memory
+          export MESSAGE_DEFAULT_PUSH_PROVIDER=memory
+          export MESSAGE_DEFAULT_CHAT_PROVIDER=memory
+
+          # Build and start server in background
+          go build -o bin/server ./cmd/server
+          ./bin/server &
+
+          # Wait for server to be ready
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/api/v1/stats > /dev/null 2>&1; then
+              echo "✅ Server is ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 1
+          done
+
+      - name: Run Bruno tests
+        run: |
+          cd tests/bruno
+          bru run --env local
+        env:
+          CI: true
+
+      - name: Stop server
+        if: always()
+        run: pkill -f "bin/server" || true
+
+  web-build:
+    name: Web Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: cd web && npm ci
+
+      - name: Type check
+        run: cd web && npm run build
+
+      - name: Check for build errors
+        run: |
+          if [ -d "web/dist" ]; then
+            echo "✅ Frontend build successful"
+            ls -la web/dist/
+          else
+            echo "❌ Frontend build failed"
+            exit 1
+          fi

@@ -29,6 +29,8 @@ go.work
 .Trashes
 ehthumbs.db
 Thumbs.db
+.history
+.cursor 
 
 # Environment files
 .env
@@ -42,3 +44,4 @@ Thumbs.db
 /bin/
 /dist/
 main
+serverbin/

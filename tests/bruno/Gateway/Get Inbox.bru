@@ -1,0 +1,21 @@
+meta {
+  name: Get Inbox
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/inbox
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return array", function() {
+    expect(res.body).to.be.an("array");
+  });
+}

@@ -1,0 +1,59 @@
+meta {
+  name: Ingest Rich Chat (WhatsApp Template)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "from": "+14155238886",
+    "to": ["+1234567890", "+0987654321"],
+    "message": "Hi {{1}}, your order #{{2}} has been shipped! 📦 Track it here: {{3}}",
+    "platform": "whatsapp",
+    "template_id": "order_shipped_v2",
+    "template_params": ["John", "ORD-2026-12345", "https://track.mycompany.com/ORD-2026-12345"],
+    "media_url": "https://picsum.photos/400/200",
+    "media_type": "image",
+    "buttons": [
+      {
+        "id": "track_order",
+        "text": "🚚 Track Order",
+        "url": "https://track.mycompany.com/ORD-2026-12345"
+      },
+      {
+        "id": "contact_support",
+        "text": "💬 Contact Support",
+        "phone": "+14155238886"
+      },
+      {
+        "id": "view_details",
+        "text": "📋 View Order Details",
+        "url": "https://mycompany.com/orders/ORD-2026-12345"
+      }
+    ],
+    "metadata": {
+      "order_id": "ORD-2026-12345",
+      "customer_id": "CUST-789",
+      "campaign": "order_notifications",
+      "priority": "high"
+    }
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("richChatId", res.body.id);
+  });
+}

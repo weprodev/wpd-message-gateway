@@ -1,0 +1,35 @@
+meta {
+  name: Ingest Push
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/push
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "device_tokens": ["token-abc-123", "token-xyz-456"],
+    "title": "New Message",
+    "body": "You have a new message from John",
+    "data": {
+      "action": "open_chat",
+      "chat_id": "12345"
+    }
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("pushId", res.body.id);
+  });
+}

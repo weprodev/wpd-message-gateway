@@ -4,12 +4,12 @@ import "context"
 
 // PushNotification represents a push notification to be sent
 type PushNotification struct {
-	DeviceTokens []string          // Target device tokens
-	Title        string            // Notification title
-	Body         string            // Notification body
-	Data         map[string]string // Custom data payload
-	Badge        *int              // Badge count (optional)
-	Sound        string            // Notification sound (optional)
+	DeviceTokens []string          `json:"device_tokens"`   // Target device tokens
+	Title        string            `json:"title"`           // Notification title
+	Body         string            `json:"body"`            // Notification body
+	Data         map[string]string `json:"data,omitempty"`  // Custom data payload
+	Badge        *int              `json:"badge,omitempty"` // Badge count (optional)
+	Sound        string            `json:"sound,omitempty"` // Notification sound (optional)
 }
 
 // PushSender defines the contract for sending push notifications

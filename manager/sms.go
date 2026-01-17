@@ -7,27 +7,40 @@ import (
 	msgerrors "github.com/weprodev/wpd-message-gateway/errors"
 )
 
-// SMS returns the default SMS sender
+// SMS returns the default SMS sender.
 func (m *Manager) SMS() (contracts.SMSSender, error) {
-	if m.config.DefaultSMSProvider == "" {
+	providerName := m.config.DefaultSMSProvider()
+	if providerName == "" {
 		return nil, msgerrors.NewProviderNotFoundError("sms", "default (none configured)")
 	}
-	return m.SMSProvider(m.config.DefaultSMSProvider)
+	return m.SMSProvider(providerName)
 }
 
-// SMSProvider returns a specific SMS provider by name
+// SMSProvider returns a specific SMS provider by name.
+// Providers are created lazily if they don't exist yet.
 func (m *Manager) SMSProvider(name string) (contracts.SMSSender, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	// Try to get from registry first
+	provider, ok := m.registry.GetSMSProvider(name)
+	if ok {
+		return provider, nil
+	}
 
-	provider, ok := m.smsProviders[name]
+	// Provider doesn't exist, try to create it lazily
+	memStore := m.registry.GetMemoryStore()
+	if err := m.ensureSMSProvider(name, memStore); err != nil {
+		return nil, msgerrors.NewProviderNotFoundError("sms", name)
+	}
+
+	// Get the newly created provider
+	provider, ok = m.registry.GetSMSProvider(name)
 	if !ok {
 		return nil, msgerrors.NewProviderNotFoundError("sms", name)
 	}
+
 	return provider, nil
 }
 
-// SendSMS sends an SMS using the default provider
+// SendSMS sends an SMS using the default provider.
 func (m *Manager) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.SendResult, error) {
 	provider, err := m.SMS()
 	if err != nil {
@@ -36,7 +49,7 @@ func (m *Manager) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.S
 	return provider.Send(ctx, sms)
 }
 
-// SendSMSWith sends an SMS using a specific provider
+// SendSMSWith sends an SMS using a specific provider.
 func (m *Manager) SendSMSWith(ctx context.Context, providerName string, sms *contracts.SMS) (*contracts.SendResult, error) {
 	provider, err := m.SMSProvider(providerName)
 	if err != nil {
@@ -45,21 +58,38 @@ func (m *Manager) SendSMSWith(ctx context.Context, providerName string, sms *con
 	return provider.Send(ctx, sms)
 }
 
-// RegisterSMSProvider registers a custom SMS provider
+// RegisterSMSProvider registers a custom SMS provider.
 func (m *Manager) RegisterSMSProvider(name string, provider contracts.SMSSender) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.smsProviders[name] = provider
+	m.registry.RegisterSMSProvider(name, provider)
 }
 
-// AvailableSMSProviders returns the names of all registered SMS providers
+// AvailableSMSProviders returns the names of all registered SMS providers.
 func (m *Manager) AvailableSMSProviders() []string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	providers := make([]string, 0)
 
-	names := make([]string, 0, len(m.smsProviders))
-	for name := range m.smsProviders {
-		names = append(names, name)
+	// Check common providers
+	commonProviders := []string{"memory"}
+	for _, name := range commonProviders {
+		if _, ok := m.registry.GetSMSProvider(name); ok {
+			providers = append(providers, name)
+		}
 	}
-	return names
+
+	// Check configured providers
+	for name := range m.config.SMSProviders {
+		if _, ok := m.registry.GetSMSProvider(name); ok {
+			found := false
+			for _, p := range providers {
+				if p == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				providers = append(providers, name)
+			}
+		}
+	}
+
+	return providers
 }

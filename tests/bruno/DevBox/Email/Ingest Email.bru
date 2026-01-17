@@ -1,0 +1,34 @@
+meta {
+  name: Ingest Email
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/email
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "to": ["user@example.com"],
+    "cc": ["cc@example.com"],
+    "subject": "Welcome to Our Service",
+    "html": "<h1>Welcome!</h1><p>Thank you for joining us.</p>",
+    "plain_text": "Welcome! Thank you for joining us.",
+    "reply_to": "support@example.com"
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("emailId", res.body.id);
+  });
+}

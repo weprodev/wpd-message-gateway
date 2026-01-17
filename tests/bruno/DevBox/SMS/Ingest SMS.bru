@@ -1,0 +1,31 @@
+meta {
+  name: Ingest SMS
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/sms
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "to": ["+1234567890"],
+    "message": "Your verification code is 123456",
+    "from": "+0987654321"
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("smsId", res.body.id);
+  });
+}

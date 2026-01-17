@@ -1,0 +1,30 @@
+meta {
+  name: List Push
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/push
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return array", function() {
+    expect(res.body).to.be.an("array");
+  });
+
+  test("should have push with required fields", function() {
+    if (res.body.length > 0) {
+      const push = res.body[0];
+      expect(push).to.have.property("id");
+      expect(push).to.have.property("push");
+      expect(push).to.have.property("created_at");
+    }
+  });
+}

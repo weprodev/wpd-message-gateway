@@ -8,12 +8,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/weprodev/wpd-message-gateway/config"
 	"github.com/weprodev/wpd-message-gateway/contracts"
 	"github.com/weprodev/wpd-message-gateway/manager"
@@ -21,12 +22,12 @@ import (
 
 func main() {
 	// Load .env file from current directory (optional, falls back to system env)
-	if err := godotenv.Load(); err != nil {
+	if err := loadEnvFile(".env"); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
 
 	// Load configuration
-	cfg, err := config.LoadFromEnv()
+	cfg, err := config.LoadConfig("")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -65,6 +66,36 @@ func main() {
 	}
 
 	log.Printf("✅ Email sent successfully!")
-	log.Printf("   Provider: %s", cfg.DefaultEmailProvider)
+	log.Printf("Default Email Provider: %s", cfg.DefaultEmailProvider())
 	log.Printf("   Message ID: %s", result.ID)
+}
+
+// loadEnvFile loads environment variables from a file (simple .env loader).
+func loadEnvFile(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if idx := strings.Index(line, "="); idx != -1 {
+			key := strings.TrimSpace(line[:idx])
+			value := strings.TrimSpace(line[idx+1:])
+			// Remove quotes
+			if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') ||
+				(value[0] == '\'' && value[len(value)-1] == '\'')) {
+				value = value[1 : len(value)-1]
+			}
+			if os.Getenv(key) == "" {
+				_ = os.Setenv(key, value)
+			}
+		}
+	}
+	return scanner.Err()
 }

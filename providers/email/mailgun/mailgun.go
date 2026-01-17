@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mailgun/mailgun-go/v4"
+
 	"github.com/weprodev/wpd-message-gateway/config"
 	"github.com/weprodev/wpd-message-gateway/contracts"
 	msgerrors "github.com/weprodev/wpd-message-gateway/errors"
