@@ -1,232 +1,224 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to Go Message Gateway!
-
-## Getting Started
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/weprodev/wpd-message-gateway.git
+git clone git@github.com:weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
-
-# Install dependencies and tools
-make setup
-
-# Run tests
-make test
-
-# Run all quality checks
-make audit
+make install
 ```
 
 ## Adding a New Provider
 
-### 1. Create Provider Directory
+Adding a new provider **does not require modifying existing code** — just create your provider files. This follows the Open/Closed Principle (OCP).
+
+### 1. Create the Provider
 
 ```bash
-mkdir -p providers/{type}/{provider}
-# Example: providers/email/sendgrid
+mkdir -p internal/infrastructure/provider/sendgrid
 ```
 
-### 2. Implement the Contract
-
 ```go
-// providers/email/sendgrid/sendgrid.go
+// internal/infrastructure/provider/sendgrid/sendgrid.go
 package sendgrid
 
 import (
     "context"
-    "github.com/weprodev/wpd-message-gateway/config"
-    "github.com/weprodev/wpd-message-gateway/contracts"
-    msgerrors "github.com/weprodev/wpd-message-gateway/errors"
+    "fmt"
+
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
 const ProviderName = "sendgrid"
 
-// Compile-time interface check
-var _ contracts.EmailSender = (*Provider)(nil)
-
-type Provider struct {
-    config config.ProviderConfig
-    // ... provider-specific fields
+// Config holds SendGrid configuration.
+type Config struct {
+    APIKey    string
+    FromEmail string
+    FromName  string
 }
 
-func New(cfg config.ProviderConfig) (*Provider, error) {
+// Provider implements port.EmailSender for SendGrid.
+type Provider struct {
+    config Config
+}
+
+// New creates a new SendGrid provider.
+func New(cfg Config) (*Provider, error) {
     if cfg.APIKey == "" {
-        return nil, msgerrors.NewConfigError(ProviderName, "APIKey", "required")
+        return nil, fmt.Errorf("sendgrid: API key required")
     }
     return &Provider{config: cfg}, nil
 }
 
+// Name returns the provider name.
 func (p *Provider) Name() string {
     return ProviderName
 }
 
+// Send sends an email via SendGrid.
 func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-    // Validate input
-    if len(email.To) == 0 {
-        return nil, msgerrors.NewProviderError(ProviderName, "recipient required", 400, nil)
-    }
-    
-    // Implementation here...
-    
+    // Your SendGrid implementation here
     return &contracts.SendResult{
-        ID:         "message-id",
-        StatusCode: 200,
-        Message:    "Email sent successfully",
+        ID:      "msg-123",
+        Message: "sent",
     }, nil
 }
 ```
 
-### 3. Add Tests
+### 2. Register the Provider (Self-Registration)
+
+Create a `register.go` file that uses `init()` to self-register:
 
 ```go
-// providers/email/sendgrid/sendgrid_test.go
+// internal/infrastructure/provider/sendgrid/register.go
 package sendgrid
 
 import (
-    "context"
-    "testing"
-    "github.com/weprodev/wpd-message-gateway/config"
-    "github.com/weprodev/wpd-message-gateway/contracts"
+    "github.com/weprodev/wpd-message-gateway/internal/core/port"
+    "github.com/weprodev/wpd-message-gateway/internal/app/registry"
 )
+
+func init() {
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ port.MessageStore, _ registry.MailpitConfig) (port.EmailSender, error) {
+        return New(Config{
+            APIKey:    cfg.APIKey,
+            FromEmail: cfg.FromEmail,
+            FromName:  cfg.FromName,
+        })
+    })
+}
+```
+
+### 3. Add Import in imports.go
+
+Add a blank import to `internal/app/imports.go`:
+
+```go
+// internal/app/imports.go
+package app
+
+import (
+    // Built-in providers
+    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
+    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid"  // ← Add this
+)
+```
+
+### 4. Configure in YAML
+
+The configuration system already supports any key-value pairs. Just add to your `configs/local.yml`:
+
+```yaml
+providers:
+  defaults:
+    email: sendgrid
+  email:
+    sendgrid:
+      api_key: "your-api-key"
+      from_email: "noreply@example.com"
+      from_name: "My App"
+```
+
+**Note:** No changes to `config.go` are needed! The `CommonConfig.Extra` map captures any additional fields.
+
+### 5. Add Tests
+
+```go
+// internal/infrastructure/provider/sendgrid/sendgrid_test.go
+package sendgrid
+
+import "testing"
 
 func TestNew(t *testing.T) {
     tests := []struct {
         name    string
-        cfg     config.ProviderConfig
+        cfg     Config
         wantErr bool
     }{
-        {"valid config", config.ProviderConfig{APIKey: "key"}, false},
-        {"missing API key", config.ProviderConfig{}, true},
+        {"valid", Config{APIKey: "key"}, false},
+        {"missing key", Config{}, true},
     }
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             _, err := New(tt.cfg)
             if (err != nil) != tt.wantErr {
-                t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+                t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
             }
         })
     }
 }
-
-func TestProvider_Send_Validation(t *testing.T) {
-    p, _ := New(config.ProviderConfig{APIKey: "key"})
-    
-    _, err := p.Send(context.Background(), &contracts.Email{})
-    if err == nil {
-        t.Error("expected error for empty recipients")
-    }
-}
 ```
 
-### 4. Register in Manager
-
-Add to `manager/manager.go`:
-
-```go
-import "github.com/weprodev/wpd-message-gateway/providers/email/sendgrid"
-
-func (m *Manager) initializeProviders() error {
-    for name, cfg := range m.config.Providers {
-        switch name {
-        case mailgun.ProviderName:
-            // existing...
-        case sendgrid.ProviderName:  // Add this
-            provider, err := sendgrid.New(cfg)
-            if err != nil {
-                return msgerrors.NewProviderError(name, "failed to initialize", 0, err)
-            }
-            m.emailProviders[name] = provider
-        }
-    }
-    return nil
-}
-```
-
-### 5. Add Example
-
-```go
-// examples/email/sendgrid/main.go
-package main
-
-// Example code...
-```
-
-## Pull Request Process
-
-### PR Title Format
-
-```
-feat(provider): add SendGrid email provider
-fix(mailgun): handle rate limit errors
-docs: update architecture diagram
-test: add integration tests for Twilio
-```
-
-### PR Checklist
-
-- [ ] Code follows [code conventions](./code-conventions.md)
-- [ ] Interface compliance check: `var _ contracts.X = (*Provider)(nil)`
-- [ ] Unit tests with >80% coverage
-- [ ] `make audit` passes (fmt, lint, test, vulncheck)
-- [ ] Documentation updated if needed
-- [ ] Example added for new provider
-
-### Review Process
-
-1. Create feature branch from `main`
-2. Make changes with atomic commits
-3. Run `make audit` locally
-4. Open PR with description
-5. Address review feedback
-6. Squash merge when approved
-
-## Testing Guidelines
-
-### Unit Tests
+### 6. Run Quality Checks
 
 ```bash
-make test          # All tests
-make test-cover    # With coverage
+make audit  # Runs fmt, lint, test, vulncheck
 ```
 
-### Mock Testing
+## Architecture: Why Self-Registration?
 
-Use mock implementations for testing:
+The registry pattern follows **SOLID principles**:
 
-```go
-type mockEmailSender struct {
-    sendCalled bool
-    lastEmail  *contracts.Email
-}
+| Principle | How We Apply It |
+|-----------|-----------------|
+| **Open/Closed** | Add providers without modifying existing code |
+| **Single Responsibility** | Each provider manages only its registration |
+| **Dependency Inversion** | Providers depend on `port` interfaces, not concrete types |
 
-func (m *mockEmailSender) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-    m.sendCalled = true
-    m.lastEmail = email
-    return &contracts.SendResult{ID: "mock-id"}, nil
-}
-
-func (m *mockEmailSender) Name() string { return "mock" }
+```
+┌─────────────────┐     registers      ┌──────────────┐
+│ sendgrid/       │─────────────────►  │ app/         │
+│  register.go    │   via init()       │  providers   │
+│  sendgrid.go    │                    │  (registry)  │
+└─────────────────┘                    └──────────────┘
 ```
 
-### Integration Tests
+## Project Structure
 
-Tag integration tests to run separately:
-
-```go
-//go:build integration
-
-func TestSendGrid_Integration(t *testing.T) {
-    // Real API calls...
-}
+```
+internal/infrastructure/provider/
+├── mailgun/
+│   ├── mailgun.go      # Implementation
+│   └── register.go     # Self-registration
+├── memory/
+│   ├── store.go        # Shared message store
+│   ├── email.go        # Memory email provider
+│   ├── register.go     # Self-registration
+│   └── ...
+└── sendgrid/           # Your new provider
+    ├── sendgrid.go     # Implementation
+    ├── sendgrid_test.go
+    └── register.go     # Self-registration ← KEY FILE
 ```
 
-```bash
-go test -tags=integration ./...
+## Pull Request
+
+### Commit Message Format
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for automatic versioning:
+
 ```
+feat(sendgrid): add email provider    → Minor release
+fix(mailgun): handle rate limits      → Patch release
+docs: update usage guide              → Patch release
+feat!: change API response format     → Major release
+```
+
+See [Workflow Guide](./workflow.md) for full details.
+
+### Checklist
+
+- [ ] `make audit` passes
+- [ ] Tests added with good coverage
+- [ ] Interface check: `var _ port.EmailSender = (*Provider)(nil)`
+- [ ] `register.go` with `init()` for self-registration
+- [ ] Blank import added to `internal/app/imports.go`
+- [ ] Commit messages follow [conventions](./workflow.md#commit-conventions)
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - Understand the design
-- [Code Conventions](./code-conventions.md) - Coding standards
+- [Architecture](./architecture.md) — System design
+- [Code Conventions](./code-conventions.md) — Coding standards
+- [Workflow Guide](./workflow.md) — CI/CD, commits, and releases

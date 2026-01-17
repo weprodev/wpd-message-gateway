@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    name: 📦 Release
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get latest tag
+        id: tag
+        run: |
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.version_type }}" >> $GITHUB_OUTPUT
+          else
+            LATEST="${{ steps.tag.outputs.latest }}"
+            COMMITS=$([ "$LATEST" == "v0.0.0" ] && git log --oneline || git log ${LATEST}..HEAD --oneline)
+            
+            if echo "$COMMITS" | grep -qiE "(BREAKING CHANGE|^[a-z]+!:)"; then
+              echo "type=major" >> $GITHUB_OUTPUT
+            elif echo "$COMMITS" | grep -qiE "^[a-f0-9]+ feat"; then
+              echo "type=minor" >> $GITHUB_OUTPUT
+            else
+              echo "type=patch" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Calculate version
+        id: version
+        run: |
+          LATEST="${{ steps.tag.outputs.latest }}"
+          BUMP="${{ steps.bump.outputs.type }}"
+          VERSION=${LATEST#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          
+          case $BUMP in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          
+          echo "new=v${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
+
+      - name: Check skip
+        id: check
+        run: |
+          if [ "${{ steps.tag.outputs.latest }}" == "${{ steps.version.outputs.new }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          LATEST="${{ steps.tag.outputs.latest }}"
+          NEW="${{ steps.version.outputs.new }}"
+          
+          cat > CHANGELOG.md << EOF
+          ## What's Changed in $NEW
+          
+          EOF
+          
+          if [ "$LATEST" == "v0.0.0" ]; then
+            git log --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          else
+            git log ${LATEST}..HEAD --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          fi
+          
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST}...${NEW}" >> CHANGELOG.md
+
+      - name: Create tag
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.new }}" -m "Release ${{ steps.version.outputs.new }}"
+          git push origin "${{ steps.version.outputs.new }}"
+
+      - name: Create release
+        if: steps.check.outputs.skip != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.new }}
+          name: ${{ steps.version.outputs.new }}
+          body_path: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## 📦 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Previous | \`${{ steps.tag.outputs.latest }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bump | ${{ steps.bump.outputs.type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| New | \`${{ steps.version.outputs.new }}\` |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.skip }}" == "true" ]; then
+            echo "| Status | ⏭️ Skipped (no changes) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Status | ✅ Released |" >> $GITHUB_STEP_SUMMARY
+          fi

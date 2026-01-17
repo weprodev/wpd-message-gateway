@@ -1,0 +1,85 @@
+meta {
+  name: Get Rich Chat
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/chat/{{richChatId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should have all chat fields populated", function() {
+    const chat = res.body.chat;
+    
+    // Sender and recipients
+    expect(chat.from).to.equal("+14155238886");
+    expect(chat.to).to.be.an("array");
+    expect(chat.to.length).to.equal(2);
+    
+    // Platform
+    expect(chat.platform).to.equal("whatsapp");
+    
+    // Message with placeholders
+    expect(chat.message).to.include("{{1}}");
+    expect(chat.message).to.include("📦");
+  });
+
+  test("should have template configuration", function() {
+    const chat = res.body.chat;
+    
+    // Template ID
+    expect(chat.template_id).to.equal("order_shipped_v2");
+    
+    // Template parameters
+    expect(chat.template_params).to.be.an("array");
+    expect(chat.template_params.length).to.equal(3);
+    expect(chat.template_params[0]).to.equal("John");
+    expect(chat.template_params[1]).to.include("ORD-2026");
+  });
+
+  test("should have media attachment", function() {
+    const chat = res.body.chat;
+    
+    expect(chat.media_url).to.include("https://");
+    expect(chat.media_url).to.include("picsum.photos");
+    expect(chat.media_type).to.equal("image");
+  });
+
+  test("should have interactive buttons", function() {
+    const buttons = res.body.chat.buttons;
+    
+    expect(buttons).to.be.an("array");
+    expect(buttons.length).to.equal(3);
+    
+    // Track order button (URL type)
+    const trackBtn = buttons.find(b => b.id === "track_order");
+    expect(trackBtn.text).to.include("Track Order");
+    expect(trackBtn.url).to.include("track.mycompany.com");
+    
+    // Contact support button (Phone type)
+    const supportBtn = buttons.find(b => b.id === "contact_support");
+    expect(supportBtn.text).to.include("Contact Support");
+    expect(supportBtn.phone).to.equal("+14155238886");
+    
+    // View details button
+    const detailsBtn = buttons.find(b => b.id === "view_details");
+    expect(detailsBtn.text).to.include("View Order");
+  });
+
+  test("should have metadata", function() {
+    const metadata = res.body.chat.metadata;
+    
+    expect(metadata).to.be.an("object");
+    expect(metadata.order_id).to.equal("ORD-2026-12345");
+    expect(metadata.customer_id).to.equal("CUST-789");
+    expect(metadata.campaign).to.equal("order_notifications");
+    expect(metadata.priority).to.equal("high");
+  });
+}

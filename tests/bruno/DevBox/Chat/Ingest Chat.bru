@@ -1,0 +1,33 @@
+meta {
+  name: Ingest Chat
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "to": ["+1234567890"],
+    "message": "Hello! How can I help you today?",
+    "platform": "whatsapp",
+    "template_name": "greeting",
+    "template_params": ["John", "Support Team"]
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("chatId", res.body.id);
+  });
+}

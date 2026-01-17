@@ -1,0 +1,30 @@
+meta {
+  name: Send Chat
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "to": ["+1234567890"],
+    "message": "Hello from the gateway!",
+    "platform": "whatsapp"
+  }
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+  });
+}

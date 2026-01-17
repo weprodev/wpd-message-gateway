@@ -1,0 +1,33 @@
+meta {
+  name: Get Stats
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/stats
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return email count", function() {
+    expect(res.body.emails).to.be.a("number");
+  });
+
+  test("should return sms count", function() {
+    expect(res.body.sms).to.be.a("number");
+  });
+
+  test("should return push count", function() {
+    expect(res.body.push).to.be.a("number");
+  });
+
+  test("should return chat count", function() {
+    expect(res.body.chat).to.be.a("number");
+  });
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Get Email by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/emails/{{emailId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return email object", function() {
+    expect(res.body).to.have.property("id");
+    expect(res.body).to.have.property("email");
+  });
+
+  test("should have email content", function() {
+    expect(res.body.email).to.have.property("to");
+    expect(res.body.email).to.have.property("subject");
+  });
+}

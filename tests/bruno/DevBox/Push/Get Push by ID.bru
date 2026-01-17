@@ -1,0 +1,22 @@
+meta {
+  name: Get Push by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/push/{{pushId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return push object", function() {
+    expect(res.body).to.have.property("id");
+    expect(res.body).to.have.property("push");
+  });
+}

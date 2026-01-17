@@ -1,0 +1,48 @@
+environment: local
+
+server:
+  port: 10101
+
+devbox:
+  enabled: true
+  port: 10104
+
+# Mailpit Integration (optional)
+# To use Mailpit, start it with: make mailpit
+mailpit:
+  enabled: true
+
+providers:
+  defaults:
+    email: memory
+    sms: memory
+    push: memory
+    chat: memory
+  
+  # Provider configurations
+  email:
+    memory: {}
+    # mailgun:
+    #   api_key: "key-1234567890"
+    #   domain: "mg.example.com"
+    #   from_email: "no-reply@mg.example.com"
+    #   base_url: "https://api.eu.mailgun.net" # Optional, defaults to US
+
+  sms:
+    memory: {}
+    # twilio:
+    #   account_sid: "AC..."
+    #   auth_token: "..."
+    #   from_number: "+15550000000"
+
+  push:
+    memory: {}
+    # fcm:
+    #   service_account_file: "path/to/service-account.json"
+    #   project_id: "my-project-id"
+
+  chat:
+    memory: {}
+    # slack:
+    #   webhook_url: "https://hooks.slack.com/services/..."
+

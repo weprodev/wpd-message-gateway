@@ -1,30 +1,24 @@
 # Usage Guide
 
-This guide covers how to use Go Message Gateway in your projects.
-
 ## Installation
+
+### As a Go Package
 
 ```bash
 go get github.com/weprodev/wpd-message-gateway
 ```
 
-## Quick Start
-
-### 1. Configure Environment
+### As an HTTP Server
 
 ```bash
-# Required: Set default provider and credentials
-export MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun
-export MESSAGE_MAILGUN_API_KEY=your-api-key
-export MESSAGE_MAILGUN_DOMAIN=mg.yourdomain.com
-export MESSAGE_MAILGUN_FROM_EMAIL=noreply@yourdomain.com
-export MESSAGE_MAILGUN_FROM_NAME=YourApp
-
-# Optional: EU region
-export MESSAGE_MAILGUN_BASE_URL=https://api.eu.mailgun.net
+git clone https://github.com/weprodev/wpd-message-gateway.git
+cd wpd-message-gateway
+make install
 ```
 
-### 2. Send Your First Email
+## Quick Start
+
+### Option 1: Go Package (Embedded SDK)
 
 ```go
 package main
@@ -33,16 +27,21 @@ import (
     "context"
     "log"
 
-    "github.com/weprodev/wpd-message-gateway/config"
-    "github.com/weprodev/wpd-message-gateway/contracts"
-    "github.com/weprodev/wpd-message-gateway/manager"
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+    "github.com/weprodev/wpd-message-gateway/pkg/gateway"
 )
 
 func main() {
-    cfg, _ := config.LoadFromEnv()
-    mgr, _ := manager.New(cfg)
+    // Create gateway with configuration
+    gw, err := gateway.New(gateway.Config{
+        DefaultEmailProvider: "memory",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
 
-    result, err := mgr.SendEmail(context.Background(), &contracts.Email{
+    // Send email
+    result, err := gw.SendEmail(context.Background(), &contracts.Email{
         To:      []string{"user@example.com"},
         Subject: "Welcome!",
         HTML:    "<h1>Hello!</h1>",
@@ -54,32 +53,69 @@ func main() {
 }
 ```
 
-## Configuration Methods
-
-### Environment Variables (Recommended)
+### Option 2: HTTP Server
 
 ```bash
-MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun
-MESSAGE_DEFAULT_SMS_PROVIDER=twilio
-MESSAGE_DEFAULT_CHAT_PROVIDER=whatsapp
+# 1. Configure
+cp configs/local.example.yml configs/local.yml
+# Edit configs/local.yml with your provider settings
 
-MESSAGE_{PROVIDER}_API_KEY=xxx
-MESSAGE_{PROVIDER}_DOMAIN=xxx
-MESSAGE_{PROVIDER}_FROM_EMAIL=xxx
-MESSAGE_{PROVIDER}_FROM_NAME=xxx
-MESSAGE_{PROVIDER}_BASE_URL=xxx  # optional
+# 2. Start server
+make start
+
+# 3. Send via HTTP
+curl -X POST http://localhost:10101/v1/email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": ["user@example.com"],
+    "subject": "Hello",
+    "html": "<h1>World</h1>"
+  }'
 ```
 
-### Programmatic Configuration
+## Configuration
+
+### YAML Configuration
+
+Create `configs/local.yml`:
+
+```yaml
+providers:
+  defaults:
+    email: mailgun
+    sms: twilio
+    push: firebase
+    chat: slack
+
+  email:
+    mailgun:
+      api_key: "key-xxxxxxxx"
+      domain: "mg.yourdomain.com"
+      from_email: "noreply@yourdomain.com"
+      from_name: "YourApp"
+```
+
+### Environment Variable Overrides
+
+Environment variables override YAML values (useful for secrets):
+
+```bash
+MESSAGE_MAILGUN_API_KEY=key-xxxxx
+MESSAGE_MAILGUN_DOMAIN=mg.example.com
+MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun
+```
+
+### SDK Configuration
 
 ```go
-cfg := config.NewConfig()
-cfg.DefaultEmailProvider = "mailgun"
-cfg.AddProvider("mailgun", config.ProviderConfig{
-    APIKey:    os.Getenv("MAILGUN_API_KEY"),
-    Domain:    "mg.yourdomain.com",
-    FromEmail: "noreply@yourdomain.com",
-    FromName:  "My App",
+gw, _ := gateway.New(gateway.Config{
+    DefaultEmailProvider: "mailgun",
+    Mailgun: gateway.MailgunConfig{
+        APIKey:    "key-xxxxxxxx",
+        Domain:    "mg.yourdomain.com",
+        FromEmail: "noreply@yourdomain.com",
+        FromName:  "YourApp",
+    },
 })
 ```
 
@@ -88,111 +124,129 @@ cfg.AddProvider("mailgun", config.ProviderConfig{
 ### Email
 
 ```go
-result, err := mgr.SendEmail(ctx, &contracts.Email{
-    To:          []string{"user@example.com"},
-    CC:          []string{"cc@example.com"},
-    BCC:         []string{"bcc@example.com"},
-    Subject:     "Subject",
-    HTML:        "<h1>HTML Body</h1>",
-    PlainText:   "Plain text fallback",
-    ReplyTo:     "reply@example.com",
-    Attachments: []contracts.Attachment{
-        {Filename: "doc.pdf", Data: pdfBytes},
-    },
+result, err := gw.SendEmail(ctx, &contracts.Email{
+    To:        []string{"user@example.com"},
+    CC:        []string{"cc@example.com"},
+    BCC:       []string{"bcc@example.com"},
+    Subject:   "Subject",
+    HTML:      "<h1>HTML Body</h1>",
+    PlainText: "Plain text fallback",
 })
 ```
 
-### SMS (Coming Soon)
+### SMS
 
 ```go
-result, err := mgr.SendSMS(ctx, &contracts.SMS{
+result, err := gw.SendSMS(ctx, &contracts.SMS{
     To:      []string{"+1234567890"},
     Message: "Your verification code is 123456",
 })
 ```
 
-### Push Notification (Coming Soon)
+### Push Notification
 
 ```go
-result, err := mgr.SendPush(ctx, &contracts.PushNotification{
-    DeviceTokens: []string{"token1", "token2"},
+result, err := gw.SendPush(ctx, &contracts.PushNotification{
+    DeviceTokens: []string{"device-token-1"},
     Title:        "New Message",
     Body:         "You have a new message",
     Data:         map[string]string{"action": "open_chat"},
 })
 ```
 
-### Chat / Social Media (Coming Soon)
+### Chat (Slack, WhatsApp, Telegram)
 
 ```go
-result, err := mgr.SendChat(ctx, &contracts.ChatMessage{
-    To:      []string{"+1234567890"},  // WhatsApp
-    Message: "Hello from Go Message Gateway!",
+result, err := gw.SendChat(ctx, &contracts.ChatMessage{
+    To:      []string{"+1234567890"},
+    Message: "Hello from the gateway!",
 })
 ```
 
-## Using Specific Providers
+### Using a Specific Provider
+
+Override the default provider for a single message:
 
 ```go
-// Use a specific provider instead of default
-result, err := mgr.SendEmailWith(ctx, "sendgrid", email)
+// Send via SendGrid instead of the default
+result, err := gw.SendEmailWith(ctx, "sendgrid", &contracts.Email{...})
 
-// Get provider instance directly
-mailgun, err := mgr.EmailProvider("mailgun")
-result, err := mailgun.Send(ctx, email)
-
-// List available providers
-providers := mgr.AvailableEmailProviders()
+// Send via Vonage instead of default SMS provider
+result, err := gw.SendSMSWith(ctx, "vonage", &contracts.SMS{...})
 ```
 
-## Custom Providers
+## Development Mode
 
-Implement the contract interface:
+For local development and testing, use the **memory** provider:
 
-```go
-type MyEmailProvider struct{}
-
-func (p *MyEmailProvider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-    // Your implementation
-    return &contracts.SendResult{ID: "123", Message: "sent"}, nil
-}
-
-func (p *MyEmailProvider) Name() string {
-    return "my-provider"
-}
-
-// Register it
-mgr.RegisterEmailProvider("my-provider", &MyEmailProvider{})
+```yaml
+# configs/local.yml
+providers:
+  defaults:
+    email: memory
+    sms: memory
+    push: memory
+    chat: memory
 ```
 
-## Error Handling
+Messages are stored in RAM. View them in the DevBox UI:
 
-```go
-result, err := mgr.SendEmail(ctx, email)
-if err != nil {
-    var providerErr *errors.ProviderError
-    if errors.As(err, &providerErr) {
-        log.Printf("Provider %s failed: %s (code: %d)", 
-            providerErr.Provider, providerErr.Message, providerErr.StatusCode)
-    }
-    return err
-}
+```bash
+make start    # Starts Gateway + DevBox UI
 ```
+
+Open http://localhost:10104 to see all intercepted messages.
+
+→ See [DevBox](./devbox.md) for more details.
+
+## HTTP API Reference
+
+### Gateway Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/email` | Send email |
+| POST | `/v1/sms` | Send SMS |
+| POST | `/v1/push` | Send push notification |
+| POST | `/v1/chat` | Send chat message |
+
+### DevBox Endpoints (Development Only)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/stats` | Message counts |
+| GET | `/api/v1/emails` | List all emails |
+| GET | `/api/v1/sms` | List all SMS |
+| GET | `/api/v1/push` | List all push notifications |
+| GET | `/api/v1/chat` | List all chat messages |
+| DELETE | `/api/v1/messages` | Clear all messages |
+| GET | `/api/v1/events` | Real-time updates (SSE) |
 
 ## Troubleshooting
 
-### Mailgun: 403 Forbidden / "Free accounts are for test purposes only"
-If you receive this error: 'Domain ... is not allowed to send', it means you are using a Sandbox Domain.
-**Solution**:
-1.  Log in to Mailgun.
-2.  Go to **Sending > Domains > [Your Sandbox Domain]**.
-3.  Add the recipient's email to **Authorized Recipients**.
-4.  The recipient must click the verification link sent by Mailgun.
+### Mailgun: 403 Forbidden
 
-### Config Issues
-Ensure your `.env` keys match the provider requirements (e.g., `MESSAGE_MAILGUN_API_KEY`). Use `make sandbox` to verify configuration interactively.
+If using a Mailgun Sandbox Domain:
+1. Log in to Mailgun
+2. Go to **Sending > Domains > [Your Sandbox Domain]**
+3. Add recipient email to **Authorized Recipients**
+4. Recipient must click verification link
+
+### Provider Not Found
+
+Ensure your configuration has the provider defined:
+
+```yaml
+providers:
+  defaults:
+    email: mailgun   # Must match a key under providers.email
+  email:
+    mailgun:         # This key must exist
+      api_key: "..."
+```
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - How the package is designed
-- [Code Conventions](./code-conventions.md) - Coding standards
+- [Architecture](./architecture.md) — System design
+- [DevBox](./devbox.md) — Development UI
+- [Contributing](./contributing.md) — Adding providers

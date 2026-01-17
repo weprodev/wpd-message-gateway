@@ -1,0 +1,30 @@
+meta {
+  name: List SMS
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/sms
+  body: none
+  auth: none
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return array", function() {
+    expect(res.body).to.be.an("array");
+  });
+
+  test("should have SMS with required fields", function() {
+    if (res.body.length > 0) {
+      const sms = res.body[0];
+      expect(sms).to.have.property("id");
+      expect(sms).to.have.property("sms");
+      expect(sms).to.have.property("created_at");
+    }
+  });
+}

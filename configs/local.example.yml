@@ -1,0 +1,173 @@
+# ============================================================================
+# WPD Message Gateway - Local Development Configuration Example
+# ============================================================================
+#
+# Copy this file to `local.yml` and customize as needed:
+#   cp configs/local.example.yml configs/local.yml
+#
+# The gateway loads `configs/local.yml` by default. You can override this
+# by setting the CONFIG_PATH environment variable:
+#   CONFIG_PATH=configs/production.yml ./bin/server
+#
+# ============================================================================
+
+environment: local
+
+# ----------------------------------------------------------------------------
+# Server Configuration
+# ----------------------------------------------------------------------------
+server:
+  port: 10101
+
+# ----------------------------------------------------------------------------
+# DevBox UI Configuration (Development Inbox)
+# ----------------------------------------------------------------------------
+# DevBox is a web UI for viewing intercepted messages during development.
+# It reads messages from the memory provider - NOT a provider itself.
+devbox:
+  enabled: true
+  port: 10104
+
+# ----------------------------------------------------------------------------
+# Mailpit Configuration (Optional - Email Preview)
+# ----------------------------------------------------------------------------
+# Mailpit Integration (optional)
+# To use Mailpit, start it with: make mailpit
+# mailpit:
+#   enabled: true
+
+# ----------------------------------------------------------------------------
+# Provider Configuration
+# ----------------------------------------------------------------------------
+providers:
+  # Default providers for each message type
+  # Use 'memory' for development (stores in RAM, viewable in DevBox UI)
+  # Use real provider names (mailgun, twilio, etc.) for production
+  defaults:
+    email: memory
+    sms: memory
+    push: memory
+    chat: memory
+
+  # --------------------------------------------------------------------------
+  # Email Providers
+  # --------------------------------------------------------------------------
+  email:
+    # Memory provider (development) - messages viewable in DevBox UI
+    memory: {}
+
+    # Mailgun
+    # mailgun:
+    #   api_key: "key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   domain: "mg.example.com"
+    #   from_email: "no-reply@example.com"
+    #   from_name: "My App"
+    #   base_url: "https://api.eu.mailgun.net"  # Optional, for EU region
+
+    # SendGrid
+    # sendgrid:
+    #   api_key: "SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_email: "no-reply@example.com"
+    #   from_name: "My App"
+
+    # SMTP (generic)
+    # smtp:
+    #   host: "smtp.example.com"
+    #   port: "587"
+    #   username: "user@example.com"
+    #   password: "your-password"
+    #   from_email: "no-reply@example.com"
+
+    # AWS SES
+    # ses:
+    #   api_key: "AKIAXXXXXXXXXXXXXXXXXX"
+    #   api_secret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   region: "us-east-1"
+    #   from_email: "no-reply@example.com"
+
+  # --------------------------------------------------------------------------
+  # SMS Providers
+  # --------------------------------------------------------------------------
+  sms:
+    # Memory provider (development)
+    memory: {}
+
+    # Twilio
+    # twilio:
+    #   account_sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   auth_token: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+15550000000"
+
+    # Vonage (Nexmo)
+    # vonage:
+    #   api_key: "xxxxxxxx"
+    #   api_secret: "xxxxxxxxxxxxxxxx"
+    #   from_phone: "+15550000000"
+
+    # Plivo
+    # plivo:
+    #   api_key: "MAXXXXXXXXXXXXXXXXXX"
+    #   api_secret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+15550000000"
+
+  # --------------------------------------------------------------------------
+  # Push Notification Providers
+  # --------------------------------------------------------------------------
+  push:
+    # Memory provider (development)
+    memory: {}
+
+    # Firebase Cloud Messaging (FCM)
+    # firebase:
+    #   service_account_file: "path/to/service-account.json"
+    #   project_id: "my-project-id"
+
+    # OneSignal
+    # onesignal:
+    #   app_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    #   api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+    # Apple Push Notification Service (APNS)
+    # apns:
+    #   key_file: "path/to/AuthKey_XXXXXXXXXX.p8"
+    #   key_id: "XXXXXXXXXX"
+    #   team_id: "XXXXXXXXXX"
+    #   topic: "com.example.myapp"
+
+  # --------------------------------------------------------------------------
+  # Chat Providers
+  # --------------------------------------------------------------------------
+  chat:
+    # Memory provider (development)
+    memory: {}
+
+    # Slack
+    # slack:
+    #   webhook_url: "your-slack-webhook-url"
+
+    # Discord
+    # discord:
+    #   webhook_url: "https://discord.com/api/webhooks/000000000000000000/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+    # Telegram
+    # telegram:
+    #   bot_token: "0000000000:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+    # WhatsApp (via Twilio)
+    # whatsapp:
+    #   account_sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   auth_token: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+14155238886"  # Twilio WhatsApp sandbox number
+
+# ============================================================================
+# Environment Variable Overrides
+# ============================================================================
+# You can override any provider setting via environment variables:
+#
+#   MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun
+#   MESSAGE_MAILGUN_API_KEY=key-xxxxx
+#   MESSAGE_MAILGUN_DOMAIN=mg.example.com
+#
+# This is useful for injecting secrets in production without storing
+# them in config files.
+# ============================================================================

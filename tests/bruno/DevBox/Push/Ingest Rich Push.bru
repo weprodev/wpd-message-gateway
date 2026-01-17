@@ -1,0 +1,47 @@
+meta {
+  name: Ingest Rich Push
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/internal/push
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "device_tokens": [
+      "fMz9x8K2abc:APA91bGpBc123456789abcdefghijklmnop",
+      "dGhpcyBpcyBhIHRlc3QgdG9rZW4gZm9yIGRlbW8gcHVycG9zZXM"
+    ],
+    "title": "🎁 Flash Sale: 50% Off Everything!",
+    "body": "Don't miss out! Sale ends in 2 hours. Tap to shop now →",
+    "data": {
+      "type": "promotion",
+      "promotion_id": "FLASH-SALE-2026",
+      "discount_percent": "50",
+      "expires_at": "2026-01-17T23:59:59Z",
+      "deep_link": "myapp://promotions/FLASH-SALE-2026",
+      "image_url": "https://picsum.photos/600/300",
+      "action": "open_promotion",
+      "category": "sales",
+      "priority": "high"
+    },
+    "badge": 5,
+    "sound": "promotion_alert.wav"
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("richPushId", res.body.id);
+  });
+}

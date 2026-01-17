@@ -1,0 +1,31 @@
+meta {
+  name: Send Email
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/email
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "to": ["test@example.com"],
+    "subject": "Test Email from Bruno",
+    "html": "<h1>Hello!</h1><p>This is a test email.</p>",
+    "plain_text": "Hello! This is a test email."
+  }
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+  });
+}

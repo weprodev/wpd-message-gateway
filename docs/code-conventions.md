@@ -1,145 +1,148 @@
 # Code Conventions
 
-This document defines the coding standards for Go Message Gateway.
+Follow [Effective Go](https://go.dev/doc/effective_go) plus these project-specific rules.
 
-## Go Style
+## Project Structure
 
-Follow [Effective Go](https://go.dev/doc/effective_go) and [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments).
+```
+internal/           # Private application code
+├── app/            # Configuration, wiring, validation
+├── core/           # Business logic (domain)
+│   ├── port/       # Interface definitions
+│   └── service/    # Business services
+├── infrastructure/ # External integrations
+│   └── provider/   # Provider implementations
+└── presentation/   # HTTP layer
+    └── handler/    # Request handlers
+
+pkg/                # Public packages
+├── contracts/      # Message types (single source of truth)
+├── errors/         # Structured error types
+└── gateway/        # Embedded SDK
+```
 
 ## Naming
 
-### Packages
-
 ```go
-// Good: lowercase, single word
-package mailgun
-package config
+// Packages: lowercase, single word
+package mailgun  // Good
+package mail_gun // Bad
 
-// Bad: underscores, mixed case
-package mail_gun
-package MailGun
-```
+// Interfaces: verb-based, in port/
+type EmailSender interface { ... }  // Good
+type EmailService interface { ... } // Bad
 
-### Interfaces
-
-```go
-// Good: verb-based, single method = -er suffix
-type EmailSender interface {
-    Send(ctx context.Context, email *Email) (*SendResult, error)
-    Name() string
-}
-
-// Bad: noun-based
-type EmailService interface {}
-```
-
-### Constants
-
-```go
-// Good: exported, descriptive
+// Constants: exported, descriptive
 const ProviderName = "mailgun"
-const DefaultTimeout = 30 * time.Second
-
-// Bad: unexported for public API
-const providerName = "mailgun"
 ```
 
-### Errors
+## Interfaces
+
+Always add compile-time check:
 
 ```go
-// Good: start with package/context
-return fmt.Errorf("mailgun: failed to send: %w", err)
-
-// Bad: generic
-return fmt.Errorf("error: %v", err)
+var _ port.EmailSender = (*Provider)(nil)
 ```
 
-## Interface Compliance
+Define interfaces in `internal/core/port/`, not alongside implementations.
 
-Always add compile-time checks:
+## Provider Registration
+
+Use the **self-registration pattern** via `init()`:
 
 ```go
-var _ contracts.EmailSender = (*Provider)(nil)
+// internal/infrastructure/provider/sendgrid/register.go
+package sendgrid
+
+import (
+    "github.com/weprodev/wpd-message-gateway/internal/core/port"
+    "github.com/weprodev/wpd-message-gateway/internal/app/registry"
+)
+
+func init() {
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ port.MessageStore, _ registry.MailpitConfig) (port.EmailSender, error) {
+        return New(Config{
+            APIKey:    cfg.APIKey,
+            FromEmail: cfg.FromEmail,
+        })
+    })
+}
+```
+
+**Why:** Follows Open/Closed Principle — add providers without modifying business logic.
+
+**Required:** Add blank import in `internal/app/imports.go`:
+
+```go
+_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid"
 ```
 
 ## Context
 
-Always accept `context.Context` as first parameter:
+First parameter for any I/O operation:
 
 ```go
-// Good
-func (p *Provider) Send(ctx context.Context, email *Email) (*SendResult, error)
-
-// Bad
-func (p *Provider) Send(email *Email) (*SendResult, error)
+func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error)
 ```
 
-## Error Handling
+## Errors
 
-### Use Custom Error Types
-
-```go
-// Good: rich error with context
-return msgerrors.NewProviderError(ProviderName, "rate limited", 429, err)
-
-// Bad: generic error
-return errors.New("failed")
-```
-
-### Wrap Errors
+Use structured errors from `pkg/errors`:
 
 ```go
-// Good: preserve error chain
-return fmt.Errorf("mailgun: send failed: %w", err)
+import pkgerrors "github.com/weprodev/wpd-message-gateway/pkg/errors"
 
-// Bad: lose original error
-return fmt.Errorf("send failed: %v", err)
+// Provider errors
+return nil, pkgerrors.NewProviderError("mailgun", "failed to send", 500, err)
+
+// Config errors
+return nil, pkgerrors.NewConfigError("mailgun", "api_key", "required")
+
+// Simple errors with context
+return fmt.Errorf("mailgun: failed to send: %w", err)  // Good
+return fmt.Errorf("error: %v", err)                    // Bad
 ```
 
 ## Validation
 
-Validate at provider boundary:
+Validate at the start of public functions:
 
 ```go
 func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-    // Validate first
     if len(email.To) == 0 {
-        return nil, msgerrors.NewProviderError(ProviderName, "recipient required", 400, nil)
+        return nil, fmt.Errorf("%s: recipient required", ProviderName)
     }
-    
-    // Then process...
+    // ...
 }
 ```
 
-## File Organization
+## Types
 
-### Provider Structure
+Use `pkg/contracts` types — they are the single source of truth:
 
+```go
+import "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+
+// Good: Use contracts types directly
+func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error)
+
+// Bad: Creating duplicate types
+type Email struct { ... }  // Don't duplicate contracts.Email
 ```
-providers/email/mailgun/
-├── mailgun.go       # Main implementation
-├── mailgun_test.go  # Unit tests
-└── doc.go           # Package documentation (optional)
-```
 
-### Test Files
+## Tests
 
-- Same package for unit tests: `mailgun_test.go`
-- Integration tests: use build tag `//go:build integration`
-
-## Testing
-
-### Table-Driven Tests
+Use table-driven tests:
 
 ```go
 func TestNew(t *testing.T) {
     tests := []struct {
         name    string
-        cfg     config.ProviderConfig
+        cfg     Config
         wantErr bool
     }{
-        {"valid", config.ProviderConfig{APIKey: "key", Domain: "d"}, false},
-        {"missing key", config.ProviderConfig{Domain: "d"}, true},
+        {"valid", Config{APIKey: "key"}, false},
+        {"missing key", Config{}, true},
     }
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
@@ -152,57 +155,39 @@ func TestNew(t *testing.T) {
 }
 ```
 
-### Mock Interfaces
+## Quality Checks
 
-```go
-type mockEmailSender struct {
-    contracts.EmailSender
-    sendFunc func(ctx context.Context, e *contracts.Email) (*contracts.SendResult, error)
-}
+Before committing:
 
-func (m *mockEmailSender) Send(ctx context.Context, e *contracts.Email) (*contracts.SendResult, error) {
-    return m.sendFunc(ctx, e)
-}
-```
-
-## Documentation
-
-### Package Comments
-
-```go
-// Package mailgun implements the EmailSender interface using the Mailgun API.
-//
-// Configuration requires MESSAGE_MAILGUN_API_KEY and MESSAGE_MAILGUN_DOMAIN
-// environment variables.
-package mailgun
-```
-
-### Function Comments
-
-```go
-// New creates a new Mailgun provider from the given configuration.
-// Returns an error if APIKey or Domain is empty.
-func New(cfg config.ProviderConfig) (*Provider, error)
+```bash
+make audit  # fmt + lint + test + vulncheck
 ```
 
 ## Commit Messages
 
 ```
 feat(mailgun): add attachment support
-fix(config): handle empty provider names
-docs: add architecture diagram
-test(manager): add concurrent access tests
-refactor(errors): simplify error types
+fix(config): handle empty values
+docs: update readme
+test(service): add concurrent tests
+refactor(provider): simplify factory
 ```
 
-## Quality Checks
+## Import Order
 
-Before submitting:
+```go
+import (
+    // Standard library
+    "context"
+    "fmt"
 
-```bash
-make fmt        # Format code
-make lint       # Run linter
-make test       # Run tests
-make vulncheck  # Check vulnerabilities
-make audit      # All of the above
+    // External packages
+    "github.com/mailgun/mailgun-go/v4"
+
+    // Internal packages (local module)
+    "github.com/weprodev/wpd-message-gateway/internal/core/port"
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+)
 ```
+
+Use `goimports -local github.com/weprodev/wpd-message-gateway` to auto-format.

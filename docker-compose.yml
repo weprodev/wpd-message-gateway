@@ -1,0 +1,9 @@
+services:
+  # Gateway API (port 10101)
+  gateway:
+    build: .
+    ports:
+      - "10101:10101"
+    environment:
+      - PORT=10101
+    restart: unless-stopped
