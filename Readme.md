@@ -10,13 +10,9 @@ One interface, multiple providers. Write your messaging code once — switch bet
 ## Why Use This?
 
 - **🔌 One API, Many Providers** — Send emails via Mailgun today, switch to SendGrid tomorrow. No code changes.
-- **📦 DevBox Included** — Built-in web UI to preview emails, SMS, push notifications, and chat messages during development. No real messages sent.
+- **📦 DevBox Included** — Built-in web UI to preview emails, SMS, push notifications, and chat messages during development.
 - **🧪 E2E Testing Ready** — Memory provider stores messages in RAM. Query them via REST API for automated testing.
-- **🚀 Go Library + HTTP Server** — Use as a Go package (`import`) or deploy as a standalone microservice for any language.
-
-## What is this?
-
-Think of it as a **universal adapter for messaging**. Instead of learning how Mailgun, Twilio, Firebase, and WhatsApp each work differently, you use **one simple interface**:
+- **🚀 Go Library + HTTP Server** — Use as a Go package (`import`) or deploy as a standalone microservice.
 
 ## How It Works
 
@@ -27,12 +23,12 @@ Think of it as a **universal adapter for messaging**. Instead of learning how Ma
          │ POST /v1/email
          ▼
 ┌─────────────────┐
-│    Manager      │
+│  Gateway Service│
 │ (Routes by      │
 │  provider name) │
 └────────┬────────┘
          │
-         │ MESSAGE_DEFAULT_EMAIL_PROVIDER = ?
+         │ providers.defaults.email = ?
          │
     ┌────┴────────────────────────────┐
     │                                 │
@@ -47,26 +43,9 @@ Think of it as a **universal adapter for messaging**. Instead of learning how Ma
 │        +        │       │                 │
 │ ┌─────────────┐ │       └─────────────────┘
 │ │ Mailpit     │ │
-│ │ (optional)  │ │ ← Only if MAILPIT_ENABLED=true
+│ │ (optional)  │ │ ← Only if mailpit.enabled: true
 │ └─────────────┘ │
 └─────────────────┘
-```
-
-**Development** (`MESSAGE_DEFAULT_EMAIL_PROVIDER=memory`):
-- Emails stored in RAM → View in DevBox UI
-- Optionally forward to Mailpit (`MAILPIT_ENABLED=true`)
-
-**Production** (`MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun`):
-- Emails sent via real provider API
-- Nothing in DevBox
-
-```go
-// Send an email - same code works with any email provider
-mgr.SendEmail(ctx, &contracts.Email{
-    To:      []string{"user@example.com"},
-    Subject: "Hello!",
-    HTML:    "<h1>Welcome!</h1>",
-})
 ```
 
 ## Message Types
@@ -76,25 +55,72 @@ mgr.SendEmail(ctx, &contracts.Email{
 | 📧 **Email** | Send emails with HTML, attachments | Mailgun, SendGrid, AWS SES |
 | 📱 **SMS** | Send text messages to phones | Twilio, Vonage |
 | 🔔 **Push** | Send notifications to apps | Firebase, OneSignal |
-| 💬 **Chat** | Send messages on chat platforms | WhatsApp, Telegram |
+| 💬 **Chat** | Send messages on chat platforms | WhatsApp, Telegram, Slack |
 
 ## Quick Start
 
-### 1. Install
+### Option 1: Use as a Go Package
 
 ```bash
 go get github.com/weprodev/wpd-message-gateway
 ```
 
-### 2. Configure
+```go
+package main
 
-Configure your providers in `configs/local.yml`:
+import (
+    "context"
+    "log"
+
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+    "github.com/weprodev/wpd-message-gateway/pkg/gateway"
+)
+
+func main() {
+    gw, _ := gateway.New(gateway.Config{
+        DefaultEmailProvider: "memory",
+    })
+
+    result, err := gw.SendEmail(context.Background(), &contracts.Email{
+        To:      []string{"user@example.com"},
+        Subject: "Welcome!",
+        HTML:    "<h1>Hello!</h1>",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("Sent! ID: %s", result.ID)
+}
+```
+
+### Option 2: Run as HTTP Server
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/weprodev/wpd-message-gateway.git
+cd wpd-message-gateway
+cp configs/local.example.yml configs/local.yml
+
+# 2. Start everything (Gateway + DevBox UI)
+make start
+```
+
+Open http://localhost:10104 to see all intercepted messages in the DevBox UI.
+
+→ See [Usage Guide](docs/usage.md) for more examples.
+
+## Configuration
+
+Configure providers in `configs/local.yml`:
 
 ```yaml
-# configs/local.yml
 providers:
   defaults:
-    email: mailgun
+    email: mailgun   # or: memory, sendgrid, ses
+    sms: memory      # or: twilio, vonage
+    push: memory     # or: firebase, onesignal
+    chat: memory     # or: slack, telegram, whatsapp
+  
   email:
     mailgun:
       api_key: "your-api-key"
@@ -103,47 +129,46 @@ providers:
 
 Or use environment variables for secrets:
 
-### 3. Send
-
-```go
-package main
-
-import (
-    "context"
-    "github.com/weprodev/wpd-message-gateway/config"
-    "github.com/weprodev/wpd-message-gateway/contracts"
-    "github.com/weprodev/wpd-message-gateway/manager"
-)
-
-func main() {
-    cfg, _ := config.LoadFromEnv()
-    mgr, _ := manager.New(cfg)
-
-    mgr.SendEmail(context.Background(), &contracts.Email{
-        To:      []string{"user@example.com"},
-        Subject: "Welcome!",
-        HTML:    "<h1>Hello!</h1>",
-    })
-}
+```bash
+MESSAGE_MAILGUN_API_KEY=key-xxxxx
+MESSAGE_MAILGUN_DOMAIN=mg.example.com
 ```
-
-That's it! See [Usage Guide](docs/usage.md) for more examples.
 
 ## Development Mode (DevBox)
 
-During development, you don't want to send real messages. The **DevBox** catches all messages and shows them in a web UI:
+During development, use the **memory** provider to capture all messages locally:
 
-```bash
-# 1. Copy config example
-cp configs/local.example.yml configs/local.yml
-
-# 2. Start everything (Gateway + DevBox UI)
-make start
+```yaml
+# configs/local.yml
+providers:
+  defaults:
+    email: memory
+    sms: memory
+    push: memory
+    chat: memory
 ```
 
-Open http://localhost:10104 to see all intercepted messages.
-
 → See [DevBox Documentation](docs/devbox.md) for details.
+
+### Mailpit Integration (Optional)
+
+For realistic email preview with HTML rendering:
+
+```bash
+# 1. Start Mailpit
+make mailpit
+
+# 2. Enable in configs/local.yml:
+mailpit:
+  enabled: true
+
+# 3. Start server
+make start
+
+# View emails:
+#   - DevBox UI: http://localhost:10104 (all message types)
+#   - Mailpit:   http://localhost:10103 (email preview)
+```
 
 ## Provider Status
 
@@ -167,36 +192,39 @@ make start      # Start development (Gateway + DevBox UI)
 make test       # Run tests
 make audit      # Full check: format + lint + test + security
 make build      # Build all packages
-make clean      # Clean artifacts
 
 # Docker
 make dev        # Start Gateway via Docker
 make dev-down   # Stop Docker
 
-# Optional (SMTP provider testing only)
-make mailpit    # Start Mailpit
+# Optional (email preview)
+make mailpit    # Start Mailpit for HTML email preview
 ```
 
-### When do I need Mailpit?
+## Project Structure
 
-**Most developers don't need it.** The DevBox UI shows all messages stored in memory.
-
-Use Mailpit when you want **realistic email preview** (HTML rendering, attachments):
-
-```bash
-# 1. Start Mailpit
-make mailpit
-
-# 2. Set in configs/local.yml:
-providers:
-  defaults:
-    email: memory
-mailpit:
-  enabled: true
-
-# 3. Send emails → View in BOTH:
-#    - DevBox UI: http://localhost:10104 (all message types)
-#    - Mailpit:   http://localhost:10103 (email preview)
+```
+wpd-message-gateway/
+├── cmd/server/          # HTTP server entry point
+├── configs/             # YAML configuration files
+├── internal/            # Private application code
+│   ├── app/             # Configuration, wiring, validation
+│   ├── core/            # Business logic
+│   │   ├── port/        # Interface definitions (contracts)
+│   │   └── service/     # Gateway service, registry
+│   ├── infrastructure/  # External integrations
+│   │   └── provider/    # Provider implementations
+│   │       ├── mailgun/ # Mailgun email provider
+│   │       └── memory/  # In-memory provider (DevBox)
+│   └── presentation/    # HTTP layer
+│       ├── handler/     # Request handlers
+│       └── router.go    # Route definitions
+├── pkg/                 # Public packages for external use
+│   ├── contracts/       # Message types (Email, SMS, Push, Chat)
+│   ├── errors/          # Error types
+│   └── gateway/         # Embedded SDK
+├── web/                 # DevBox React UI
+└── tests/bruno/         # API test collection
 ```
 
 ## Documentation
@@ -204,27 +232,11 @@ mailpit:
 | Document | Description |
 |----------|-------------|
 | [Usage Guide](docs/usage.md) | How to install, configure, and send messages |
-| [Architecture](docs/architecture.md) | How the package is designed |
+| [Architecture](docs/architecture.md) | System design and principles |
 | [DevBox](docs/devbox.md) | Development inbox for testing |
 | [Contributing](docs/contributing.md) | How to add new providers |
-| [Workflow](docs/workflow.md) | CI/CD, commit conventions, and releases |
+| [Workflow](docs/workflow.md) | CI/CD and release process |
 | [Code Conventions](docs/code-conventions.md) | Coding style guide |
-
-## Project Structure
-
-```
-wpd-message-gateway/
-├── config/         # Configuration loading
-├── contracts/      # Message types (Email, SMS, Push, Chat)
-├── manager/        # Main API you use
-├── providers/      # Provider implementations
-│   ├── email/      # Mailgun, SendGrid, etc.
-│   ├── sms/        # Twilio, etc.
-│   ├── push/       # Firebase, etc.
-│   └── chat/       # WhatsApp, Telegram, etc.
-├── internal/       # Internal packages (DevBox API)
-└── web/            # DevBox React UI
-```
 
 ## License
 

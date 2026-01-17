@@ -28,21 +28,34 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) for automati
 | `test` | Adding tests | Patch |
 | `feat!` | Breaking change | Major |
 
+### Scopes
+
+Common scopes for this project:
+
+| Scope | Description |
+|-------|-------------|
+| `config` | Configuration changes |
+| `mailgun` | Mailgun provider |
+| `memory` | Memory provider |
+| `devbox` | DevBox UI/API |
+| `gateway` | SDK package |
+| `api` | HTTP endpoints |
+
 ### Examples
 
 ```bash
 # Patch release (v1.0.0 → v1.0.1)
-git commit -m "fix: resolve email validation error"
+git commit -m "fix(mailgun): resolve rate limit handling"
 git commit -m "docs: update README"
 git commit -m "chore: update dependencies"
 
 # Minor release (v1.0.0 → v1.1.0)
-git commit -m "feat: add SendGrid email provider"
-git commit -m "feat(sms): add Twilio support"
+git commit -m "feat(sendgrid): add email provider"
+git commit -m "feat(api): add batch send endpoint"
 
 # Major release (v1.0.0 → v2.0.0)
 git commit -m "feat!: change API response format"
-git commit -m "refactor: rename Email.Body to Email.HTML
+git commit -m "refactor!: rename contracts.Email.Body to contracts.Email.HTML
 
 BREAKING CHANGE: Email.Body field renamed to Email.HTML"
 ```
@@ -73,7 +86,7 @@ Every push and pull request triggers the CI workflow:
 
 | Job | Description | Tools |
 |-----|-------------|-------|
-| **Lint & Format** | Code style check | `gofmt`, `golangci-lint` |
+| **Lint & Format** | Code style check | `gofmt`, `goimports`, `golangci-lint` |
 | **Unit Tests** | Run Go tests | `go test -race` |
 | **Build** | Compile binaries | `go build` |
 | **Security Scan** | Vulnerability check | `govulncheck` |
@@ -134,13 +147,13 @@ You can trigger a release manually:
 ```
 main ─────●─────●─────●─────●───── (releases)
           │     │     │
-          │     │     └── fix/email-validation
+          │     │     └── fix/mailgun-rate-limit
           │     └── feat/sendgrid-provider
-          └── docs/update-readme
+          └── docs/update-architecture
 ```
 
 - **main**: Production-ready code, releases are tagged here
-- **feature branches**: `feat/`, `fix/`, `docs/`, `chore/`
+- **feature branches**: `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`
 
 ## Pull Request Workflow
 
@@ -168,6 +181,7 @@ main ─────●─────●─────●─────●─
 ```bash
 # Check formatting
 gofmt -d .
+goimports -local github.com/weprodev/wpd-message-gateway -d .
 
 # Check linting
 golangci-lint run ./...
@@ -194,5 +208,5 @@ git push origin v1.2.3
 
 ## Related Documentation
 
-- [Contributing Guide](./contributing.md) - How to contribute code
-- [Code Conventions](./code-conventions.md) - Coding standards
+- [Contributing Guide](./contributing.md) — How to contribute code
+- [Code Conventions](./code-conventions.md) — Coding standards
