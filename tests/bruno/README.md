@@ -46,11 +46,12 @@ tests/bruno/
 ├── environments/
 │   ├── local.bru        # Local dev environment
 │   └── memory.bru       # Memory provider environment
-├── Gateway/             # Gateway API (/v1/*)
+├── Gateway/             # Gateway API (/v1/*) - Send messages
 │   ├── Send Email.bru
-│   ├── Get Inbox.bru
-│   └── Clear Inbox.bru
-└── DevBox/              # DevBox API (/api/v1/*)
+│   ├── Send SMS.bru
+│   ├── Send Push.bru
+│   └── Send Chat.bru
+└── DevBox/              # DevBox API (/api/v1/*) - View/manage messages
     ├── Get Stats.bru
     ├── Clear All Messages.bru
     ├── Email/

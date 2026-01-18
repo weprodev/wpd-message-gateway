@@ -1,5 +1,5 @@
 // Package registry provides provider registration functionality.
-// This is a sub-package of app to avoid circular imports when
+// This is a subpackage of app to avoid circular imports when
 // providers register themselves via init().
 package registry
 

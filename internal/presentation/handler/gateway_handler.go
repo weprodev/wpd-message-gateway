@@ -7,21 +7,18 @@ import (
 	"net/http"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
 // GatewayHandler handles message sending API endpoints.
 type GatewayHandler struct {
 	service *service.GatewayService
-	store   *memory.Store
 }
 
 // NewGatewayHandler creates a new gateway handler.
-func NewGatewayHandler(svc *service.GatewayService, store *memory.Store) *GatewayHandler {
+func NewGatewayHandler(svc *service.GatewayService) *GatewayHandler {
 	return &GatewayHandler{
 		service: svc,
-		store:   store,
 	}
 }
 
@@ -95,28 +92,6 @@ func (h *GatewayHandler) HandleSendChat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, result)
-}
-
-// HandleGetInbox handles GET /v1/inbox
-func (h *GatewayHandler) HandleGetInbox(w http.ResponseWriter, r *http.Request) {
-	if h.store == nil {
-		http.Error(w, "Memory provider not active", http.StatusNotFound)
-		return
-	}
-
-	messages := h.store.Emails()
-	respondJSON(w, http.StatusOK, messages)
-}
-
-// HandleClearInbox handles DELETE /v1/inbox
-func (h *GatewayHandler) HandleClearInbox(w http.ResponseWriter, r *http.Request) {
-	if h.store == nil {
-		http.Error(w, "Memory provider not active", http.StatusNotFound)
-		return
-	}
-
-	h.store.Clear()
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {

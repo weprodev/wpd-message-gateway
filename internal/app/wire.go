@@ -29,7 +29,7 @@ func Wire(cfg *Config) (*Application, error) {
 	}
 
 	gatewaySvc := service.NewGatewayService(cfg, registry)
-	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, memoryStore)
+	gatewayHandler := handler.NewGatewayHandler(gatewaySvc)
 
 	var devboxHandler *handler.DevBoxHandler
 	if cfg.DevBox.Enabled || cfg.Providers.Defaults.Email == "memory" {
