@@ -17,48 +17,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
-
-// Config holds the gateway configuration.
-type Config struct {
-	DefaultEmailProvider string
-	DefaultSMSProvider   string
-	DefaultPushProvider  string
-	DefaultChatProvider  string
-
-	Mailgun MailgunConfig
-	Memory  MemoryConfig
-}
-
-// MailgunConfig holds Mailgun provider configuration.
-type MailgunConfig struct {
-	APIKey    string
-	Domain    string
-	BaseURL   string
-	FromEmail string
-	FromName  string
-}
-
-// MemoryConfig holds memory provider configuration.
-type MemoryConfig struct {
-	MailpitEnabled bool
-}
-
-// Gateway is the main entry point for sending messages.
-type Gateway struct {
-	service     *service.GatewayService
-	memoryStore *memory.Store
-}
-
-// configAdapter adapts Gateway config to service.GatewayConfig interface.
-type configAdapter struct {
-	cfg Config
-}
 
 func (c *configAdapter) DefaultEmailProvider() string { return c.cfg.DefaultEmailProvider }
 func (c *configAdapter) DefaultSMSProvider() string   { return c.cfg.DefaultSMSProvider }
@@ -67,53 +30,50 @@ func (c *configAdapter) DefaultChatProvider() string  { return c.cfg.DefaultChat
 
 // New creates a new Gateway instance.
 func New(cfg Config) (*Gateway, error) {
-	registry := service.NewRegistry()
-	memoryStore := memory.NewStore()
+	serviceRegistry := service.NewRegistry()
 
-	gw := &Gateway{
-		memoryStore: memoryStore,
-	}
+	gw := &Gateway{cfg: cfg}
 
-	if err := gw.initializeProviders(cfg, registry); err != nil {
+	if err := gw.initializeProviders(serviceRegistry); err != nil {
 		return nil, err
 	}
 
-	gw.service = service.NewGatewayService(&configAdapter{cfg}, registry)
+	gw.service = service.NewGatewayService(&configAdapter{cfg}, serviceRegistry)
 
 	return gw, nil
 }
 
-func (g *Gateway) initializeProviders(cfg Config, registry *service.Registry) error {
-	if cfg.DefaultEmailProvider != "" {
-		provider, err := g.createEmailProvider(cfg, cfg.DefaultEmailProvider)
+func (g *Gateway) initializeProviders(serviceRegistry *service.Registry) error {
+	if name := g.cfg.DefaultEmailProvider; name != "" {
+		provider, err := g.createEmailProvider(name)
 		if err != nil {
-			return fmt.Errorf("failed to create email provider: %w", err)
+			return fmt.Errorf("failed to create email provider %s: %w", name, err)
 		}
-		registry.RegisterEmailProvider(cfg.DefaultEmailProvider, provider)
+		serviceRegistry.RegisterEmailProvider(name, provider)
 	}
 
-	if cfg.DefaultSMSProvider != "" {
-		provider, err := g.createSMSProvider(cfg.DefaultSMSProvider)
+	if name := g.cfg.DefaultSMSProvider; name != "" {
+		provider, err := g.createSMSProvider(name)
 		if err != nil {
-			return fmt.Errorf("failed to create SMS provider: %w", err)
+			return fmt.Errorf("failed to create SMS provider %s: %w", name, err)
 		}
-		registry.RegisterSMSProvider(cfg.DefaultSMSProvider, provider)
+		serviceRegistry.RegisterSMSProvider(name, provider)
 	}
 
-	if cfg.DefaultPushProvider != "" {
-		provider, err := g.createPushProvider(cfg.DefaultPushProvider)
+	if name := g.cfg.DefaultPushProvider; name != "" {
+		provider, err := g.createPushProvider(name)
 		if err != nil {
-			return fmt.Errorf("failed to create push provider: %w", err)
+			return fmt.Errorf("failed to create push provider %s: %w", name, err)
 		}
-		registry.RegisterPushProvider(cfg.DefaultPushProvider, provider)
+		serviceRegistry.RegisterPushProvider(name, provider)
 	}
 
-	if cfg.DefaultChatProvider != "" {
-		provider, err := g.createChatProvider(cfg.DefaultChatProvider)
+	if name := g.cfg.DefaultChatProvider; name != "" {
+		provider, err := g.createChatProvider(name)
 		if err != nil {
-			return fmt.Errorf("failed to create chat provider: %w", err)
+			return fmt.Errorf("failed to create chat provider %s: %w", name, err)
 		}
-		registry.RegisterChatProvider(cfg.DefaultChatProvider, provider)
+		serviceRegistry.RegisterChatProvider(name, provider)
 	}
 
 	return nil
@@ -159,47 +119,40 @@ func (g *Gateway) SendChatWith(ctx context.Context, provider string, chat *contr
 	return g.service.SendChatWith(ctx, provider, chat)
 }
 
-func (g *Gateway) createEmailProvider(cfg Config, name string) (port.EmailSender, error) {
-	switch name {
-	case "memory":
-		mailpitCfg := memory.MailpitConfig{Enabled: cfg.Memory.MailpitEnabled}
-		return memory.NewEmailProvider(g.memoryStore, mailpitCfg), nil
-	case "mailgun":
-		return mailgun.New(mailgun.Config{
-			APIKey:    cfg.Mailgun.APIKey,
-			Domain:    cfg.Mailgun.Domain,
-			BaseURL:   cfg.Mailgun.BaseURL,
-			FromEmail: cfg.Mailgun.FromEmail,
-			FromName:  cfg.Mailgun.FromName,
-		})
-	default:
-		return nil, fmt.Errorf("unknown email provider: %s", name)
+func (g *Gateway) createEmailProvider(name string) (port.EmailSender, error) {
+	factory, err := registry.GetEmailFactory(name)
+	if err != nil {
+		return nil, err
 	}
+
+	cfg := g.cfg.EmailProviders[name]
+	mailpit := registry.MailpitConfig{Enabled: g.cfg.MailpitEnabled}
+	return factory(cfg, mailpit)
 }
 
 func (g *Gateway) createSMSProvider(name string) (port.SMSSender, error) {
-	switch name {
-	case "memory":
-		return memory.NewSMSProvider(g.memoryStore), nil
-	default:
-		return nil, fmt.Errorf("unknown SMS provider: %s", name)
+	factory, err := registry.GetSMSFactory(name)
+	if err != nil {
+		return nil, err
 	}
+
+	return factory(g.cfg.SMSProviders[name])
 }
 
 func (g *Gateway) createPushProvider(name string) (port.PushSender, error) {
-	switch name {
-	case "memory":
-		return memory.NewPushProvider(g.memoryStore), nil
-	default:
-		return nil, fmt.Errorf("unknown push provider: %s", name)
+	factory, err := registry.GetPushFactory(name)
+	if err != nil {
+		return nil, err
 	}
+
+	return factory(g.cfg.PushProviders[name])
 }
 
 func (g *Gateway) createChatProvider(name string) (port.ChatSender, error) {
-	switch name {
-	case "memory":
-		return memory.NewChatProvider(g.memoryStore), nil
-	default:
-		return nil, fmt.Errorf("unknown chat provider: %s", name)
+	factory, err := registry.GetChatFactory(name)
+	if err != nil {
+		return nil, err
 	}
+
+	return factory(g.cfg.ChatProviders[name])
 }

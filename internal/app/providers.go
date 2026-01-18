@@ -24,7 +24,7 @@ func (f *ProviderFactory) CreateEmailProvider(name string) (port.EmailSender, er
 		return nil, err
 	}
 
-	cfg := f.toRegistryEmailConfig(name)
+	cfg := f.cfg.EmailProviders[name]
 	mailpit := registry.MailpitConfig{Enabled: f.cfg.Mailpit.Enabled}
 	return factory(cfg, mailpit)
 }
@@ -36,8 +36,7 @@ func (f *ProviderFactory) CreateSMSProvider(name string) (port.SMSSender, error)
 		return nil, err
 	}
 
-	cfg := f.toRegistrySMSConfig(name)
-	return factory(cfg)
+	return factory(f.cfg.SMSProviders[name])
 }
 
 // CreatePushProvider creates a push provider by name.
@@ -47,8 +46,7 @@ func (f *ProviderFactory) CreatePushProvider(name string) (port.PushSender, erro
 		return nil, err
 	}
 
-	cfg := f.toRegistryPushConfig(name)
-	return factory(cfg)
+	return factory(f.cfg.PushProviders[name])
 }
 
 // CreateChatProvider creates a chat provider by name.
@@ -58,66 +56,5 @@ func (f *ProviderFactory) CreateChatProvider(name string) (port.ChatSender, erro
 		return nil, err
 	}
 
-	cfg := f.toRegistryChatConfig(name)
-	return factory(cfg)
-}
-
-func (f *ProviderFactory) toRegistryEmailConfig(name string) registry.EmailConfig {
-	appCfg := f.cfg.EmailProviders[name]
-	return registry.EmailConfig{
-		CommonConfig: registry.CommonConfig{
-			APIKey:    appCfg.APIKey,
-			APISecret: appCfg.APISecret,
-			Region:    appCfg.Region,
-			BaseURL:   appCfg.BaseURL,
-			Extra:     appCfg.Extra,
-		},
-		Domain:    appCfg.Domain,
-		FromEmail: appCfg.FromEmail,
-		FromName:  appCfg.FromName,
-	}
-}
-
-func (f *ProviderFactory) toRegistrySMSConfig(name string) registry.SMSConfig {
-	appCfg := f.cfg.SMSProviders[name]
-	return registry.SMSConfig{
-		CommonConfig: registry.CommonConfig{
-			APIKey:    appCfg.APIKey,
-			APISecret: appCfg.APISecret,
-			Region:    appCfg.Region,
-			BaseURL:   appCfg.BaseURL,
-			Extra:     appCfg.Extra,
-		},
-		FromPhone: appCfg.FromPhone,
-	}
-}
-
-func (f *ProviderFactory) toRegistryPushConfig(name string) registry.PushConfig {
-	appCfg := f.cfg.PushProviders[name]
-	return registry.PushConfig{
-		CommonConfig: registry.CommonConfig{
-			APIKey:    appCfg.APIKey,
-			APISecret: appCfg.APISecret,
-			Region:    appCfg.Region,
-			BaseURL:   appCfg.BaseURL,
-			Extra:     appCfg.Extra,
-		},
-		AppID: appCfg.AppID,
-		Topic: appCfg.Topic,
-	}
-}
-
-func (f *ProviderFactory) toRegistryChatConfig(name string) registry.ChatConfig {
-	appCfg := f.cfg.ChatProviders[name]
-	return registry.ChatConfig{
-		CommonConfig: registry.CommonConfig{
-			APIKey:    appCfg.APIKey,
-			APISecret: appCfg.APISecret,
-			Region:    appCfg.Region,
-			BaseURL:   appCfg.BaseURL,
-			Extra:     appCfg.Extra,
-		},
-		FromPhone:  appCfg.FromPhone,
-		WebhookURL: appCfg.WebhookURL,
-	}
+	return factory(f.cfg.ChatProviders[name])
 }
