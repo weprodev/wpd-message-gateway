@@ -279,11 +279,20 @@ import (
     "github.com/weprodev/wpd-message-gateway/pkg/gateway"
 )
 
+// Simple: memory provider (no config needed)
+gw, _ := gateway.New(gateway.Config{
+    DefaultEmailProvider: "memory",
+})
+
+// Production: with provider config
 gw, _ := gateway.New(gateway.Config{
     DefaultEmailProvider: "mailgun",
-    Mailgun: gateway.MailgunConfig{
-        APIKey: "key-xxx",
-        Domain: "mg.example.com",
+    EmailProviders: map[string]gateway.EmailConfig{
+        "mailgun": {
+            CommonConfig: gateway.CommonConfig{APIKey: "key-xxx"},
+            Domain:       "mg.example.com",
+            FromEmail:    "noreply@example.com",
+        },
     },
 })
 
@@ -291,8 +300,8 @@ gw.SendEmail(ctx, &contracts.Email{...})
 ```
 
 The SDK:
-- Uses the same `pkg/contracts` types
-- Delegates to `internal/core/service/GatewayService`
+- Uses `registry` types (re-exported as `gateway.EmailConfig`, etc.)
+- Leverages the same provider self-registration pattern as the server
 - Provides a clean, minimal public API
 
 ## Related Documentation

@@ -108,13 +108,23 @@ MESSAGE_DEFAULT_EMAIL_PROVIDER=mailgun
 ### SDK Configuration
 
 ```go
+// Simple: memory provider for development (no config needed)
+gw, _ := gateway.New(gateway.Config{
+    DefaultEmailProvider: "memory",
+})
+
+// Production: with provider-specific config
 gw, _ := gateway.New(gateway.Config{
     DefaultEmailProvider: "mailgun",
-    Mailgun: gateway.MailgunConfig{
-        APIKey:    "key-xxxxxxxx",
-        Domain:    "mg.yourdomain.com",
-        FromEmail: "noreply@yourdomain.com",
-        FromName:  "YourApp",
+    EmailProviders: map[string]gateway.EmailConfig{
+        "mailgun": {
+            CommonConfig: gateway.CommonConfig{
+                APIKey: "key-xxxxxxxx",
+            },
+            Domain:    "mg.yourdomain.com",
+            FromEmail: "noreply@yourdomain.com",
+            FromName:  "YourApp",
+        },
     },
 })
 ```
