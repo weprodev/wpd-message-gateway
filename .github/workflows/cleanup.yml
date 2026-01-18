@@ -15,20 +15,22 @@ jobs:
             packages: write
 
         steps:
-            - name: Delete old container versions
+            # Keep at least 60 versions (~2 months of daily builds)
+            - name: Delete old untagged versions
               uses: actions/delete-package-versions@v5
               with:
                   package-name: wpd-message-gateway
                   package-type: container
-                  min-versions-to-keep: 10
+                  min-versions-to-keep: 60
                   delete-only-untagged-versions: true
 
+            # Keep at least 60 pre-release versions (~2 months)
             - name: Delete old pre-release versions
               uses: actions/delete-package-versions@v5
               with:
                   package-name: wpd-message-gateway
                   package-type: container
-                  min-versions-to-keep: 5
+                  min-versions-to-keep: 60
                   delete-only-pre-release-versions: true
 
             - name: Summary
@@ -38,6 +40,6 @@ jobs:
                   echo "✅ Old container images cleaned up" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
                   echo "**Policy:**" >> $GITHUB_STEP_SUMMARY
-                  echo "- Keep last 10 tagged versions" >> $GITHUB_STEP_SUMMARY
-                  echo "- Delete untagged images" >> $GITHUB_STEP_SUMMARY
-                  echo "- Keep last 5 pre-release versions" >> $GITHUB_STEP_SUMMARY
+                  echo "- Keep at least last 60 versions (~2 months)" >> $GITHUB_STEP_SUMMARY
+                  echo "- Delete untagged images older than 2 months" >> $GITHUB_STEP_SUMMARY
+                  echo "- Delete pre-release versions older than 2 months" >> $GITHUB_STEP_SUMMARY
