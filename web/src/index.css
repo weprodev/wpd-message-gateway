@@ -6,57 +6,61 @@
  * Brand Colors (from Message Gateway logo):
  * - Navy Background: #263055
  * - Gold Primary: #D4A24C
- * - Coral Accent: #E85941
- * - Orange: #D86F4A
- * - Amber: #DCA55E
+ * - Coral (sparingly): #E85941
+ *
+ * Design Principles:
+ * - Gold for primary actions and brand identity
+ * - Subtle blues/grays for selection states (not harsh colors)
+ * - High contrast for accessibility (WCAG AA compliant)
+ * - Coral reserved for destructive actions only
  */
 
 @layer base {
   :root {
-    /* Light theme - warm and inviting */
-    --background: 40 33% 98%;
-    --foreground: 230 30% 20%;
+    /* Light theme - clean and professional */
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 230 30% 20%;
+    --card-foreground: 224 71% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 230 30% 20%;
-    --primary: 38 56% 56%;
+    --popover-foreground: 224 71% 4%;
+    --primary: 38 60% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 40 30% 93%;
-    --secondary-foreground: 230 30% 20%;
-    --muted: 40 20% 94%;
-    --muted-foreground: 230 15% 45%;
-    --accent: 12 76% 57%;
-    --accent-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 224 71% 4%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 224 71% 4%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 20% 88%;
-    --input: 40 20% 88%;
-    --ring: 38 56% 56%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 38 60% 50%;
     --radius: 0.5rem;
   }
 
   .dark {
-    /* Dark theme - navy base with gold accents */
-    --background: 230 40% 16%;
-    --foreground: 40 30% 95%;
-    --card: 230 38% 20%;
-    --card-foreground: 40 30% 95%;
-    --popover: 230 38% 20%;
-    --popover-foreground: 40 30% 95%;
-    --primary: 38 56% 56%;
-    --primary-foreground: 230 40% 12%;
-    --secondary: 230 30% 24%;
-    --secondary-foreground: 40 30% 92%;
-    --muted: 230 28% 22%;
-    --muted-foreground: 40 15% 65%;
-    --accent: 12 76% 57%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62% 45%;
+    /* Dark theme - navy base, subtle selections, gold accents */
+    --background: 228 39% 15%;
+    --foreground: 213 31% 91%;
+    --card: 228 35% 18%;
+    --card-foreground: 213 31% 91%;
+    --popover: 228 35% 18%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 38 60% 55%;
+    --primary-foreground: 228 39% 10%;
+    --secondary: 228 30% 22%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 228 25% 20%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 228 30% 26%;
+    --accent-foreground: 213 31% 91%;
+    --destructive: 0 63% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 230 28% 26%;
-    --input: 230 28% 26%;
-    --ring: 38 56% 50%;
+    --border: 228 25% 24%;
+    --input: 228 25% 24%;
+    --ring: 38 60% 50%;
   }
 }
 
