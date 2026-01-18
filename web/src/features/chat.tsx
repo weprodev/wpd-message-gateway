@@ -1,10 +1,9 @@
-import { Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { EmptyState, ListItem } from '@/components/shared'
 import type { StoredChat } from '@/types/messages'
-import { cn } from '@/lib/utils'
-import { formatDate, formatFullDate } from '@/lib/date'
+import { formatFullDate } from '@/lib/date'
+import { PREVIEW_TEXT_LENGTH } from '@/lib/constants'
 
 interface ChatListProps {
   messages: StoredChat[]
@@ -15,54 +14,24 @@ interface ChatListProps {
 
 export function ChatList({ messages, selected, onSelect, onDelete }: ChatListProps) {
   if (messages.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        <p className="text-sm">No chat messages yet</p>
-      </div>
-    )
+    return <EmptyState message="No chat messages yet" />
   }
 
   return (
     <div className="divide-y">
       {messages.map((msg) => (
-        <div
+        <ListItem
           key={msg.id}
-          onClick={() => onSelect(msg)}
-          className={cn(
-            "p-3 cursor-pointer hover:bg-accent/50 transition-colors",
-            selected?.id === msg.id && "bg-accent"
-          )}
-        >
-          <div className="flex justify-between items-start mb-1">
-            <span className="font-medium text-sm truncate flex-1">
-              {msg.chat.to?.join(', ')}
-            </span>
-            <span className="text-xs text-muted-foreground ml-2">
-              {formatDate(msg.created_at)}
-            </span>
-          </div>
-          {msg.chat.from && (
-            <div className="text-xs text-muted-foreground">
-              From: {msg.chat.from}
-            </div>
-          )}
-          <div className="text-xs text-muted-foreground truncate mt-1">
-            {msg.chat.message?.slice(0, 80)}
-          </div>
-          <div className="flex justify-end mt-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(msg.id)
-              }}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
+          id={msg.id}
+          title={msg.chat.to?.join(', ') || 'Unknown'}
+          subtitle={msg.chat.from ? `From: ${msg.chat.from}` : undefined}
+          preview={msg.chat.message?.slice(0, PREVIEW_TEXT_LENGTH)}
+          timestamp={msg.created_at}
+          isSelected={selected?.id === msg.id}
+          isSelectable
+          onSelect={() => onSelect(msg)}
+          onDelete={() => onDelete(msg.id)}
+        />
       ))}
     </div>
   )
@@ -73,59 +42,59 @@ interface ChatDetailProps {
 }
 
 export function ChatDetail({ chat }: ChatDetailProps) {
+  const { to, from, message, template_id, template_params, media_url, media_type, buttons, metadata } = chat.chat
+
   return (
     <>
       <div className="p-4 border-b">
         <h2 className="text-lg font-semibold">Chat Message</h2>
         <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-          <div>To: {chat.chat.to?.join(', ')}</div>
-          {chat.chat.from && <div>From: {chat.chat.from}</div>}
+          <div>To: {to?.join(', ')}</div>
+          {from && <div>From: {from}</div>}
           <div>{formatFullDate(chat.created_at)}</div>
         </div>
       </div>
       <ScrollArea className="flex-1 p-4">
-        <div className="bg-muted p-4 rounded-lg">
-          {chat.chat.message}
-        </div>
+        <div className="bg-muted p-4 rounded-lg">{message}</div>
 
-        {chat.chat.template_id && (
+        {template_id && (
           <Section title="Template">
             <div className="text-sm bg-muted/50 p-2 rounded">
-              <div>ID: {chat.chat.template_id}</div>
-              {(chat.chat.template_params?.length ?? 0) > 0 && (
-                <div>Params: {chat.chat.template_params?.join(', ')}</div>
+              <div>ID: {template_id}</div>
+              {hasItems(template_params) && (
+                <div>Params: {template_params?.join(', ')}</div>
               )}
             </div>
           </Section>
         )}
 
-        {chat.chat.media_url && (
+        {media_url && (
           <Section title="Media">
             <a
-              href={chat.chat.media_url}
+              href={media_url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline text-sm"
             >
-              {chat.chat.media_type || 'View Media'}
+              {media_type || 'View Media'}
             </a>
           </Section>
         )}
 
-        {(chat.chat.buttons?.length ?? 0) > 0 && (
+        {hasItems(buttons) && (
           <Section title="Buttons">
             <div className="flex flex-wrap gap-2">
-              {chat.chat.buttons?.map((btn, i) => (
+              {buttons?.map((btn, i) => (
                 <Badge key={i} variant="outline">{btn.text}</Badge>
               ))}
             </div>
           </Section>
         )}
 
-        {chat.chat.metadata && Object.keys(chat.chat.metadata).length > 0 && (
+        {hasData(metadata) && (
           <Section title="Metadata">
             <pre className="text-xs bg-muted/50 p-2 rounded overflow-auto">
-              {JSON.stringify(chat.chat.metadata, null, 2)}
+              {JSON.stringify(metadata, null, 2)}
             </pre>
           </Section>
         )}
@@ -141,4 +110,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </div>
   )
+}
+
+function hasItems<T>(arr?: T[]): boolean {
+  return Boolean(arr && arr.length > 0)
+}
+
+function hasData(data?: Record<string, string>): boolean {
+  return Boolean(data && Object.keys(data).length > 0)
 }

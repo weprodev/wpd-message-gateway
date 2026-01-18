@@ -1,65 +1,39 @@
-# WPD Message Gateway
+<p align="center">
+  <img src="assets/logo.png" alt="Message Gateway Logo" width="400" />
+</p>
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/weprodev/wpd-message-gateway.svg)](https://pkg.go.dev/github.com/weprodev/wpd-message-gateway)
-[![Go Report Card](https://goreportcard.com/badge/github.com/weprodev/wpd-message-gateway)](https://goreportcard.com/report/github.com/weprodev/wpd-message-gateway)
+<h1 align="center">Message Gateway</h1>
 
-**A unified Go library and HTTP API for sending Email, SMS, Push, and Chat messages.**
+<p align="center">
+  <strong>A unified Go library and HTTP API for sending Email, SMS, Push, and Chat messages.</strong>
+</p>
 
-One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
+<p align="center">
+  <a href="https://pkg.go.dev/github.com/weprodev/wpd-message-gateway"><img src="https://pkg.go.dev/badge/github.com/weprodev/wpd-message-gateway.svg" alt="Go Reference"></a>
+  <a href="https://goreportcard.com/report/github.com/weprodev/wpd-message-gateway"><img src="https://goreportcard.com/badge/github.com/weprodev/wpd-message-gateway" alt="Go Report Card"></a>
+  <a href="https://github.com/weprodev/wpd-message-gateway/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+</p>
 
-## Why Use This?
+<p align="center">
+  One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
+</p>
 
-- **🔌 One API, Many Providers** — Send emails via Mailgun today, switch to SendGrid tomorrow. No code changes.
-- **📦 DevBox Included** — Built-in web UI to preview emails, SMS, push notifications, and chat messages during development.
-- **🧪 E2E Testing Ready** — Memory provider stores messages in RAM. Query them via REST API for automated testing.
-- **🚀 Go Library + HTTP Server** — Use as a Go package (`import`) or deploy as a standalone microservice.
+---
 
-## How It Works
+## Why Message Gateway?
 
-```
-┌─────────────────┐
-│   Your App      │
-└────────┬────────┘
-         │ POST /v1/email
-         ▼
-┌─────────────────┐
-│  Gateway Service│
-│ (Routes by      │
-│  provider name) │
-└────────┬────────┘
-         │
-         │ providers.defaults.email = ?
-         │
-    ┌────┴────────────────────────────┐
-    │                                 │
-    ▼                                 ▼
-┌─────────────────┐       ┌─────────────────┐
-│ "memory"        │       │ "mailgun"       │
-│                 │       │ "sendgrid"      │
-│ ┌─────────────┐ │       │ etc.            │
-│ │ DevBox UI   │ │       │                 │
-│ │ (RAM store) │ │       │  Real Provider  │
-│ └─────────────┘ │       │  (API calls)    │
-│        +        │       │                 │
-│ ┌─────────────┐ │       └─────────────────┘
-│ │ Mailpit     │ │
-│ │ (optional)  │ │ ← Only if mailpit.enabled: true
-│ └─────────────┘ │
-└─────────────────┘
-```
+Building applications that send messages across multiple channels is complex. You need to integrate different APIs, handle various authentication methods, manage provider-specific quirks, and test everything without spamming real users.
 
-## Message Types
+**Message Gateway solves this by providing:**
 
-| Type | What it does | Example providers |
-|------|--------------|-------------------|
-| 📧 **Email** | Send emails with HTML, attachments | Mailgun, SendGrid, AWS SES |
-| 📱 **SMS** | Send text messages to phones | Twilio, Vonage |
-| 🔔 **Push** | Send notifications to apps | Firebase, OneSignal |
-| 💬 **Chat** | Send messages on chat platforms | WhatsApp, Telegram, Slack |
+- **Unified API** — Send emails, SMS, push notifications, and chat messages through a single, consistent interface
+- **Provider Abstraction** — Switch from Mailgun to SendGrid, or Twilio to Vonage, with a config change—no code modifications
+- **DevBox** — Built-in web UI to preview all messages during development
+- **E2E Testing** — Memory provider captures messages for automated testing without external dependencies
 
 ## Quick Start
 
-### Option 1: Use as a Go Package
+### As a Go Package
 
 ```bash
 go get github.com/weprodev/wpd-message-gateway
@@ -93,21 +67,25 @@ func main() {
 }
 ```
 
-### Option 2: Run as HTTP Server
+### As an HTTP Server
 
 ```bash
-# 1. Clone and configure
 git clone https://github.com/weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
 cp configs/local.example.yml configs/local.yml
-
-# 2. Start everything (Gateway + DevBox UI)
 make start
 ```
 
-Open http://localhost:10104 to see all intercepted messages in the DevBox UI.
+Open **http://localhost:10104** to see the DevBox UI with all captured messages.
 
-→ See [Usage Guide](docs/usage.md) for more examples.
+## Supported Message Types
+
+| Type | Description | Providers |
+|------|-------------|-----------|
+| **Email** | Send emails with HTML, plain text, and attachments | Mailgun, Memory |
+| **SMS** | Send text messages to mobile phones | Memory (Twilio planned) |
+| **Push** | Send notifications to mobile and web apps | Memory (Firebase planned) |
+| **Chat** | Send messages to chat platforms | Memory (WhatsApp, Slack planned) |
 
 ## Configuration
 
@@ -116,10 +94,10 @@ Configure providers in `configs/local.yml`:
 ```yaml
 providers:
   defaults:
-    email: mailgun   # or: memory, sendgrid, ses
-    sms: memory      # or: twilio, vonage
-    push: memory     # or: firebase, onesignal
-    chat: memory     # or: slack, telegram, whatsapp
+    email: mailgun
+    sms: memory
+    push: memory
+    chat: memory
   
   email:
     mailgun:
@@ -127,19 +105,18 @@ providers:
       domain: "mg.yourdomain.com"
 ```
 
-Or use environment variables for secrets:
+Or use environment variables:
 
 ```bash
 MESSAGE_MAILGUN_API_KEY=key-xxxxx
 MESSAGE_MAILGUN_DOMAIN=mg.example.com
 ```
 
-## Development Mode (DevBox)
+## Development with DevBox
 
-During development, use the **memory** provider to capture all messages locally:
+During development, use the **memory** provider to capture all messages locally without sending them to real recipients:
 
 ```yaml
-# configs/local.yml
 providers:
   defaults:
     email: memory
@@ -148,86 +125,64 @@ providers:
     chat: memory
 ```
 
-→ See [DevBox Documentation](docs/devbox.md) for details.
+The DevBox UI at **http://localhost:10104** displays all captured messages organized by type.
 
-### Mailpit Integration (Optional)
+### Optional: Mailpit Integration
 
-For realistic email preview with HTML rendering:
+For realistic HTML email preview with proper rendering:
 
 ```bash
-# 1. Start Mailpit
-make mailpit
-
-# 2. Enable in configs/local.yml:
-mailpit:
-  enabled: true
-
-# 3. Start server
-make start
-
-# View emails:
-#   - DevBox UI: http://localhost:10104 (all message types)
-#   - Mailpit:   http://localhost:10103 (email preview)
+make mailpit          # Start Mailpit
+# Enable in configs/local.yml: mailpit.enabled: true
+make start            # Start the gateway
 ```
 
-## E2E Testing in CI
+View emails at:
+- **DevBox**: http://localhost:10104 (all message types)
+- **Mailpit**: http://localhost:10103 (rich email preview)
 
-Use the gateway to **capture and verify** all messages your app sends during tests. No mocks needed.
+## E2E Testing
 
-**Benefits:**
-- ✅ Test real HTTP calls, not mocks
-- ✅ Verify exact message content (subject, body, recipients)
-- ✅ Test all channels: Email + SMS + Push + Chat
-- ✅ Zero external dependencies (no Mailgun/Twilio accounts needed)
+Capture and verify messages your application sends during automated tests—no mocks required.
 
 ```yaml
+# docker-compose.yml
 services:
   gateway:
     image: ghcr.io/weprodev/wpd-message-gateway:latest
     ports:
       - 10101:10101
-
-steps:
-  - run: npm test  # Your app sends to http://localhost:10101
-  
-  - name: Verify welcome email
-    run: |
-      curl -s http://localhost:10101/api/v1/emails | \
-        jq -e '.emails[0].email.subject == "Welcome!"'
 ```
 
-→ See [E2E Testing Guide](docs/e2e-testing.md) for complete examples.
+```bash
+# Verify the welcome email was sent correctly
+curl -s http://localhost:10101/api/v1/emails | \
+  jq -e '.emails[0].email.subject == "Welcome!"'
+```
 
-## Provider Status
-
-| Type | Provider | Status |
-|------|----------|--------|
-| 📧 Email | Mailgun | ✅ Ready |
-| 📧 Email | Memory (DevBox) | ✅ Ready |
-| 📧 Email | SendGrid | 📋 Planned |
-| 📱 SMS | Memory (DevBox) | ✅ Ready |
-| 📱 SMS | Twilio | 📋 Planned |
-| 🔔 Push | Memory (DevBox) | ✅ Ready |
-| 🔔 Push | Firebase | 📋 Planned |
-| 💬 Chat | Memory (DevBox) | ✅ Ready |
-| 💬 Chat | WhatsApp | 📋 Planned |
+See the [E2E Testing Guide](docs/e2e-testing.md) for complete examples.
 
 ## Commands
 
 ```bash
-make install    # Install all dependencies
-make start      # Start development (Gateway + DevBox UI)
+make install    # Install dependencies
+make start      # Start development server with DevBox
 make test       # Run tests
-make audit      # Full check: format + lint + test + security
+make audit      # Format, lint, test, and security check
 make build      # Build all packages
-
-# Docker
-make dev        # Start Gateway via Docker
-make dev-down   # Stop Docker
-
-# Optional (email preview)
-make mailpit    # Start Mailpit for HTML email preview
+make upgrade    # Upgrade all dependencies
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Usage Guide](docs/usage.md) | Installation, configuration, and examples |
+| [E2E Testing](docs/e2e-testing.md) | Automated testing patterns |
+| [Architecture](docs/architecture.md) | System design and principles |
+| [DevBox](docs/devbox.md) | Development inbox documentation |
+| [Contributing](docs/contributing.md) | How to add providers |
+| [Code Conventions](docs/code-conventions.md) | Coding standards |
 
 ## Project Structure
 
@@ -236,37 +191,73 @@ wpd-message-gateway/
 ├── cmd/server/          # HTTP server entry point
 ├── configs/             # YAML configuration files
 ├── internal/            # Private application code
-│   ├── app/             # Configuration, wiring, validation
-│   ├── core/            # Business logic
-│   │   ├── port/        # Interface definitions (contracts)
-│   │   └── service/     # Gateway service, registry
-│   ├── infrastructure/  # External integrations
-│   │   └── provider/    # Provider implementations
-│   │       ├── mailgun/ # Mailgun email provider
-│   │       └── memory/  # In-memory provider (DevBox)
-│   └── presentation/    # HTTP layer
-│       ├── handler/     # Request handlers
-│       └── router.go    # Route definitions
-├── pkg/                 # Public packages for external use
+│   ├── app/             # Configuration and wiring
+│   ├── core/            # Business logic and interfaces
+│   └── infrastructure/  # Provider implementations
+├── pkg/                 # Public packages
 │   ├── contracts/       # Message types (Email, SMS, Push, Chat)
-│   ├── errors/          # Error types
 │   └── gateway/         # Embedded SDK
 ├── web/                 # DevBox React UI
-└── tests/bruno/         # API test collection
+└── docs/                # Documentation
 ```
 
-## Documentation
+## Contributing
 
-| Document | Description |
-|----------|-------------|
-| [Usage Guide](docs/usage.md) | Install, configure, and send messages |
-| [E2E Testing](docs/e2e-testing.md) | Test your app's messages in CI |
-| [Architecture](docs/architecture.md) | System design and principles |
-| [DevBox](docs/devbox.md) | Development inbox UI |
-| [Contributing](docs/contributing.md) | Add new providers |
-| [Workflow](docs/workflow.md) | CI/CD and releases |
-| [Code Conventions](docs/code-conventions.md) | Coding standards |
+We welcome contributions! Whether you're fixing bugs, adding features, or improving documentation, your help makes Message Gateway better for everyone.
+
+**Ways to contribute:**
+
+1. **Report bugs** — Open an issue describing the problem
+2. **Suggest features** — Share your ideas for improvements
+3. **Submit pull requests** — Code contributions are always welcome
+4. **Add providers** — Help expand support for more messaging services
+5. **Improve docs** — Help others understand and use the project
+6. **Become a sponsor** — Support ongoing development and maintenance
+
+See [CONTRIBUTING.md](docs/contributing.md) for detailed guidelines.
+
+### Development Setup
+
+```bash
+git clone https://github.com/weprodev/wpd-message-gateway.git
+cd wpd-message-gateway
+make install
+make start
+```
+
+Run `make audit` before submitting pull requests to ensure code quality.
+
+## Become a Sponsor
+
+Message Gateway is open source and free to use. If it helps your team ship faster, consider supporting its continued development.
+
+**Your sponsorship helps:**
+
+- Maintain and improve the codebase
+- Add support for more providers 
+- Build better documentation and examples
+- Keep the project actively maintained
+
+<p align="center">
+  <a href="https://github.com/sponsors/weprodev">
+    <img src="https://img.shields.io/badge/Sponsor-❤️-ea4aaa?style=for-the-badge" alt="Sponsor">
+  </a>
+</p>
+
+**Sponsor tiers:**
+
+- **Individual** — Support open source development
+- **Startup** — Priority support and feature requests
+- **Enterprise** — Custom integrations and dedicated support
+
+[Become a sponsor →](https://github.com/sponsors/weprodev)
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — Free for personal and commercial use.
+
+---
+
+<p align="center">
+  Built with ❤️ by <a href="https://github.com/weprodev">WeProDev</a>
+</p>

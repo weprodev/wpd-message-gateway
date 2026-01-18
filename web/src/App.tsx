@@ -4,14 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStats, useEmails, useSMS, usePush, useChat, useDeleteMessage, useClearAll, useSSE } from '@/hooks/useMessages'
+import { useDarkMode } from '@/hooks/useDarkMode'
 import { EmailList, EmailDetail } from '@/features/email'
 import { SMSList } from '@/features/sms'
 import { PushList } from '@/features/push'
 import { ChatList, ChatDetail } from '@/features/chat'
-import type { StoredEmail, StoredChat } from '@/types/messages'
+import type { StoredEmail, StoredChat, MessageType } from '@/types/messages'
 import { cn } from '@/lib/utils'
-
-type MessageType = 'email' | 'sms' | 'push' | 'chat'
+import { BADGE_MAX_COUNT } from '@/lib/constants'
 
 const NAV_ITEMS = [
   { type: 'email' as const, icon: Mail, label: 'Email' },
@@ -21,7 +21,7 @@ const NAV_ITEMS = [
 ]
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true)
+  const { darkMode, toggle: toggleDarkMode } = useDarkMode()
   const [activeType, setActiveType] = useState<MessageType>('email')
   const [selectedEmail, setSelectedEmail] = useState<StoredEmail | null>(null)
   const [selectedChat, setSelectedChat] = useState<StoredChat | null>(null)
@@ -36,19 +36,14 @@ export default function App() {
   const deleteMessage = useDeleteMessage()
   const clearAll = useClearAll()
 
-  if (darkMode) {
-    document.documentElement.classList.add('dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-  }
-
-  const getCount = (type: MessageType) => {
-    switch (type) {
-      case 'email': return stats?.emails ?? 0
-      case 'sms': return stats?.sms ?? 0
-      case 'push': return stats?.push ?? 0
-      case 'chat': return stats?.chat ?? 0
+  const getCount = (type: MessageType): number => {
+    const counts: Record<MessageType, number> = {
+      email: stats?.emails ?? 0,
+      sms: stats?.sms ?? 0,
+      push: stats?.push ?? 0,
+      chat: stats?.chat ?? 0,
     }
+    return counts[type]
   }
 
   const handleNavClick = (type: MessageType) => {
@@ -57,60 +52,31 @@ export default function App() {
     setSelectedChat(null)
   }
 
+  const handleDelete = (type: string, id: string) => {
+    deleteMessage.mutate({ type, id })
+  }
+
   const hasDetailPanel = activeType === 'email' || activeType === 'chat'
+  const totalCount = stats?.total ?? 0
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 border-b shrink-0">
-        <div className="flex items-center gap-2">
-          <Archive className="h-5 w-5 text-primary" />
-          <span className="font-semibold">DevBox</span>
-          <Badge variant="secondary" className="ml-2">{stats?.total ?? 0}</Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => clearAll.mutate()}
-            disabled={clearAll.isPending || (stats?.total ?? 0) === 0}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDarkMode(!darkMode)}>
-            {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        </div>
-      </header>
+      <Header
+        totalCount={totalCount}
+        darkMode={darkMode}
+        onToggleDarkMode={toggleDarkMode}
+        onClear={() => clearAll.mutate()}
+        isClearDisabled={clearAll.isPending || totalCount === 0}
+      />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-14 border-r flex flex-col items-center py-2 gap-1 shrink-0">
-          {NAV_ITEMS.map(({ type, icon: Icon, label }) => {
-            const count = getCount(type)
-            return (
-              <Button
-                key={type}
-                variant={activeType === type ? 'secondary' : 'ghost'}
-                size="icon"
-                className="relative"
-                onClick={() => handleNavClick(type)}
-                title={label}
-              >
-                <Icon className="h-4 w-4" />
-                {count > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 text-[10px] bg-primary text-primary-foreground rounded-full flex items-center justify-center">
-                    {count > 99 ? '99+' : count}
-                  </span>
-                )}
-              </Button>
-            )
-          })}
-        </aside>
+        <Sidebar
+          activeType={activeType}
+          getCount={getCount}
+          onNavClick={handleNavClick}
+        />
 
-        {/* Message List */}
-        <div className={cn("border-r flex flex-col", hasDetailPanel ? "w-80" : "flex-1")}>
+        <MessageListPanel hasDetailPanel={hasDetailPanel}>
           <div className="p-3 border-b shrink-0">
             <h2 className="font-semibold capitalize">{activeType}</h2>
           </div>
@@ -120,19 +86,19 @@ export default function App() {
                 emails={emails}
                 selected={selectedEmail}
                 onSelect={setSelectedEmail}
-                onDelete={(id) => deleteMessage.mutate({ type: 'emails', id })}
+                onDelete={(id) => handleDelete('emails', id)}
               />
             )}
             {activeType === 'sms' && (
               <SMSList
                 messages={sms}
-                onDelete={(id) => deleteMessage.mutate({ type: 'sms', id })}
+                onDelete={(id) => handleDelete('sms', id)}
               />
             )}
             {activeType === 'push' && (
               <PushList
                 notifications={push}
-                onDelete={(id) => deleteMessage.mutate({ type: 'push', id })}
+                onDelete={(id) => handleDelete('push', id)}
               />
             )}
             {activeType === 'chat' && (
@@ -140,13 +106,12 @@ export default function App() {
                 messages={chat}
                 selected={selectedChat}
                 onSelect={setSelectedChat}
-                onDelete={(id) => deleteMessage.mutate({ type: 'chat', id })}
+                onDelete={(id) => handleDelete('chat', id)}
               />
             )}
           </ScrollArea>
-        </div>
+        </MessageListPanel>
 
-        {/* Detail Panel */}
         {activeType === 'email' && (
           <DetailPanel>
             {selectedEmail ? (
@@ -166,6 +131,93 @@ export default function App() {
           </DetailPanel>
         )}
       </div>
+    </div>
+  )
+}
+
+// --- Sub-components ---
+
+interface HeaderProps {
+  totalCount: number
+  darkMode: boolean
+  onToggleDarkMode: () => void
+  onClear: () => void
+  isClearDisabled: boolean
+}
+
+function Header({ totalCount, darkMode, onToggleDarkMode, onClear, isClearDisabled }: HeaderProps) {
+  return (
+    <header className="flex items-center justify-between px-4 py-2 border-b shrink-0">
+      <div className="flex items-center gap-2">
+        <Archive className="h-5 w-5 text-primary" />
+        <span className="font-semibold">Message Gateway - DevBox</span>
+        <Badge variant="secondary" className="ml-2">{totalCount}</Badge>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClear}
+          disabled={isClearDisabled}
+        >
+          <Trash2 className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onToggleDarkMode}>
+          {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+      </div>
+    </header>
+  )
+}
+
+interface SidebarProps {
+  activeType: MessageType
+  getCount: (type: MessageType) => number
+  onNavClick: (type: MessageType) => void
+}
+
+function Sidebar({ activeType, getCount, onNavClick }: SidebarProps) {
+  return (
+    <aside className="w-14 border-r flex flex-col items-center py-2 gap-1 shrink-0">
+      {NAV_ITEMS.map(({ type, icon: Icon, label }) => {
+        const count = getCount(type)
+        return (
+          <Button
+            key={type}
+            variant={activeType === type ? 'secondary' : 'ghost'}
+            size="icon"
+            className="relative"
+            onClick={() => onNavClick(type)}
+            title={label}
+          >
+            <Icon className="h-4 w-4" />
+            {count > 0 && <CountBadge count={count} />}
+          </Button>
+        )
+      })}
+    </aside>
+  )
+}
+
+function CountBadge({ count }: { count: number }) {
+  const displayCount = count > BADGE_MAX_COUNT ? `${BADGE_MAX_COUNT}+` : count
+  return (
+    <span className="absolute -top-1 -right-1 h-4 w-4 text-[10px] bg-primary text-primary-foreground rounded-full flex items-center justify-center">
+      {displayCount}
+    </span>
+  )
+}
+
+interface MessageListPanelProps {
+  hasDetailPanel: boolean
+  children: React.ReactNode
+}
+
+function MessageListPanel({ hasDetailPanel, children }: MessageListPanelProps) {
+  return (
+    <div className={cn('border-r flex flex-col', hasDetailPanel ? 'w-80' : 'flex-1')}>
+      {children}
     </div>
   )
 }
