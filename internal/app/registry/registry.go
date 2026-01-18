@@ -53,16 +53,16 @@ type ChatConfig struct {
 }
 
 // EmailProviderFactory creates an email provider from config.
-type EmailProviderFactory func(cfg EmailConfig, store port.MessageStore, mailpit MailpitConfig) (port.EmailSender, error)
+type EmailProviderFactory func(cfg EmailConfig, mailpit MailpitConfig) (port.EmailSender, error)
 
 // SMSProviderFactory creates an SMS provider from config.
-type SMSProviderFactory func(cfg SMSConfig, store port.MessageStore) (port.SMSSender, error)
+type SMSProviderFactory func(cfg SMSConfig) (port.SMSSender, error)
 
 // PushProviderFactory creates a push provider from config.
-type PushProviderFactory func(cfg PushConfig, store port.MessageStore) (port.PushSender, error)
+type PushProviderFactory func(cfg PushConfig) (port.PushSender, error)
 
 // ChatProviderFactory creates a chat provider from config.
-type ChatProviderFactory func(cfg ChatConfig, store port.MessageStore) (port.ChatSender, error)
+type ChatProviderFactory func(cfg ChatConfig) (port.ChatSender, error)
 
 var (
 	emailFactories = make(map[string]EmailProviderFactory)

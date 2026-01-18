@@ -7,15 +7,13 @@ import (
 
 // ProviderFactory creates provider instances using the registry.
 type ProviderFactory struct {
-	cfg   *Config
-	store port.MessageStore
+	cfg *Config
 }
 
 // NewProviderFactory creates a new provider factory.
-func NewProviderFactory(cfg *Config, store port.MessageStore) *ProviderFactory {
+func NewProviderFactory(cfg *Config) *ProviderFactory {
 	return &ProviderFactory{
-		cfg:   cfg,
-		store: store,
+		cfg: cfg,
 	}
 }
 
@@ -28,7 +26,7 @@ func (f *ProviderFactory) CreateEmailProvider(name string) (port.EmailSender, er
 
 	cfg := f.toRegistryEmailConfig(name)
 	mailpit := registry.MailpitConfig{Enabled: f.cfg.Mailpit.Enabled}
-	return factory(cfg, f.store, mailpit)
+	return factory(cfg, mailpit)
 }
 
 // CreateSMSProvider creates an SMS provider by name.
@@ -39,7 +37,7 @@ func (f *ProviderFactory) CreateSMSProvider(name string) (port.SMSSender, error)
 	}
 
 	cfg := f.toRegistrySMSConfig(name)
-	return factory(cfg, f.store)
+	return factory(cfg)
 }
 
 // CreatePushProvider creates a push provider by name.
@@ -50,7 +48,7 @@ func (f *ProviderFactory) CreatePushProvider(name string) (port.PushSender, erro
 	}
 
 	cfg := f.toRegistryPushConfig(name)
-	return factory(cfg, f.store)
+	return factory(cfg)
 }
 
 // CreateChatProvider creates a chat provider by name.
@@ -61,7 +59,7 @@ func (f *ProviderFactory) CreateChatProvider(name string) (port.ChatSender, erro
 	}
 
 	cfg := f.toRegistryChatConfig(name)
-	return factory(cfg, f.store)
+	return factory(cfg)
 }
 
 func (f *ProviderFactory) toRegistryEmailConfig(name string) registry.EmailConfig {

@@ -60,7 +60,7 @@ import (
 )
 
 func init() {
-    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ port.MessageStore, _ registry.MailpitConfig) (port.EmailSender, error) {
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ registry.MailpitConfig) (port.EmailSender, error) {
         return New(Config{
             APIKey:    cfg.APIKey,
             FromEmail: cfg.FromEmail,

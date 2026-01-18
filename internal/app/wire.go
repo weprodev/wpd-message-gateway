@@ -20,9 +20,9 @@ type Application struct {
 }
 
 func Wire(cfg *Config) (*Application, error) {
-	memoryStore := memory.NewStore()
+	memoryStore := memory.GetStore()
 	registry := service.NewRegistry()
-	factory := NewProviderFactory(cfg, memoryStore)
+	factory := NewProviderFactory(cfg)
 
 	if err := initializeDefaultProviders(cfg, factory, registry); err != nil {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)

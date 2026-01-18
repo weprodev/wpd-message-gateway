@@ -9,6 +9,20 @@ import (
 
 const ProviderName = "memory"
 
+var (
+	globalStore     *Store
+	globalStoreOnce sync.Once
+)
+
+// GetStore returns the singleton memory store instance.
+// This is used by the memory provider internally and by handlers that need access to stored messages.
+func GetStore() *Store {
+	globalStoreOnce.Do(func() {
+		globalStore = NewStore()
+	})
+	return globalStore
+}
+
 // StoredEmail wraps an email with metadata for storage.
 type StoredEmail struct {
 	ID        string           `json:"id"`
