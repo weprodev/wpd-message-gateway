@@ -9,7 +9,19 @@ import (
 
 const ProviderName = "memory"
 
-// --- Stored Message Wrappers ---
+var (
+	globalStore     *Store
+	globalStoreOnce sync.Once
+)
+
+// GetStore returns the singleton memory store instance.
+// This is used by the memory provider internally and by handlers that need access to stored messages.
+func GetStore() *Store {
+	globalStoreOnce.Do(func() {
+		globalStore = NewStore()
+	})
+	return globalStore
+}
 
 // StoredEmail wraps an email with metadata for storage.
 type StoredEmail struct {
@@ -58,8 +70,6 @@ func NewStore() *Store {
 	}
 }
 
-// --- Email Methods ---
-
 // Emails returns a copy of all stored emails.
 func (s *Store) Emails() []*StoredEmail {
 	s.mu.RLock()
@@ -100,8 +110,6 @@ func (s *Store) AddEmail(stored *StoredEmail) {
 	defer s.mu.Unlock()
 	s.emails = append(s.emails, stored)
 }
-
-// --- SMS Methods ---
 
 // AllSMS returns a copy of all stored SMS messages.
 func (s *Store) AllSMS() []*StoredSMS {
@@ -144,8 +152,6 @@ func (s *Store) AddSMS(stored *StoredSMS) {
 	s.sms = append(s.sms, stored)
 }
 
-// --- Push Methods ---
-
 // Pushes returns a copy of all stored push notifications.
 func (s *Store) Pushes() []*StoredPush {
 	s.mu.RLock()
@@ -187,8 +193,6 @@ func (s *Store) AddPush(stored *StoredPush) {
 	s.pushes = append(s.pushes, stored)
 }
 
-// --- Chat Methods ---
-
 // Chats returns a copy of all stored chat messages.
 func (s *Store) Chats() []*StoredChat {
 	s.mu.RLock()
@@ -229,8 +233,6 @@ func (s *Store) AddChat(stored *StoredChat) {
 	defer s.mu.Unlock()
 	s.chats = append(s.chats, stored)
 }
-
-// --- General Methods ---
 
 // Count returns the total number of stored messages across all types.
 func (s *Store) Count() int {

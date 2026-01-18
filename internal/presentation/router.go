@@ -46,8 +46,6 @@ func (rt *Router) Setup() chi.Router {
 		r.Post("/sms", rt.gatewayHandler.HandleSendSMS)
 		r.Post("/push", rt.gatewayHandler.HandleSendPush)
 		r.Post("/chat", rt.gatewayHandler.HandleSendChat)
-		r.Get("/inbox", rt.gatewayHandler.HandleGetInbox)
-		r.Delete("/inbox", rt.gatewayHandler.HandleClearInbox)
 	})
 
 	// DevBox API - for viewing intercepted messages

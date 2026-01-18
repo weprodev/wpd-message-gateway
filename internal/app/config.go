@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
 )
 
 // Config represents the application configuration.
@@ -16,11 +18,11 @@ type Config struct {
 	Providers   ProviderConfig `yaml:"providers"`
 	Mailpit     MailpitConfig  `yaml:"mailpit,omitempty"`
 
-	// Parsed provider configs
-	EmailProviders map[string]EmailConfig `yaml:"-"`
-	SMSProviders   map[string]SMSConfig   `yaml:"-"`
-	PushProviders  map[string]PushConfig  `yaml:"-"`
-	ChatProviders  map[string]ChatConfig  `yaml:"-"`
+	// Parsed provider configs - using registry types as single source of truth
+	EmailProviders map[string]registry.EmailConfig `yaml:"-"`
+	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
+	PushProviders  map[string]registry.PushConfig  `yaml:"-"`
+	ChatProviders  map[string]registry.ChatConfig  `yaml:"-"`
 }
 
 // MailpitConfig holds SMTP forwarding configuration.
@@ -56,51 +58,11 @@ type ProviderDefaults struct {
 	Chat  string `yaml:"chat"`
 }
 
-// Intermediate maps for YAML parsing (allows any key-value pairs)
 type EmailConfigMap map[string]string
 type SMSConfigMap map[string]string
 type PushConfigMap map[string]string
 type ChatConfigMap map[string]string
 
-// CommonConfig shared fields across all providers.
-// The Extra map captures any additional fields not explicitly defined.
-type CommonConfig struct {
-	APIKey    string
-	APISecret string
-	Region    string
-	BaseURL   string
-	Extra     map[string]string
-}
-
-// EmailConfig holds email provider configuration.
-type EmailConfig struct {
-	CommonConfig
-	Domain    string
-	FromEmail string
-	FromName  string
-}
-
-// SMSConfig holds SMS provider configuration.
-type SMSConfig struct {
-	CommonConfig
-	FromPhone string
-}
-
-// PushConfig holds push notification provider configuration.
-type PushConfig struct {
-	CommonConfig
-	AppID string
-	Topic string
-}
-
-// ChatConfig holds chat provider configuration.
-type ChatConfig struct {
-	CommonConfig
-	FromPhone  string
-	WebhookURL string
-}
-
-// Default Providers Helpers
 func (c *Config) DefaultEmailProvider() string { return c.Providers.Defaults.Email }
 func (c *Config) DefaultSMSProvider() string   { return c.Providers.Defaults.SMS }
 func (c *Config) DefaultPushProvider() string  { return c.Providers.Defaults.Push }
@@ -118,10 +80,10 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		EmailProviders: make(map[string]EmailConfig),
-		SMSProviders:   make(map[string]SMSConfig),
-		PushProviders:  make(map[string]PushConfig),
-		ChatProviders:  make(map[string]ChatConfig),
+		EmailProviders: make(map[string]registry.EmailConfig),
+		SMSProviders:   make(map[string]registry.SMSConfig),
+		PushProviders:  make(map[string]registry.PushConfig),
+		ChatProviders:  make(map[string]registry.ChatConfig),
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -132,15 +94,6 @@ func LoadConfig(path string) (*Config, error) {
 	cfg.parseProviderConfigs()
 
 	return cfg, nil
-}
-
-// MustLoadConfig loads config and panics on error.
-func MustLoadConfig(path string) *Config {
-	cfg, err := LoadConfig(path)
-	if err != nil {
-		panic(fmt.Sprintf("failed to load config: %v", err))
-	}
-	return cfg
 }
 
 // applyEnvOverrides applies environment variable overrides.
@@ -176,8 +129,8 @@ func (c *Config) applyEnvOverrides() {
 
 // parseProviderConfigs converts raw map configs into typed configs.
 func (c *Config) parseProviderConfigs() {
-	buildCommon := func(m map[string]string) CommonConfig {
-		return CommonConfig{
+	buildCommon := func(m map[string]string) registry.CommonConfig {
+		return registry.CommonConfig{
 			APIKey:    m["api_key"],
 			APISecret: m["api_secret"],
 			Region:    m["region"],
@@ -187,7 +140,7 @@ func (c *Config) parseProviderConfigs() {
 	}
 
 	for name, m := range c.Providers.Email {
-		c.EmailProviders[name] = EmailConfig{
+		c.EmailProviders[name] = registry.EmailConfig{
 			CommonConfig: buildCommon(map[string]string(m)),
 			Domain:       m["domain"],
 			FromEmail:    m["from_email"],
@@ -196,14 +149,14 @@ func (c *Config) parseProviderConfigs() {
 	}
 
 	for name, m := range c.Providers.SMS {
-		c.SMSProviders[name] = SMSConfig{
+		c.SMSProviders[name] = registry.SMSConfig{
 			CommonConfig: buildCommon(map[string]string(m)),
 			FromPhone:    m["from_phone"],
 		}
 	}
 
 	for name, m := range c.Providers.Push {
-		c.PushProviders[name] = PushConfig{
+		c.PushProviders[name] = registry.PushConfig{
 			CommonConfig: buildCommon(map[string]string(m)),
 			AppID:        m["app_id"],
 			Topic:        m["topic"],
@@ -211,22 +164,10 @@ func (c *Config) parseProviderConfigs() {
 	}
 
 	for name, m := range c.Providers.Chat {
-		c.ChatProviders[name] = ChatConfig{
+		c.ChatProviders[name] = registry.ChatConfig{
 			CommonConfig: buildCommon(map[string]string(m)),
 			FromPhone:    m["from_phone"],
 			WebhookURL:   m["webhook_url"],
 		}
 	}
 }
-
-// --- Provider Type (for documentation/validation purposes) ---
-
-// ProviderType defines the type of message provider.
-type ProviderType string
-
-const (
-	ProviderTypeEmail ProviderType = "email"
-	ProviderTypeSMS   ProviderType = "sms"
-	ProviderTypePush  ProviderType = "push"
-	ProviderTypeChat  ProviderType = "chat"
-)

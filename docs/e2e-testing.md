@@ -210,15 +210,20 @@ If your app uses the gateway Go SDK, just change the provider in tests:
 // Production
 gw, _ := gateway.New(gateway.Config{
     DefaultEmailProvider: "mailgun",
-    Mailgun: gateway.MailgunConfig{...},
+    EmailProviders: map[string]gateway.EmailConfig{
+        "mailgun": {
+            CommonConfig: gateway.CommonConfig{APIKey: os.Getenv("MAILGUN_API_KEY")},
+            Domain:       "mg.example.com",
+        },
+    },
 })
 
-// Tests - use memory provider
+// Tests - use memory provider (no config needed)
 gw, _ := gateway.New(gateway.Config{
     DefaultEmailProvider: "memory",
 })
 
-// Messages are stored in memory, query via HTTP API
+// Messages are stored in memory, query via DevBox API
 ```
 
 ---
