@@ -29,20 +29,11 @@ func NewDevBoxHandler(store *memory.Store, mailpitCfg memory.MailpitConfig) *Dev
 	}
 }
 
-// Store returns the underlying memory store.
-func (h *DevBoxHandler) Store() *memory.Store {
-	return h.store
-}
-
-// --- Stats ---
-
 // HandleStats returns message counts by type.
 func (h *DevBoxHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	stats := h.store.Stats()
 	respondJSON(w, http.StatusOK, stats)
 }
-
-// --- Emails ---
 
 // HandleGetEmails returns all stored emails.
 func (h *DevBoxHandler) HandleGetEmails(w http.ResponseWriter, r *http.Request) {
@@ -72,8 +63,6 @@ func (h *DevBoxHandler) HandleDeleteEmailByID(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// --- SMS ---
-
 // HandleGetSMS returns all stored SMS messages.
 func (h *DevBoxHandler) HandleGetSMS(w http.ResponseWriter, r *http.Request) {
 	sms := h.store.AllSMS()
@@ -101,8 +90,6 @@ func (h *DevBoxHandler) HandleDeleteSMSByID(w http.ResponseWriter, r *http.Reque
 	h.broadcast("sms_deleted", id)
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// --- Push Notifications ---
 
 // HandleGetPush returns all stored push notifications.
 func (h *DevBoxHandler) HandleGetPush(w http.ResponseWriter, r *http.Request) {
@@ -132,8 +119,6 @@ func (h *DevBoxHandler) HandleDeletePushByID(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// --- Chat Messages ---
-
 // HandleGetChat returns all stored chat messages.
 func (h *DevBoxHandler) HandleGetChat(w http.ResponseWriter, r *http.Request) {
 	chats := h.store.Chats()
@@ -162,16 +147,12 @@ func (h *DevBoxHandler) HandleDeleteChatByID(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// --- Clear All ---
-
 // HandleClearAll removes all stored messages.
 func (h *DevBoxHandler) HandleClearAll(w http.ResponseWriter, r *http.Request) {
 	h.store.Clear()
 	h.broadcast("messages_cleared", nil)
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// --- Internal Ingest Endpoints ---
 
 // HandleIngestEmail receives an email from external sources.
 func (h *DevBoxHandler) HandleIngestEmail(w http.ResponseWriter, r *http.Request) {
@@ -249,8 +230,6 @@ func (h *DevBoxHandler) HandleIngestChat(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusCreated, map[string]string{"id": result.ID})
 }
 
-// --- SSE (Server-Sent Events) ---
-
 // HandleSSE handles Server-Sent Events connections.
 func (h *DevBoxHandler) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -318,24 +297,4 @@ func (h *DevBoxHandler) broadcast(eventType string, data interface{}) {
 		default:
 		}
 	}
-}
-
-// BroadcastNewEmail broadcasts a new email event.
-func (h *DevBoxHandler) BroadcastNewEmail(id string) {
-	h.broadcast("email_received", map[string]string{"id": id})
-}
-
-// BroadcastNewSMS broadcasts a new SMS event.
-func (h *DevBoxHandler) BroadcastNewSMS(id string) {
-	h.broadcast("sms_received", map[string]string{"id": id})
-}
-
-// BroadcastNewPush broadcasts a new push notification event.
-func (h *DevBoxHandler) BroadcastNewPush(id string) {
-	h.broadcast("push_received", map[string]string{"id": id})
-}
-
-// BroadcastNewChat broadcasts a new chat message event.
-func (h *DevBoxHandler) BroadcastNewChat(id string) {
-	h.broadcast("chat_received", map[string]string{"id": id})
 }

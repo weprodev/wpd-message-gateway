@@ -30,13 +30,6 @@ func NewGatewayService(cfg GatewayConfig, registry *Registry) *GatewayService {
 	}
 }
 
-// Registry returns the underlying registry.
-func (s *GatewayService) Registry() *Registry {
-	return s.registry
-}
-
-// --- Email Methods ---
-
 // SendEmail sends an email using the default provider.
 func (s *GatewayService) SendEmail(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
 	provider, err := s.Email()
@@ -77,8 +70,6 @@ func (s *GatewayService) EmailProvider(name string) (port.EmailSender, error) {
 func (s *GatewayService) RegisterEmailProvider(name string, provider port.EmailSender) {
 	s.registry.RegisterEmailProvider(name, provider)
 }
-
-// --- SMS Methods ---
 
 // SendSMS sends an SMS using the default provider.
 func (s *GatewayService) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.SendResult, error) {
@@ -121,8 +112,6 @@ func (s *GatewayService) RegisterSMSProvider(name string, provider port.SMSSende
 	s.registry.RegisterSMSProvider(name, provider)
 }
 
-// --- Push Methods ---
-
 // SendPush sends a push notification using the default provider.
 func (s *GatewayService) SendPush(ctx context.Context, notification *contracts.PushNotification) (*contracts.SendResult, error) {
 	provider, err := s.Push()
@@ -163,8 +152,6 @@ func (s *GatewayService) PushProvider(name string) (port.PushSender, error) {
 func (s *GatewayService) RegisterPushProvider(name string, provider port.PushSender) {
 	s.registry.RegisterPushProvider(name, provider)
 }
-
-// --- Chat Methods ---
 
 // SendChat sends a chat message using the default provider.
 func (s *GatewayService) SendChat(ctx context.Context, message *contracts.ChatMessage) (*contracts.SendResult, error) {
@@ -207,9 +194,6 @@ func (s *GatewayService) RegisterChatProvider(name string, provider port.ChatSen
 	s.registry.RegisterChatProvider(name, provider)
 }
 
-// --- Error Types ---
-
-// ProviderNotFoundError indicates a requested provider doesn't exist.
 type ProviderNotFoundError struct {
 	ProviderType string
 	ProviderName string
@@ -219,7 +203,6 @@ func (e *ProviderNotFoundError) Error() string {
 	return fmt.Sprintf("%s provider '%s' not found", e.ProviderType, e.ProviderName)
 }
 
-// NewProviderNotFoundError creates a new ProviderNotFoundError.
 func NewProviderNotFoundError(providerType, providerName string) *ProviderNotFoundError {
 	return &ProviderNotFoundError{
 		ProviderType: providerType,

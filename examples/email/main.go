@@ -19,9 +19,7 @@ func main() {
 	// Create gateway with memory provider (for testing)
 	gw, err := gateway.New(gateway.Config{
 		DefaultEmailProvider: "memory",
-		Memory: gateway.MemoryConfig{
-			MailpitEnabled: false,
-		},
+		MailpitEnabled:       false,
 	})
 	if err != nil {
 		log.Fatalf("Failed to create gateway: %v", err)
