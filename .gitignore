@@ -45,3 +45,8 @@ Thumbs.db
 /dist/
 main
 serverbin/
+
+# Node.js
+node_modules/
+web/node_modules/
+web/dist/

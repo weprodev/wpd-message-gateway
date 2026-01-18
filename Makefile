@@ -1,4 +1,4 @@
-.PHONY: install start stop test audit build clean dev dev-down mailpit mailpit-down help
+.PHONY: install upgrade start stop test audit build clean dev dev-down mailpit mailpit-down help
 
 # ============================================================================
 # ANSI Color Codes
@@ -16,6 +16,29 @@ RESET   := \033[0m
 # ============================================================================
 # Core Commands
 # ============================================================================
+
+## Upgrade all dependencies (Go + frontend)
+upgrade:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)⬆️  Upgrading all dependencies...$(RESET)\n"
+	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)📦 Upgrading Go dependencies...$(RESET)\n"
+	@go get -u ./...
+	@go mod tidy
+	@printf "$(GREEN)✅ Go dependencies upgraded!$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)🌐 Upgrading frontend dependencies...$(RESET)\n"
+	@cd web && npm update
+	@cd web && npm audit fix --force 2>/dev/null || true
+	@printf "$(GREEN)✅ Frontend dependencies upgraded!$(RESET)\n"
+	@printf "\n"
+	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
+	@printf "$(BOLD)$(GREEN)✅ All dependencies upgraded!$(RESET)\n"
+	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(MAGENTA)💡 Tip:$(RESET) Run $(YELLOW)make audit$(RESET) to verify everything works\n"
+	@printf "\n"
 
 ## Install all dependencies (Go + tools + frontend)
 install:
@@ -202,6 +225,7 @@ help:
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🚀 Development$(RESET)\n"
 	@printf "   $(YELLOW)make install$(RESET)      Install all dependencies\n"
+	@printf "   $(YELLOW)make upgrade$(RESET)      Upgrade all dependencies\n"
 	@printf "   $(YELLOW)make start$(RESET)        Start Gateway + DevBox UI\n"
 	@printf "   $(YELLOW)make stop$(RESET)         Stop running servers\n"
 	@printf "   $(YELLOW)make test$(RESET)         Run tests\n"
