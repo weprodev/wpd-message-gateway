@@ -11,7 +11,7 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
 )
 
-// Application holds all wired dependencies.
+// The Application holds all wired dependencies.
 type Application struct {
 	Config         *Config
 	GatewayService *service.GatewayService
@@ -19,26 +19,16 @@ type Application struct {
 	Router         *presentation.Router
 }
 
-// Wire creates and wires all application dependencies.
 func Wire(cfg *Config) (*Application, error) {
-	// Create memory store (shared across all memory providers)
 	memoryStore := memory.NewStore()
-
-	// Create registry
 	registry := service.NewRegistry()
-
-	// Create provider factory
 	factory := NewProviderFactory(cfg, memoryStore)
 
-	// Initialize default providers
 	if err := initializeDefaultProviders(cfg, factory, registry); err != nil {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	// Create gateway service
 	gatewaySvc := service.NewGatewayService(cfg, registry)
-
-	// Create handlers
 	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, memoryStore)
 
 	var devboxHandler *handler.DevBoxHandler
@@ -47,7 +37,6 @@ func Wire(cfg *Config) (*Application, error) {
 		devboxHandler = handler.NewDevBoxHandler(memoryStore, mailpitCfg)
 	}
 
-	// Create router
 	router := presentation.NewRouter(gatewayHandler, devboxHandler)
 
 	return &Application{
@@ -58,18 +47,7 @@ func Wire(cfg *Config) (*Application, error) {
 	}, nil
 }
 
-// MustWire creates application or panics.
-func MustWire(cfg *Config) *Application {
-	app, err := Wire(cfg)
-	if err != nil {
-		panic(fmt.Sprintf("failed to wire application: %v", err))
-	}
-	return app
-}
-
-// initializeDefaultProviders initializes providers set as defaults.
 func initializeDefaultProviders(cfg *Config, factory *ProviderFactory, registry *service.Registry) error {
-	// Initialize default email provider
 	if name := cfg.DefaultEmailProvider(); name != "" {
 		provider, err := factory.CreateEmailProvider(name)
 		if err != nil && !isUnknownProviderError(err) {
@@ -81,7 +59,6 @@ func initializeDefaultProviders(cfg *Config, factory *ProviderFactory, registry 
 		}
 	}
 
-	// Initialize default SMS provider
 	if name := cfg.DefaultSMSProvider(); name != "" {
 		provider, err := factory.CreateSMSProvider(name)
 		if err != nil && !isUnknownProviderError(err) {
@@ -93,7 +70,6 @@ func initializeDefaultProviders(cfg *Config, factory *ProviderFactory, registry 
 		}
 	}
 
-	// Initialize default push provider
 	if name := cfg.DefaultPushProvider(); name != "" {
 		provider, err := factory.CreatePushProvider(name)
 		if err != nil && !isUnknownProviderError(err) {
@@ -105,7 +81,6 @@ func initializeDefaultProviders(cfg *Config, factory *ProviderFactory, registry 
 		}
 	}
 
-	// Initialize default chat provider
 	if name := cfg.DefaultChatProvider(); name != "" {
 		provider, err := factory.CreateChatProvider(name)
 		if err != nil && !isUnknownProviderError(err) {
@@ -120,7 +95,6 @@ func initializeDefaultProviders(cfg *Config, factory *ProviderFactory, registry 
 	return nil
 }
 
-// isUnknownProviderError checks if error indicates an unknown provider.
 func isUnknownProviderError(err error) bool {
 	if err == nil {
 		return false

@@ -26,8 +26,6 @@ func NewRegistry() *Registry {
 	}
 }
 
-// --- Email Provider Methods ---
-
 // GetEmailProvider returns an email provider by name.
 func (r *Registry) GetEmailProvider(name string) (port.EmailSender, bool) {
 	r.mu.RLock()
@@ -42,8 +40,6 @@ func (r *Registry) RegisterEmailProvider(name string, provider port.EmailSender)
 	defer r.mu.Unlock()
 	r.emailProviders[name] = provider
 }
-
-// --- SMS Provider Methods ---
 
 // GetSMSProvider returns an SMS provider by name.
 func (r *Registry) GetSMSProvider(name string) (port.SMSSender, bool) {
@@ -60,8 +56,6 @@ func (r *Registry) RegisterSMSProvider(name string, provider port.SMSSender) {
 	r.smsProviders[name] = provider
 }
 
-// --- Push Provider Methods ---
-
 // GetPushProvider returns a push provider by name.
 func (r *Registry) GetPushProvider(name string) (port.PushSender, bool) {
 	r.mu.RLock()
@@ -76,8 +70,6 @@ func (r *Registry) RegisterPushProvider(name string, provider port.PushSender) {
 	defer r.mu.Unlock()
 	r.pushProviders[name] = provider
 }
-
-// --- Chat Provider Methods ---
 
 // GetChatProvider returns a chat provider by name.
 func (r *Registry) GetChatProvider(name string) (port.ChatSender, bool) {

@@ -56,7 +56,6 @@ type ProviderDefaults struct {
 	Chat  string `yaml:"chat"`
 }
 
-// Intermediate maps for YAML parsing (allows any key-value pairs)
 type EmailConfigMap map[string]string
 type SMSConfigMap map[string]string
 type PushConfigMap map[string]string
@@ -100,7 +99,6 @@ type ChatConfig struct {
 	WebhookURL string
 }
 
-// Default Providers Helpers
 func (c *Config) DefaultEmailProvider() string { return c.Providers.Defaults.Email }
 func (c *Config) DefaultSMSProvider() string   { return c.Providers.Defaults.SMS }
 func (c *Config) DefaultPushProvider() string  { return c.Providers.Defaults.Push }
@@ -132,15 +130,6 @@ func LoadConfig(path string) (*Config, error) {
 	cfg.parseProviderConfigs()
 
 	return cfg, nil
-}
-
-// MustLoadConfig loads config and panics on error.
-func MustLoadConfig(path string) *Config {
-	cfg, err := LoadConfig(path)
-	if err != nil {
-		panic(fmt.Sprintf("failed to load config: %v", err))
-	}
-	return cfg
 }
 
 // applyEnvOverrides applies environment variable overrides.
@@ -218,15 +207,3 @@ func (c *Config) parseProviderConfigs() {
 		}
 	}
 }
-
-// --- Provider Type (for documentation/validation purposes) ---
-
-// ProviderType defines the type of message provider.
-type ProviderType string
-
-const (
-	ProviderTypeEmail ProviderType = "email"
-	ProviderTypeSMS   ProviderType = "sms"
-	ProviderTypePush  ProviderType = "push"
-	ProviderTypeChat  ProviderType = "chat"
-)

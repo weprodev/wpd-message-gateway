@@ -64,8 +64,6 @@ func (f *ProviderFactory) CreateChatProvider(name string) (port.ChatSender, erro
 	return factory(cfg, f.store)
 }
 
-// --- Config Conversion Helpers ---
-
 func (f *ProviderFactory) toRegistryEmailConfig(name string) registry.EmailConfig {
 	appCfg := f.cfg.EmailProviders[name]
 	return registry.EmailConfig{

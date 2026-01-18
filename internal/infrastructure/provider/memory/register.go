@@ -8,7 +8,6 @@ import (
 )
 
 func init() {
-	// Register email provider
 	registry.RegisterEmailProvider("memory", func(cfg registry.EmailConfig, store port.MessageStore, mailpit registry.MailpitConfig) (port.EmailSender, error) {
 		memStore, ok := store.(*Store)
 		if !ok {
@@ -18,7 +17,6 @@ func init() {
 		return NewEmailProvider(memStore, mailpitCfg), nil
 	})
 
-	// Register SMS provider
 	registry.RegisterSMSProvider("memory", func(cfg registry.SMSConfig, store port.MessageStore) (port.SMSSender, error) {
 		memStore, ok := store.(*Store)
 		if !ok {
@@ -27,7 +25,6 @@ func init() {
 		return NewSMSProvider(memStore), nil
 	})
 
-	// Register push provider
 	registry.RegisterPushProvider("memory", func(cfg registry.PushConfig, store port.MessageStore) (port.PushSender, error) {
 		memStore, ok := store.(*Store)
 		if !ok {
@@ -36,7 +33,6 @@ func init() {
 		return NewPushProvider(memStore), nil
 	})
 
-	// Register chat provider
 	registry.RegisterChatProvider("memory", func(cfg registry.ChatConfig, store port.MessageStore) (port.ChatSender, error) {
 		memStore, ok := store.(*Store)
 		if !ok {

@@ -10,8 +10,6 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
-// --- Configuration Types (duplicated to avoid circular imports) ---
-
 // MailpitConfig holds SMTP forwarding configuration.
 type MailpitConfig struct {
 	Enabled bool
@@ -54,8 +52,6 @@ type ChatConfig struct {
 	WebhookURL string
 }
 
-// --- Provider Factory Functions ---
-
 // EmailProviderFactory creates an email provider from config.
 type EmailProviderFactory func(cfg EmailConfig, store port.MessageStore, mailpit MailpitConfig) (port.EmailSender, error)
 
@@ -67,8 +63,6 @@ type PushProviderFactory func(cfg PushConfig, store port.MessageStore) (port.Pus
 
 // ChatProviderFactory creates a chat provider from config.
 type ChatProviderFactory func(cfg ChatConfig, store port.MessageStore) (port.ChatSender, error)
-
-// --- Provider Registry ---
 
 var (
 	emailFactories = make(map[string]EmailProviderFactory)
@@ -106,8 +100,6 @@ func RegisterChatProvider(name string, factory ChatProviderFactory) {
 	defer mu.Unlock()
 	chatFactories[name] = factory
 }
-
-// --- Factory Access Functions ---
 
 // GetEmailFactory returns an email provider factory by name.
 func GetEmailFactory(name string) (EmailProviderFactory, error) {
@@ -157,8 +149,6 @@ func GetChatFactory(name string) (ChatProviderFactory, error) {
 	return factory, nil
 }
 
-// --- Query Functions ---
-
 // IsEmailProviderRegistered checks if an email provider is registered.
 func IsEmailProviderRegistered(name string) bool {
 	mu.RLock()
@@ -189,32 +179,4 @@ func IsChatProviderRegistered(name string) bool {
 	defer mu.RUnlock()
 	_, ok := chatFactories[name]
 	return ok
-}
-
-// ListRegisteredProviders returns all registered provider names.
-func ListRegisteredProviders() map[string][]string {
-	mu.RLock()
-	defer mu.RUnlock()
-
-	result := map[string][]string{
-		"email": make([]string, 0, len(emailFactories)),
-		"sms":   make([]string, 0, len(smsFactories)),
-		"push":  make([]string, 0, len(pushFactories)),
-		"chat":  make([]string, 0, len(chatFactories)),
-	}
-
-	for name := range emailFactories {
-		result["email"] = append(result["email"], name)
-	}
-	for name := range smsFactories {
-		result["sms"] = append(result["sms"], name)
-	}
-	for name := range pushFactories {
-		result["push"] = append(result["push"], name)
-	}
-	for name := range chatFactories {
-		result["chat"] = append(result["chat"], name)
-	}
-
-	return result
 }

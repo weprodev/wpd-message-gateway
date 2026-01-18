@@ -119,8 +119,6 @@ func (g *Gateway) initializeProviders(cfg Config, registry *service.Registry) er
 	return nil
 }
 
-// --- Send Methods (direct delegation, no conversion needed) ---
-
 // SendEmail sends an email using the default provider.
 func (g *Gateway) SendEmail(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
 	return g.service.SendEmail(ctx, email)
@@ -160,8 +158,6 @@ func (g *Gateway) SendChat(ctx context.Context, chat *contracts.ChatMessage) (*c
 func (g *Gateway) SendChatWith(ctx context.Context, provider string, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
 	return g.service.SendChatWith(ctx, provider, chat)
 }
-
-// --- Provider Creation ---
 
 func (g *Gateway) createEmailProvider(cfg Config, name string) (port.EmailSender, error) {
 	switch name {

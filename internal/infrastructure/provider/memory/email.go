@@ -18,8 +18,6 @@ type MailpitConfig struct {
 	Enabled bool
 }
 
-// --- SMTP Forwarder ---
-
 const (
 	defaultMailpitHost = "localhost"
 	defaultMailpitPort = "10102"
@@ -98,8 +96,6 @@ func (f *smtpForwarder) collectRecipients(email *contracts.Email) []string {
 	return recipients
 }
 
-// --- Email Provider ---
-
 // EmailProvider implements port.EmailSender using an in-memory store.
 type EmailProvider struct {
 	store         *Store
@@ -112,11 +108,6 @@ func NewEmailProvider(store *Store, mailpitCfg MailpitConfig) *EmailProvider {
 		store:         store,
 		smtpForwarder: newSMTPForwarder(mailpitCfg),
 	}
-}
-
-// Store returns the underlying memory store.
-func (e *EmailProvider) Store() *Store {
-	return e.store
 }
 
 // Name returns the provider name.
