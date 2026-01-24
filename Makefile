@@ -169,10 +169,10 @@ clean:
 # Docker
 # ============================================================================
 
-## Start Gateway via Docker Compose
+## Start Gateway, and DevBox UI via Docker Compose
 dev:
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway via Docker...$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway, and DevBox UI via Docker...$(RESET)\n"
 	@docker compose up -d
 	@printf "$(GREEN)✅ Gateway started!$(RESET)\n"
 	@printf "\n"

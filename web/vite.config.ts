@@ -11,9 +11,10 @@ export default defineConfig({
     },
     server: {
         port: 10104,
+        host: "0.0.0.0", // Ensure server binds to all interfaces for Docker
         proxy: {
             "/api": {
-                target: "http://localhost:10101",
+                target: process.env.API_TARGET || "http://localhost:10101",
                 changeOrigin: true,
             },
         },

@@ -7,3 +7,19 @@ services:
     environment:
       - PORT=10101
     restart: unless-stopped
+
+  # DevBox UI (port 10104)
+  devbox:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "10104:10104"
+    environment:
+      - API_TARGET=http://gateway:10101
+      - CHOKIDAR_USEPOLLING=true # Better file watching in Docker
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - gateway
