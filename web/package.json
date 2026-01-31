@@ -18,13 +18,13 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
-    "react": "^19.2.3",
+    "react": "^19.2.4",
     "react-dom": "^19.2.3",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@types/react": "^19.2.8",
+    "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
