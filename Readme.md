@@ -171,6 +171,8 @@ make test       # Run tests
 make audit      # Format, lint, test, and security check
 make build      # Build all packages
 make upgrade    # Upgrade all dependencies
+make dev        # Start Gateway API via Docker Compose
+make dev-down   # Stop Docker Compose Containers
 ```
 
 ## Documentation
