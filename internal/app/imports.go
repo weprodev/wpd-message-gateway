@@ -4,6 +4,7 @@ package app
 
 import (
 	// Built-in providers
+	_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/kavenegar"
 	_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
 	_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
 )

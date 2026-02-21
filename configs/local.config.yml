@@ -110,6 +110,11 @@ providers:
     #   api_secret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     #   from_phone: "+15550000000"
 
+    # Kavenegar
+    # kavenegar:
+    #   api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+1234567890"
+
   # --------------------------------------------------------------------------
   # Push Notification Providers
   # --------------------------------------------------------------------------

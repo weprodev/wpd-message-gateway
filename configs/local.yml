@@ -30,10 +30,9 @@ providers:
 
   sms:
     memory: {}
-    # twilio:
-    #   account_sid: "AC..."
-    #   auth_token: "..."
-    #   from_number: "+15550000000"
+    # kavenegar:
+    #   api_key: "YUOUR_REAL_API_KEY"
+    #   from_phone: "YOUR_REAL_SENDER_NUMBER"
 
   push:
     memory: {}

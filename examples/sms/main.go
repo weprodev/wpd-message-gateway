@@ -18,7 +18,7 @@ import (
 
 func main() {
 	gw, err := gateway.New(gateway.Config{
-		DefaultSMSProvider: "memory",
+		DefaultSMSProvider: "kavenegar",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create gateway: %v", err)
@@ -33,8 +33,9 @@ func main() {
 	defer cancel()
 
 	result, err := gw.SendSMS(ctx, &contracts.SMS{
+		From:    "2000660110",
 		To:      []string{recipient},
-		Message: "Hello from wpd-message-gateway! Your verification code is 123456.",
+		Message: "Hello from wpd-message-gateway via Kavenegar! Your verification code is 123456.",
 	})
 	if err != nil {
 		log.Fatalf("Failed to send SMS: %v", err)

@@ -1,11 +1,12 @@
 module github.com/weprodev/wpd-message-gateway
 
-go 1.25
+go 1.26
 
 require (
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/go-chi/cors v1.2.2
 	github.com/google/uuid v1.6.0
+	github.com/kavenegar/kavenegar-go v0.0.0-20240205151018-77039f51467d
 	github.com/mailgun/mailgun-go/v4 v4.23.0
 	gopkg.in/yaml.v3 v3.0.1
 )

@@ -18,7 +18,7 @@ func main() {
 
 	if err := app.ValidateConfig(cfg); err != nil {
 		log.Fatalf("Configuration error: %v\n\n"+
-			"Each message type requires a valid default provider (e.g. 'memory', 'mailgun', 'twilio').\n"+
+			"Each message type requires a valid default provider (e.g. 'memory', 'mailgun', 'kavenegar').\n"+
 			"Please configure these in configs/local.yml or via environment variables.\n\n"+
 			"💡 Tip: Copy configs/local.example.yml to configs/local.yml and configure your providers", err)
 	}

@@ -35,7 +35,8 @@ type EmailConfig struct {
 // SMSConfig holds SMS provider configuration.
 type SMSConfig struct {
 	CommonConfig
-	FromPhone string
+	FromPhone      string
+	DefaultToPhone string
 }
 
 // PushConfig holds push notification provider configuration.
