@@ -31,8 +31,8 @@ providers:
   sms:
     memory: {}
     # kavenegar:
-    #   api_key: "YUOUR_REAL_API_KEY"
-    #   from_phone: "YOUR_REAL_SENDER_NUMBER"
+    #   api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+1234567890"
 
   push:
     memory: {}
