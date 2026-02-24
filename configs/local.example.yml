@@ -92,6 +92,11 @@ providers:
     # Memory provider (development)
     memory: {}
 
+    # Kavenegar
+    # kavenegar
+    #   api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+123456789"
+
     # Twilio
     # twilio:
     #   account_sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"

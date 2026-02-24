@@ -30,6 +30,10 @@ providers:
 
   sms:
     memory: {}
+    # kavenegar
+    #   api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    #   from_phone: "+123456789"
+    
     # twilio:
     #   account_sid: "AC..."
     #   auth_token: "..."
