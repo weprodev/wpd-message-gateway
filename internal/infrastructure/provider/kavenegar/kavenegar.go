@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	ProviderName   	  = "kavenegar"
-	defaultTimeout	  = 40 * time.Second
+	ProviderName      = "kavenegar"
+	defaultTimeout    = 40 * time.Second
 	deduplicateWindow = 2 * time.Minute
 )
 
@@ -29,8 +29,8 @@ type Provider struct {
 	client    *kavenegar.Kavenegar
 	config    Config
 	fromPhone string
-	recent	  map[string]time.Time
-	mu		  sync.Mutex
+	recent    map[string]time.Time
+	mu        sync.Mutex
 }
 
 func New(cfg Config) (*Provider, error) {
@@ -49,7 +49,7 @@ func New(cfg Config) (*Provider, error) {
 		client:    kavenegar.New(cfg.APIKey),
 		config:    cfg,
 		fromPhone: cfg.FromPhone,
-		recent:	   make(map[string]time.Time),
+		recent:    make(map[string]time.Time),
 	}, nil
 
 }
