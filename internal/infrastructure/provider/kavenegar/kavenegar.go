@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -14,8 +15,9 @@ import (
 )
 
 const (
-	ProviderName   = "kavenegar"
-	defaultTimeout = 40 * time.Second
+	ProviderName   	  = "kavenegar"
+	defaultTimeout	  = 40 * time.Second
+	deduplicateWindow = 2 * time.Minute
 )
 
 type Config struct {
@@ -27,6 +29,8 @@ type Provider struct {
 	client    *kavenegar.Kavenegar
 	config    Config
 	fromPhone string
+	recent	  map[string]time.Time
+	mu		  sync.Mutex
 }
 
 func New(cfg Config) (*Provider, error) {
@@ -45,6 +49,7 @@ func New(cfg Config) (*Provider, error) {
 		client:    kavenegar.New(cfg.APIKey),
 		config:    cfg,
 		fromPhone: cfg.FromPhone,
+		recent:	   make(map[string]time.Time),
 	}, nil
 
 }
@@ -55,12 +60,6 @@ func (p *Provider) Name() string {
 }
 
 func (p *Provider) Send(ctx context.Context, sms *contracts.SMS) (*contracts.SendResult, error) {
-
-	if sms.From == "" {
-		sms.From = p.fromPhone
-
-	}
-
 	if len(sms.To) == 0 {
 		return nil, errors.New("at least one recipient is required")
 
@@ -73,14 +72,7 @@ func (p *Provider) Send(ctx context.Context, sms *contracts.SMS) (*contracts.Sen
 
 	}
 
-	seen := make(map[string]bool)
-
 	for _, recipient := range sms.To {
-
-		if seen[recipient] {
-			return nil, fmt.Errorf("duplicate message detected: %s", recipient)
-		}
-		seen[recipient] = true
 
 		num, err := phonenumbers.Parse(recipient, "")
 
@@ -95,10 +87,33 @@ func (p *Provider) Send(ctx context.Context, sms *contracts.SMS) (*contracts.Sen
 		}
 	}
 
+	p.mu.Lock()
+	now := time.Now()
+
+	for k, t := range p.recent {
+		if now.Sub(t) > deduplicateWindow {
+			delete(p.recent, k)
+		}
+	}
+
+	for _, recipient := range sms.To {
+		key := recipient + "|" + sms.Message
+
+		if t, exists := p.recent[key]; exists {
+			if now.Sub(t) < deduplicateWindow {
+				p.mu.Unlock()
+				return nil, fmt.Errorf("duplicate message detected for %s", recipient)
+			}
+		}
+
+		p.recent[key] = now
+	}
+	p.mu.Unlock()
+
 	sendCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	res, err := p.client.Message.Send(sms.From, sms.To, sms.Message, nil)
+	result, err := p.client.Message.Send(sms.From, sms.To, sms.Message, nil)
 
 	if err != nil {
 		if errors.Is(sendCtx.Err(), context.DeadlineExceeded) {
@@ -107,16 +122,10 @@ func (p *Provider) Send(ctx context.Context, sms *contracts.SMS) (*contracts.Sen
 		return nil, fmt.Errorf("kavenegar API error: %w", err)
 	}
 
-	if len(res) == 0 {
-		return nil, errors.New("kavenegar returned an empty response entries list")
-
-	}
-
-	result := &contracts.SendResult{
-		ID:         fmt.Sprintf("%d", res[0].MessageID),
+	response := &contracts.SendResult{
+		ID:         fmt.Sprintf("%d", result[0].MessageID),
 		StatusCode: 200,
 		Message:    "SMS sent successfully",
 	}
-	return result, nil
-
+	return response, nil
 }
