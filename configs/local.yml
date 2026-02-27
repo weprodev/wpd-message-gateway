@@ -15,7 +15,7 @@ mailpit:
 providers:
   defaults:
     email: memory
-    sms: kavenegar
+    sms: memory
     push: memory
     chat: memoryx
   
