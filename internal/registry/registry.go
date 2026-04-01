@@ -14,10 +14,6 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
-// MailpitConfig holds SMTP forwarding configuration for the memory provider.
-type MailpitConfig struct {
-	Enabled bool
-}
 
 // CommonConfig contains credential fields shared across all provider channels.
 type CommonConfig struct {
@@ -57,7 +53,7 @@ type ChatConfig struct {
 }
 
 // EmailProviderFactory constructs an EmailSender from static config.
-type EmailProviderFactory func(cfg EmailConfig, mailpit MailpitConfig) (port.EmailSender, error)
+type EmailProviderFactory func(cfg EmailConfig) (port.EmailSender, error)
 
 // SMSProviderFactory constructs an SMSSender from static config.
 type SMSProviderFactory func(cfg SMSConfig) (port.SMSSender, error)

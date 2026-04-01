@@ -14,18 +14,17 @@ import (
 var _ port.InboxWriter = (*InboxWriterAdapter)(nil)
 
 // InboxWriterAdapter wraps the in-process Store and optional Mailpit forwarder
+// InboxWriterAdapter wraps the in-process Store
 // to implement port.InboxWriter. Construct via NewInboxWriter.
 type InboxWriterAdapter struct {
 	store   *Store
-	mailpit *smtpForwarder
 }
 
 // NewInboxWriter returns a port.InboxWriter backed by the given Store.
-// If mailpitCfg.Enabled is true, emails are also forwarded to Mailpit via SMTP.
-func NewInboxWriter(store *Store, mailpitCfg MailpitConfig) port.InboxWriter {
+// NewInboxWriter returns a port.InboxWriter backed by the given Store.
+func NewInboxWriter(store *Store) port.InboxWriter {
 	return &InboxWriterAdapter{
 		store:   store,
-		mailpit: newSMTPForwarder(mailpitCfg),
 	}
 }
 
@@ -38,7 +37,6 @@ func (a *InboxWriterAdapter) WriteEmail(_ context.Context, workspaceID string, e
 		CreatedAt:   time.Now(),
 		Email:       email,
 	})
-	a.mailpit.forward(email)
 	return id, nil
 }
 

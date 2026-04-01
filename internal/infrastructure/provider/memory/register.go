@@ -6,9 +6,8 @@ import (
 )
 
 func init() {
-	registry.RegisterEmailProvider("memory", func(cfg registry.EmailConfig, mailpit registry.MailpitConfig) (port.EmailSender, error) {
-		mailpitCfg := MailpitConfig{Enabled: mailpit.Enabled}
-		return NewEmailProvider(GetStore(), mailpitCfg), nil
+	registry.RegisterEmailProvider("memory", func(cfg registry.EmailConfig) (port.EmailSender, error) {
+		return NewEmailProvider(GetStore()), nil
 	})
 
 	registry.RegisterSMSProvider("memory", func(cfg registry.SMSConfig) (port.SMSSender, error) {

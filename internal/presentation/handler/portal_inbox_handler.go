@@ -16,16 +16,14 @@ import (
 // Routes require JWT + workspace membership + workspace API key (see middleware).
 type PortalInboxHandler struct {
 	store       *memory.Store
-	mailpitCfg  memory.MailpitConfig
 	mu          sync.RWMutex
 	subscribers map[string]map[chan []byte]bool // workspaceID -> subscriber channels
 }
 
 // NewPortalInboxHandler creates a handler for /api/v1/workspaces/:wid/inbox/...
-func NewPortalInboxHandler(store *memory.Store, mailpitCfg memory.MailpitConfig) *PortalInboxHandler {
+func NewPortalInboxHandler(store *memory.Store) *PortalInboxHandler {
 	return &PortalInboxHandler{
 		store:       store,
-		mailpitCfg:  mailpitCfg,
 		subscribers: make(map[string]map[chan []byte]bool),
 	}
 }
@@ -118,7 +116,7 @@ func (h *PortalInboxHandler) HandleIngestEmail(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid email payload: " + err.Error()})
 	}
 
-	emailProvider := memory.NewEmailProviderForWorkspace(h.store, h.mailpitCfg, w)
+	emailProvider := memory.NewEmailProviderForWorkspace(h.store, w)
 	result, err := emailProvider.Send(c.Request().Context(), &email)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store email: " + err.Error()})

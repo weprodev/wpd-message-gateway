@@ -100,8 +100,7 @@ func Wire(cfg *Config) (*Application, error) {
 
 	// ── Memory store & inbox writer ─────────────────────────────────────────
 	memoryStore := memory.GetStore()
-	mailpitCfg := memory.MailpitConfig{Enabled: cfg.Mailpit.Enabled}
-	inboxWriter := memory.NewInboxWriter(memoryStore, mailpitCfg)
+	inboxWriter := memory.NewInboxWriter(memoryStore)
 
 	// ── Gateway service ─────────────────────────────────────────────────────
 	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxWriter)
@@ -109,7 +108,7 @@ func Wire(cfg *Config) (*Application, error) {
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
 	portalHandler := handler.NewPortalHandler(portalSvc)
-	portalInboxHandler := handler.NewPortalInboxHandler(memoryStore, mailpitCfg)
+	portalInboxHandler := handler.NewPortalInboxHandler(memoryStore)
 	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, logRepo)
 
 	// ── Router ──────────────────────────────────────────────────────────────

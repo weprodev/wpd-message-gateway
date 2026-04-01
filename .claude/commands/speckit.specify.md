@@ -72,6 +72,12 @@ Given that feature description, do this:
 
 2. **Create the feature branch** by running the script with `--short-name` (and `--json`). In sequential mode, do NOT pass `--number` — the script auto-detects the next available number. In timestamp mode, the script generates a `YYYYMMDD-HHMMSS` prefix automatically:
 
+   **IMPORTANT (repo workflow compatibility)**:
+   - If a feature branch and `specs/<branch>/spec.md` already exist (for example, created by a local `make specify` kickoff script),
+     then you MUST **NOT** run `create-new-feature.sh` again.
+   - In that case, treat the **current branch** as the feature branch, set `SPEC_FILE` to `specs/<branch>/spec.md`,
+     and continue directly to writing/updating the spec content.
+
    **Branch numbering mode**: Before running the script, check if `.specify/init-options.json` exists and read the `branch_numbering` value.
    - If `"timestamp"`, add `--timestamp` (Bash) or `-Timestamp` (PowerShell) to the script invocation
    - If `"sequential"` or absent, do not add any extra flag (default behavior)

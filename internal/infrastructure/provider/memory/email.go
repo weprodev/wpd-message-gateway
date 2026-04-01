@@ -2,10 +2,6 @@ package memory
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"net/smtp"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,107 +9,22 @@ import (
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
-// MailpitConfig holds configuration for SMTP forwarding to Mailpit.
-type MailpitConfig struct {
-	Enabled bool
-}
-
-const (
-	defaultMailpitHost = "localhost"
-	defaultMailpitPort = "10102"
-)
-
-type smtpForwarder struct {
-	host    string
-	port    string
-	enabled bool
-}
-
-func newSMTPForwarder(cfg MailpitConfig) *smtpForwarder {
-	return &smtpForwarder{
-		host:    defaultMailpitHost,
-		port:    defaultMailpitPort,
-		enabled: cfg.Enabled,
-	}
-}
-
-func (f *smtpForwarder) forward(email *contracts.Email) {
-	if !f.enabled {
-		return
-	}
-
-	from := email.From
-	if from == "" {
-		from = "portal@local.dev"
-	}
-
-	if len(email.To) == 0 {
-		return
-	}
-
-	msg := f.buildMessage(email, from)
-	recipients := f.collectRecipients(email)
-
-	addr := fmt.Sprintf("%s:%s", f.host, f.port)
-	if err := smtp.SendMail(addr, nil, from, recipients, []byte(msg)); err != nil {
-		slog.Warn("SMTP forward to Mailpit failed", "addr", addr, "error", err)
-		return
-	}
-
-	slog.Info("email forwarded to Mailpit", "subject", email.Subject, "to", email.To)
-}
-
-func (f *smtpForwarder) buildMessage(email *contracts.Email, from string) string {
-	var msg strings.Builder
-
-	fmt.Fprintf(&msg, "From: %s\r\n", from)
-	fmt.Fprintf(&msg, "To: %s\r\n", strings.Join(email.To, ", "))
-	fmt.Fprintf(&msg, "Subject: %s\r\n", email.Subject)
-
-	if len(email.CC) > 0 {
-		fmt.Fprintf(&msg, "Cc: %s\r\n", strings.Join(email.CC, ", "))
-	}
-
-	if email.HTML != "" {
-		msg.WriteString("MIME-Version: 1.0\r\n")
-		msg.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
-		msg.WriteString("\r\n")
-		msg.WriteString(email.HTML)
-	} else {
-		msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-		msg.WriteString("\r\n")
-		msg.WriteString(email.PlainText)
-	}
-
-	return msg.String()
-}
-
-func (f *smtpForwarder) collectRecipients(email *contracts.Email) []string {
-	recipients := make([]string, 0, len(email.To)+len(email.CC)+len(email.BCC))
-	recipients = append(recipients, email.To...)
-	recipients = append(recipients, email.CC...)
-	recipients = append(recipients, email.BCC...)
-	return recipients
-}
-
 // EmailProvider implements port.EmailSender using an in-memory store.
 type EmailProvider struct {
-	store         *Store
-	smtpForwarder *smtpForwarder
-	workspaceID   string
+	store       *Store
+	workspaceID string
 }
 
 // NewEmailProvider creates a new memory email provider (no workspace scope; legacy / global inbox).
-func NewEmailProvider(store *Store, mailpitCfg MailpitConfig) *EmailProvider {
-	return NewEmailProviderForWorkspace(store, mailpitCfg, "")
+func NewEmailProvider(store *Store) *EmailProvider {
+	return NewEmailProviderForWorkspace(store, "")
 }
 
 // NewEmailProviderForWorkspace tags stored emails with workspaceID for multi-tenant portal inbox.
-func NewEmailProviderForWorkspace(store *Store, mailpitCfg MailpitConfig, workspaceID string) *EmailProvider {
+func NewEmailProviderForWorkspace(store *Store, workspaceID string) *EmailProvider {
 	return &EmailProvider{
-		store:         store,
-		smtpForwarder: newSMTPForwarder(mailpitCfg),
-		workspaceID:   workspaceID,
+		store:       store,
+		workspaceID: workspaceID,
 	}
 }
 
@@ -133,10 +44,6 @@ func (e *EmailProvider) Send(ctx context.Context, email *contracts.Email) (*cont
 		Email:       email,
 	}
 	e.store.AddEmail(stored)
-
-	if e.smtpForwarder != nil {
-		e.smtpForwarder.forward(email)
-	}
 
 	return &contracts.SendResult{
 		ID:         id,

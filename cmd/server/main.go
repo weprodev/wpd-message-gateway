@@ -59,7 +59,6 @@ func logConfiguration(cfg *app.Config) {
 		"sms_provider", cfg.DefaultSMSProvider(),
 		"push_provider", cfg.DefaultPushProvider(),
 		"chat_provider", cfg.DefaultChatProvider(),
-		"mailpit_enabled", cfg.Mailpit.Enabled,
 	)
 }
 

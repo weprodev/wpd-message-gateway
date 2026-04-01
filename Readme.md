@@ -293,7 +293,6 @@ make audit      # fmt+lint+test (Go+frontend), govulncheck, builds (Go+Vite+Stor
 make build      # Go compile + frontend build:all (no tests)
 make upgrade    # Upgrade dependencies
 make dev        # Run via Docker Compose
-make mailpit    # Start Mailpit email preview
 ```
 
 ---

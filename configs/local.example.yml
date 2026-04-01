@@ -36,17 +36,6 @@ portal:
   # Port for the React dev server (Portal UI).
   ui_port: 10104
 
-# ----------------------------------------------------------------------------
-# Mailpit (Optional — HTML email preview)
-# ----------------------------------------------------------------------------
-# When enabled, emails captured in memory are also forwarded to Mailpit
-# for rich HTML rendering and mobile preview.
-#
-# Start Mailpit with: make mailpit  (runs at http://localhost:10103)
-#
-# mailpit:
-#   enabled: true
-
 # ============================================================================
 # Environment Variable Overrides
 # ============================================================================

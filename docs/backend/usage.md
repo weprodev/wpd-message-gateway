@@ -343,10 +343,6 @@ portal:
   jwt_secret: "your-long-secret-here-minimum-32-chars"
   jwt_ttl_hours: 72
   ui_port: 10104
-
-# Optional: Mailpit for HTML email preview
-# mailpit:
-#   enabled: true
 ```
 
 > **Note:** Provider credentials (Mailgun API keys, etc.) are **NOT** in YAML files.

@@ -63,7 +63,7 @@ func buildEmailSenders(g *Gateway, cfg Config) error {
 		if err != nil {
 			return fmt.Errorf("gateway: email provider %q: %w", name, err)
 		}
-		sender, err := factory(toRegistryEmail(ec), registry.MailpitConfig{})
+		sender, err := factory(toRegistryEmail(ec))
 		if err != nil {
 			return fmt.Errorf("gateway: init email provider %q: %w", name, err)
 		}

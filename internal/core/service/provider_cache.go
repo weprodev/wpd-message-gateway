@@ -75,7 +75,7 @@ func resolveEmailSender(cache *emailSenderCache, intg *domain.Integration) (port
 	if err := json.Unmarshal(intg.Config, &cfg); err != nil {
 		return nil, fmt.Errorf("parse integration config: %w", err)
 	}
-	sender, err := factory(cfg, registry.MailpitConfig{})
+	sender, err := factory(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init email provider %q: %w", intg.ProviderName, err)
 	}

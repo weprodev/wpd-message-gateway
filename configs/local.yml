@@ -13,8 +13,6 @@ portal:
 
 # Mailpit Integration (optional)
 # To use Mailpit, start it with: make mailpit
-mailpit:
-  enabled: true
 
 providers:
   defaults:

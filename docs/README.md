@@ -6,6 +6,7 @@ The central documentation hub for the WPD Message Gateway.
 
 - **[Architecture](./backend/architecture.md)** — Core design, layers, and the dual-mode gateway overview.
 - **[Development Workflow](./workflow.md)** — CI/CD pipelines, release process, and branch strategy.
+- **[Spec Kit development flow](./development-flow.md)** — Spec → plan → tasks → implement → issue update → PR.
 
 ## Backend (Go)
 

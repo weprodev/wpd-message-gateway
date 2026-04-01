@@ -338,7 +338,7 @@ wpd-message-gateway/
 │       └── main.go
 │
 ├── configs/                 # Minimal server config (NO provider credentials)
-│   ├── local.yml            # Port, JWT secret, Mailpit toggle
+│   ├── local.yml            # Port, JWT secret
 │   └── local.example.yml
 │
 ├── database/
@@ -347,7 +347,7 @@ wpd-message-gateway/
 │
 ├── internal/                # Private application code
 │   ├── app/                 # Bootstrap and wiring
-│   │   ├── config.go        # Server config (port, JWT, mailpit)
+│   │   ├── config.go        # Server config (port, JWT)
 │   │   ├── wire.go          # Dependency injection — wires all layers
 │   │   ├── validation.go    # Config validation
 │   │   ├── imports.go       # Blank imports to trigger provider init()

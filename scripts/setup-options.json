@@ -1,0 +1,45 @@
+{
+  "branches": ["master", "main", "develop"],
+  "models": [
+    "gpt-5",
+    "gpt-5.1",
+    "gpt-5.2",
+    "gpt-5.4",
+    "claude-sonnet",
+    "claude-opus",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-3-pro-preview"
+  ],
+  "tools": ["antigravity", "cursor", "claude"],
+  "installable_tools": [
+    {
+      "id": "antigravity",
+      "display": "Antigravity",
+      "type": "brew",
+      "package": "antigravity",
+      "command": "antigravity"
+    },
+    {
+      "id": "cursor",
+      "display": "Cursor CLI (agent)",
+      "type": "custom",
+      "script": "cursor.sh",
+      "command": "agent"
+    },
+    {
+      "id": "claude",
+      "display": "Claude Code (CLI)",
+      "type": "npm",
+      "package": "@anthropic-ai/claude-code",
+      "command": "claude"
+    },
+    {
+      "id": "gh",
+      "display": "GitHub CLI (gh)",
+      "type": "brew",
+      "package": "gh",
+      "command": "gh"
+    }
+  ]
+}

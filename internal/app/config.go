@@ -16,18 +16,11 @@ type Config struct {
 	Server      ServerConfig   `yaml:"server"`
 	Portal      PortalConfig   `yaml:"portal,omitempty"`
 	Providers   ProviderConfig `yaml:"providers"`
-	Mailpit     MailpitConfig  `yaml:"mailpit,omitempty"`
-
 	// Parsed provider configs - using registry types as single source of truth
 	EmailProviders map[string]registry.EmailConfig `yaml:"-"`
 	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
 	PushProviders  map[string]registry.PushConfig  `yaml:"-"`
 	ChatProviders  map[string]registry.ChatConfig  `yaml:"-"`
-}
-
-// MailpitConfig holds SMTP forwarding configuration.
-type MailpitConfig struct {
-	Enabled bool `yaml:"enabled,omitempty"`
 }
 
 // ServerConfig holds server configuration.

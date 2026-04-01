@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	registry.RegisterEmailProvider("mailgun", func(cfg registry.EmailConfig, _ registry.MailpitConfig) (port.EmailSender, error) {
+	registry.RegisterEmailProvider(ProviderName, func(cfg registry.EmailConfig) (port.EmailSender, error) {
 		return New(Config{
 			APIKey:    cfg.APIKey,
 			Domain:    cfg.Domain,
