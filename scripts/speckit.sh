@@ -50,7 +50,7 @@ prompt_multiline_hint() {
   local title="$1"
   local hint="$2"
   printf "\n%s\n" "$title"
-  printf "%s\n" "$hint"
+  printf "%b\n" "$hint"
   printf "\n"
 }
 
@@ -77,24 +77,26 @@ main() {
     exit 1
   fi
 
-  local slash=""
   case "$cmd" in
-    specify)        slash="/speckit.specify" ;;
-    clarify)        slash="/speckit.clarify" ;;
-    plan)           slash="/speckit.plan" ;;
-    tasks)          slash="/speckit.tasks" ;;
-    implement)      slash="/speckit.implement" ;;
-    analyze)        slash="/speckit.analyze" ;;
-    checklist)      slash="/speckit.checklist" ;;
-    constitution)   slash="/speckit.constitution" ;;
-    taskstoissues)  slash="/speckit.taskstoissues" ;;
     -h|--help|help) usage; exit 0 ;;
-    *)
-      printf "Unknown command: %s\n\n" "$cmd" >&2
-      usage
-      exit 1
-      ;;
   esac
+
+  local valid_cmds=("specify" "clarify" "plan" "tasks" "implement" "analyze" "checklist" "constitution" "taskstoissues")
+  local is_valid=0
+  for v in "${valid_cmds[@]}"; do
+    if [[ "$cmd" == "$v" ]]; then
+      is_valid=1
+      break
+    fi
+  done
+
+  if [[ $is_valid -eq 0 ]]; then
+    printf "Unknown command: %s\n\n" "$cmd" >&2
+    usage
+    exit 1
+  fi
+
+  local slash="/speckit.$cmd"
 
   # Preserve spacing; avoid shell escaping tricks—user is pasting into chat.
   local raw_args=""

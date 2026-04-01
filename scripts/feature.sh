@@ -3,8 +3,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SPECS_DIR="$REPO_ROOT/specs"
+source "$REPO_ROOT/.specify/scripts/bash/common.sh"
 
+SPECS_DIR="$REPO_ROOT/specs"
 SETUP_CONFIG="$REPO_ROOT/.specify/memory/setup.json"
 
 # Colors
@@ -91,22 +92,11 @@ prompt_nonempty() {
 read_default_branch() {
   # Default to master for this repo unless setup.json overrides it.
   local default_branch="master"
-  if [[ -f "$SETUP_CONFIG" ]] && command -v python3 >/dev/null 2>&1; then
-    local parsed
-    parsed="$(python3 - <<PY 2>/dev/null || true
-import json, pathlib
-p = pathlib.Path(r"$SETUP_CONFIG")
-try:
-  data = json.loads(p.read_text())
-  print(data.get("default_branch", ""))
-except Exception:
-  pass
-PY
-)"
-    parsed="$(trim "${parsed:-}")"
-    if [[ -n "$parsed" ]]; then
-      default_branch="$parsed"
-    fi
+  local parsed
+  parsed="$(get_json_field "$SETUP_CONFIG" "default_branch")"
+  parsed="$(trim "${parsed:-}")"
+  if [[ -n "$parsed" ]]; then
+    default_branch="$parsed"
   fi
   printf "%s" "$default_branch"
 }
@@ -136,7 +126,10 @@ git_sync_default_branch() {
 
   # Only attempt pull if tracking branch exists.
   if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
-    git pull --ff-only || true
+    if ! git pull --ff-only; then
+      printf "\n${YELLOW}WARNING: Failed to fast-forward '%s'. Please resolve conflicts manually.${RESET}\n" "$default_branch" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -183,6 +176,16 @@ write_feature_meta() {
 EOF
 }
 
+get_issue_number() {
+  local meta="$1"
+  local issue_number=""
+  if [[ -f "$meta" ]]; then
+    issue_number="$(get_json_field "$meta" "issue_number")"
+    issue_number="$(trim "${issue_number:-}")"
+  fi
+  printf "%s" "$issue_number"
+}
+
 make_specify() {
   if ! is_git_repo; then
     printf "ERROR: Not a git repository.\n" >&2
@@ -214,6 +217,8 @@ make_specify() {
     if prompt_yes_no "Do you want to temporarily stash and move these changes to the new feature branch?" "yes"; then
       git stash --include-untracked
       move_changes=1
+      # Ensure stash is popped if any subsequent command fails
+      trap '[[ $? -ne 0 ]] && printf "\n${YELLOW}Script failed! Restoring stashed changes...${RESET}\n" && git stash pop || true' EXIT
     else
       printf "\n${BOLD}${CYAN}Tip:${RESET} Please commit or stash your changes natively before kicking off a new feature.\n" >&2
       exit 1
@@ -242,6 +247,8 @@ make_specify() {
 
   if [[ $move_changes -eq 1 ]]; then
     printf "\n${CYAN}Applying stashed changes to '%s'...${RESET}\n" "$branch"
+    # Unset trap before popping normally
+    trap - EXIT
     git stash pop || true
   fi
 
@@ -291,16 +298,8 @@ make_sync() {
 
   local feature_dir="$SPECS_DIR/$branch"
   local meta="$feature_dir/meta.json"
-  local issue_number=""
-  if [[ -f "$meta" ]] && command -v python3 >/dev/null 2>&1; then
-    issue_number="$(python3 - <<PY 2>/dev/null || true
-import json, pathlib
-data=json.loads(pathlib.Path(r"$meta").read_text())
-print(data.get("issue_number",""))
-PY
-)"
-    issue_number="$(trim "${issue_number:-}")"
-  fi
+  local issue_number
+  issue_number="$(get_issue_number "$meta")"
 
   if [[ -z "$issue_number" ]]; then
     printf "No linked GitHub issue found in %s. Skipping sync.\n" "$meta"
@@ -354,16 +353,8 @@ make_pr() {
 
   local feature_dir="$SPECS_DIR/$branch"
   local meta="$feature_dir/meta.json"
-  local issue_number=""
-  if [[ -f "$meta" ]] && command -v python3 >/dev/null 2>&1; then
-    issue_number="$(python3 - <<PY 2>/dev/null || true
-import json, pathlib
-data=json.loads(pathlib.Path(r"$meta").read_text())
-print(data.get("issue_number",""))
-PY
-)"
-    issue_number="$(trim "${issue_number:-}")"
-  fi
+  local issue_number
+  issue_number="$(get_issue_number "$meta")"
 
   if [[ -n "$issue_number" ]]; then
     make_sync || true
