@@ -7,9 +7,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/weprodev/go-pkg/crypto"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/authjwt"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	"github.com/weprodev/wpd-message-gateway/pkg/auth"
 )
 
 const (
@@ -107,7 +108,7 @@ func RequireWorkspaceAPIKey(apiKeys port.APIKeyRepository) echo.MiddlewareFunc {
 			if err != nil || !key.IsActive {
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid API key")
 			}
-			if !auth.CheckSecretHash(secret, key.ClientSecretHash) {
+			if !crypto.CheckSecretHash(secret, key.ClientSecretHash) {
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid API key secret")
 			}
 			if key.WorkspaceID != wid {

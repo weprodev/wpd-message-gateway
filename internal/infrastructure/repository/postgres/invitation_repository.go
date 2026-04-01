@@ -3,17 +3,17 @@ package postgres
 import (
 	"context"
 
-	"github.com/weprodev/wpd-packages/common"
+	"github.com/weprodev/go-pkg/pgsql"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
 type InvitationRepository struct {
-	client *common.PgClient
+	client *pgsql.PgClient
 }
 
-func NewInvitationRepository(client *common.PgClient) port.InvitationRepository {
+func NewInvitationRepository(client *pgsql.PgClient) port.InvitationRepository {
 	return &InvitationRepository{client: client}
 }
 

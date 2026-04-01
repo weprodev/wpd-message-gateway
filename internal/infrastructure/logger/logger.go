@@ -1,6 +1,6 @@
 // Package logger provides the application-wide structured logger for wpd-message-gateway.
 //
-// It wraps github.com/weprodev/wpd-packages/logger and installs it as the process-wide
+// It wraps github.com/weprodev/go-pkg/logger and installs it as the process-wide
 // slog default via slog.SetDefault(). After calling New(), every slog.Info(),
 // slog.Warn(), slog.Error(), and slog.ErrorContext() call in the codebase —
 // across handlers, services, and infrastructure — routes through the configured
@@ -22,7 +22,7 @@ import (
 	"context"
 	"log/slog"
 
-	pkglogger "github.com/weprodev/wpd-packages/logger"
+	pkglogger "github.com/weprodev/go-pkg/logger"
 )
 
 // contextKey is an unexported type for keys stored in context.Context.

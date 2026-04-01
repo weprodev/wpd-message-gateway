@@ -5,17 +5,17 @@ import (
 	"database/sql"
 	"strconv"
 
-	"github.com/weprodev/wpd-packages/common"
+	"github.com/weprodev/go-pkg/pgsql"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
 type MessageRequestLogRepository struct {
-	client *common.PgClient
+	client *pgsql.PgClient
 }
 
-func NewMessageRequestLogRepository(client *common.PgClient) port.MessageRequestLogRepository {
+func NewMessageRequestLogRepository(client *pgsql.PgClient) port.MessageRequestLogRepository {
 	return &MessageRequestLogRepository{client: client}
 }
 

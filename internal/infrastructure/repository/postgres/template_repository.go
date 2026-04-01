@@ -6,17 +6,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/weprodev/wpd-packages/common"
+	"github.com/weprodev/go-pkg/pgsql"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
 type TemplateRepository struct {
-	client *common.PgClient
+	client *pgsql.PgClient
 }
 
-func NewTemplateRepository(client *common.PgClient) port.TemplateRepository {
+func NewTemplateRepository(client *pgsql.PgClient) port.TemplateRepository {
 	return &TemplateRepository{client: client}
 }
 

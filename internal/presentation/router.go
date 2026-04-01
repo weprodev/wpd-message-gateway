@@ -9,6 +9,10 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
+
+	pkgapi "github.com/weprodev/go-pkg/api"
+	pkglogger "github.com/weprodev/go-pkg/logger"
+	pkgvalidator "github.com/weprodev/go-pkg/validator"
 )
 
 // Router holds HTTP handlers and Echo configuration.
@@ -20,6 +24,7 @@ type Router struct {
 	apiKeyRepo         port.APIKeyRepository
 	workspaceRepo      port.WorkspaceRepository
 	memberRepo         port.WorkspaceMemberRepository
+	logger             *pkglogger.Logger
 }
 
 // NewRouter creates a new router bundle.
@@ -31,6 +36,7 @@ func NewRouter(
 	memberRepo port.WorkspaceMemberRepository,
 	portal *handler.PortalHandler,
 	jwtSecret string,
+	logger *pkglogger.Logger,
 ) *Router {
 	return &Router{
 		gatewayHandler:     gateway,
@@ -40,6 +46,7 @@ func NewRouter(
 		apiKeyRepo:         apiKeyRepo,
 		workspaceRepo:      workspaceRepo,
 		memberRepo:         memberRepo,
+		logger:             logger,
 	}
 }
 
@@ -47,6 +54,8 @@ func NewRouter(
 func (rt *Router) Setup() *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
+	e.HTTPErrorHandler = pkgapi.NewEchoErrorHandler(rt.logger.Logger).EchoHandler
+	e.Validator = pkgvalidator.NewValidator()
 
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{

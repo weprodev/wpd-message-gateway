@@ -14,7 +14,8 @@ func main() {
 	// formatted and levelled correctly. Uses APP_ENVIRONMENT to pick text (local)
 	// vs JSON (production) format.
 	env := os.Getenv("APP_ENVIRONMENT")
-	if _, err := logger.New(env); err != nil {
+	sysLogger, err := logger.New(env)
+	if err != nil {
 		// Logger not yet up — fall back to bare stderr before exiting.
 		fmt.Fprintf(os.Stderr, "FATAL: init logger: %v\n", err)
 		os.Exit(1)
@@ -36,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	application, err := app.Wire(cfg)
+	application, err := app.Wire(cfg, sysLogger)
 	if err != nil {
 		slog.Error("failed to initialise application", "error", err)
 		os.Exit(1)
