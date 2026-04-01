@@ -14,7 +14,6 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
-
 // CommonConfig contains credential fields shared across all provider channels.
 type CommonConfig struct {
 	APIKey    string

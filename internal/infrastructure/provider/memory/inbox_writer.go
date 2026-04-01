@@ -17,14 +17,14 @@ var _ port.InboxWriter = (*InboxWriterAdapter)(nil)
 // InboxWriterAdapter wraps the in-process Store
 // to implement port.InboxWriter. Construct via NewInboxWriter.
 type InboxWriterAdapter struct {
-	store   *Store
+	store *Store
 }
 
 // NewInboxWriter returns a port.InboxWriter backed by the given Store.
 // NewInboxWriter returns a port.InboxWriter backed by the given Store.
 func NewInboxWriter(store *Store) port.InboxWriter {
 	return &InboxWriterAdapter{
-		store:   store,
+		store: store,
 	}
 }
 
