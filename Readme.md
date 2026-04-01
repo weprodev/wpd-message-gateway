@@ -5,20 +5,16 @@
   </picture>
 </p>
 
-<h1 align="center">Message Gateway</h1>
-
-<p align="center">
-  <strong>A unified Go library and HTTP API for sending Email, SMS, Push, and Chat messages.</strong>
-</p>
-
 <p align="center">
   <a href="https://pkg.go.dev/github.com/weprodev/wpd-message-gateway"><img src="https://pkg.go.dev/badge/github.com/weprodev/wpd-message-gateway.svg" alt="Go Reference"></a>
   <a href="https://goreportcard.com/report/github.com/weprodev/wpd-message-gateway"><img src="https://goreportcard.com/badge/github.com/weprodev/wpd-message-gateway" alt="Go Report Card"></a>
   <a href="https://github.com/weprodev/wpd-message-gateway/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 </p>
-
 <p align="center">
-  One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
+  <strong>A unified Go library and HTTP API for sending Email, SMS, Push, and Chat messages.</strong>
+
+One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
+
 </p>
 
 ---
@@ -129,12 +125,12 @@ Building applications that send messages across multiple channels is complex. Yo
 
 ## Supported Message Types
 
-| Type | Description | Providers |
-|------|-------------|-----------|
-| **Email** | HTML, plain text, CC/BCC, attachments | Mailgun, Memory |
-| **SMS** | Text to mobile numbers | Memory (Twilio planned) |
-| **Push** | Mobile and web notifications | Memory (Firebase planned) |
-| **Chat** | Slack, WhatsApp, Telegram | Memory (planned) |
+| Type      | Description                           | Providers                 |
+| --------- | ------------------------------------- | ------------------------- |
+| **Email** | HTML, plain text, CC/BCC, attachments | Mailgun, Memory           |
+| **SMS**   | Text to mobile numbers                | Memory (Twilio planned)   |
+| **Push**  | Mobile and web notifications          | Memory (Firebase planned) |
+| **Chat**  | Slack, WhatsApp, Telegram             | Memory (planned)          |
 
 ---
 
@@ -145,8 +141,9 @@ The Portal is **always available** at `http://localhost:10104` when the server r
 **Access**: Email + password (Portal JWT)
 
 **Manage per workspace:**
+
 - **Integrations** — add provider credentials (encrypted in DB, not in files)
-- **API Keys** — credentials for your apps to send messages  
+- **API Keys** — credentials for your apps to send messages
 - **Templates** — reusable HTML email templates
 - **Settings** — dispatch mode (`memory_only` | `provider_only` | `memory_and_provider`)
 - **Members** — invite colleagues to your workspace
@@ -157,7 +154,7 @@ The Portal is **always available** at `http://localhost:10104` when the server r
 
 ## Authentication & Gateway Modes
 
-Message Gateway features multiple dispatch modes (`memory_only`, `provider_only`, `memory_and_provider`). 
+Message Gateway features multiple dispatch modes (`memory_only`, `provider_only`, `memory_and_provider`).
 
 To interact with the Portal, users authenticate via **Email + Password** to receive a JWT. Client applications interacting with the **Send API** use an isolated **Workspace API Key**.
 
@@ -204,15 +201,15 @@ wpd-message-gateway/
 
 We use [GitHub Spec Kit](https://github.com/github/spec-kit) **inside this repository** to enforce a strict Specification‑Driven Development workflow (spec → plan → tasks → implement → review).
 
-The key to “best outcomes” is that Spec Kit is *not* free-form prompting here: our Spec Kit commands are bound to **repository agents** (Principal personas) and must follow our backend DDD + frontend composition rules.
+The key to “best outcomes” is that Spec Kit is _not_ free-form prompting here: our Spec Kit commands are bound to **repository agents** (Principal personas) and must follow our backend DDD + frontend composition rules.
 
 ### What Spec Kit Creates (Where to Look)
 
 Every feature gets a directory under `specs/` named after the feature branch, for example `specs/023-portal-inbox-search/`:
 
-- `spec.md`: requirements, user stories, success criteria  
-- `plan.md`: technical plan + design artifacts (research/data model/contracts/quickstart)  
-- `tasks.md`: dependency-ordered, file-path-specific implementation tasks  
+- `spec.md`: requirements, user stories, success criteria
+- `plan.md`: technical plan + design artifacts (research/data model/contracts/quickstart)
+- `tasks.md`: dependency-ordered, file-path-specific implementation tasks
 - `checklists/*.md`: “unit tests for requirements writing” (not implementation tests)
 
 ### Agent Mapping (How “created Agents” are used)
@@ -299,21 +296,21 @@ make dev        # Run via Docker Compose
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Docs hub](docs/README.md) | Index of backend + frontend documentation |
-| [Usage](docs/backend/usage.md) | SDK and HTTP API reference, authentication, multi-language examples |
-| [Architecture](docs/backend/architecture.md) | System design, two modes of operation, DB schema |
-| [Portal inbox](docs/backend/portal-inbox.md) | Message inbox, dispatch modes, inbox API |
-| [Frontend docs](docs/frontend/README.md) | Portal UI index — Vite, TypeScript, shadcn skill, conventions |
-| [Frontend engineer role](docs/frontend/frontend-engineer.md) | Principal-style workflow, architecture, security, Storybook, self-review |
-| [shadcn/ui skill (in-repo)](docs/frontend/shadcn/SKILL.md) | Component rules, CLI patterns ([official docs](https://ui.shadcn.com/docs)) |
-| [Backend engineer role](docs/backend/backend-engineer.md) | Go layers, registry, security, quality gate |
-| [E2E Testing](docs/backend/e2e-testing.md) | CI/CD integration, capturing and asserting messages |
-| [Contributing](docs/backend/contributing.md) | Adding new providers |
-| [Code Conventions](docs/backend/code-conventions.md) | Go coding standards |
-| [Workflow](docs/workflow.md) | CI/CD and release process |
-| [Bruno collections](tests/bruno/) | HTTP API tests (`bru run`) |
+| Document                                                     | Description                                                                 |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| [Docs hub](docs/README.md)                                   | Index of backend + frontend documentation                                   |
+| [Usage](docs/backend/usage.md)                               | SDK and HTTP API reference, authentication, multi-language examples         |
+| [Architecture](docs/backend/architecture.md)                 | System design, two modes of operation, DB schema                            |
+| [Portal inbox](docs/backend/portal-inbox.md)                 | Message inbox, dispatch modes, inbox API                                    |
+| [Frontend docs](docs/frontend/README.md)                     | Portal UI index — Vite, TypeScript, shadcn skill, conventions               |
+| [Frontend engineer role](docs/frontend/frontend-engineer.md) | Principal-style workflow, architecture, security, Storybook, self-review    |
+| [shadcn/ui skill (in-repo)](docs/frontend/shadcn/SKILL.md)   | Component rules, CLI patterns ([official docs](https://ui.shadcn.com/docs)) |
+| [Backend engineer role](docs/backend/backend-engineer.md)    | Go layers, registry, security, quality gate                                 |
+| [E2E Testing](docs/backend/e2e-testing.md)                   | CI/CD integration, capturing and asserting messages                         |
+| [Contributing](docs/backend/contributing.md)                 | Adding new providers                                                        |
+| [Code Conventions](docs/backend/code-conventions.md)         | Go coding standards                                                         |
+| [Workflow](docs/workflow.md)                                 | CI/CD and release process                                                   |
+| [Bruno collections](tests/bruno/)                            | HTTP API tests (`bru run`)                                                  |
 
 ---
 
@@ -323,12 +320,12 @@ Released under the **[MIT License](LICENSE)**. The same grant applies to everyon
 
 We want Message Gateway to stay easy to adopt for individuals and small teams, while asking larger organizations that get sustained value from it to help fund maintenance and features.
 
-| Who | What we ask |
-|-----|-------------|
-| **Individuals, learning, side projects** | Use freely under MIT. Sponsorship optional. |
-| **Small teams** | Use freely under MIT. Consider sponsoring if it's central to your stack. |
-| **Mid-size companies and enterprises** | **Please sponsor** — [GitHub Sponsors](https://github.com/sponsors/weprodev) |
-| **Qualifying non-profits** | Use freely under MIT; sponsorship optional. |
+| Who                                      | What we ask                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| **Individuals, learning, side projects** | Use freely under MIT. Sponsorship optional.                                  |
+| **Small teams**                          | Use freely under MIT. Consider sponsoring if it's central to your stack.     |
+| **Mid-size companies and enterprises**   | **Please sponsor** — [GitHub Sponsors](https://github.com/sponsors/weprodev) |
+| **Qualifying non-profits**               | Use freely under MIT; sponsorship optional.                                  |
 
 <p align="center">
   <a href="https://github.com/sponsors/weprodev">
