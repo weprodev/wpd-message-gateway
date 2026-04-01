@@ -145,7 +145,15 @@ create_feature_branch_and_spec() {
 
   # Use Spec Kit's branch+spec initializer to keep numbering consistent.
   local out
-  out="$("$REPO_ROOT/.specify/scripts/bash/create-new-feature.sh" --json "$feature_description")"
+  if ! out="$("$REPO_ROOT/.specify/scripts/bash/create-new-feature.sh" --json "$feature_description")"; then
+    echo "$out" >&2
+    echo "Error: Failed to create feature branch and spec" >&2
+    exit 1
+  fi
+  if [ -z "$out" ]; then
+    echo "Error: No output received from create-new-feature.sh" >&2
+    exit 1
+  fi
 
   if command -v python3 >/dev/null 2>&1; then
     python3 - <<PY
