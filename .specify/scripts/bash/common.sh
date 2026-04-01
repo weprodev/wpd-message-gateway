@@ -54,7 +54,8 @@ get_current_branch() {
     fi
 
     # Then check git if available at the spec-kit root (not parent)
-    local repo_root=$(get_repo_root)
+    local repo_root
+    repo_root="$(get_repo_root)"
     if has_git; then
         git -C "$repo_root" rev-parse --abbrev-ref HEAD
         return
@@ -107,7 +108,8 @@ get_current_branch() {
 has_git() {
     # First check if git command is available (before calling get_repo_root which may use git)
     command -v git >/dev/null 2>&1 || return 1
-    local repo_root=$(get_repo_root)
+    local repo_root
+    repo_root="$(get_repo_root)"
     # Check if .git exists (directory or file for worktrees/submodules)
     [ -e "$repo_root/.git" ] || return 1
     # Verify it's actually a valid git work tree
@@ -180,8 +182,10 @@ find_feature_dir_by_prefix() {
 }
 
 get_feature_paths() {
-    local repo_root=$(get_repo_root)
-    local current_branch=$(get_current_branch)
+    local repo_root
+    repo_root="$(get_repo_root)"
+    local current_branch
+    current_branch="$(get_current_branch)"
     local has_git_repo="false"
 
     if has_git; then
@@ -244,7 +248,40 @@ json_escape() {
 }
 
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
-check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
+check_dir() { 
+    if [[ -d "$1" ]]; then
+        local has_files=0
+        # Use subshell to avoid affecting caller's shopt state
+        ( shopt -s nullglob dotglob; local files=("$1"/*); [[ ${#files[@]} -gt 0 ]] ) && has_files=1
+        [[ $has_files -eq 1 ]] && echo "  ✓ $2" && return 0
+    fi
+    echo "  ✗ $2"
+}
+
+# Read a top-level field from a JSON file.
+# Relies on jq if available, gracefully gracefully degrades to Python 3.
+# Usage: get_json_field <file> <field>
+get_json_field() {
+    local file="$1"
+    local field="$2"
+    if [[ ! -f "$file" ]]; then return 1; fi
+    
+    if has_jq; then
+        jq -r ".${field} // empty" "$file" 2>/dev/null
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 -c "
+import sys, json
+try:
+    with open('$file') as f:
+        data = json.load(f)
+        val = data.get('$field')
+        if val is not None:
+            print(val)
+except Exception:
+    pass
+" 2>/dev/null
+    fi
+}
 
 # Resolve a template name to a file path using the priority stack:
 #   1. .specify/templates/overrides/
