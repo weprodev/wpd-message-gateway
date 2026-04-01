@@ -1,25 +1,7 @@
-# Binaries
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool
-*.out
-
-# Go workspace file
-go.work
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
+# Development
+.history/
+.cursor/
+.agent/
 
 # OS generated files
 .DS_Store
@@ -29,24 +11,47 @@ go.work
 .Trashes
 ehthumbs.db
 Thumbs.db
-.history
-.cursor 
 
-# Environment files
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Go
+bin/
+dist/
+main
+serverbin/
+wpd-message-gateway
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+
+# Frontend (Vite / React / Storybook)
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/storybook-static/
+frontend/.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & Configuration Variables
 .env
 .env.local
 .env.*.local
+configs/*.yml
+!configs/*.example.yml
 
-# Vendor directory (if using go mod)
-# vendor/
-
-# Build output
-/bin/
-/dist/
-main
-serverbin/
-
-# Node.js
-node_modules/
-web/node_modules/
-web/dist/
+# Vendor
+vendor/

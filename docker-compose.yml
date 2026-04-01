@@ -8,10 +8,10 @@ services:
       - PORT=10101
     restart: unless-stopped
 
-  # DevBox UI (port 10104)
-  devbox:
+  # Portal UI — React app + message inbox preview (port 10104)
+  portal-ui:
     build:
-      context: ./web
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "10104:10104"
@@ -19,7 +19,7 @@ services:
       - API_TARGET=http://gateway:10101
       - CHOKIDAR_USEPOLLING=true # Better file watching in Docker
     volumes:
-      - ./web:/app
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       - gateway

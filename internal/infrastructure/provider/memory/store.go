@@ -25,9 +25,10 @@ func GetStore() *Store {
 
 // StoredEmail wraps an email with metadata for storage.
 type StoredEmail struct {
-	ID        string           `json:"id"`
-	CreatedAt time.Time        `json:"created_at"`
-	Email     *contracts.Email `json:"email"`
+	ID          string           `json:"id"`
+	WorkspaceID string           `json:"workspace_id,omitempty"`
+	CreatedAt   time.Time        `json:"created_at"`
+	Email       *contracts.Email `json:"email"`
 }
 
 // StoredSMS wraps an SMS with metadata for storage.
@@ -77,6 +78,76 @@ func (s *Store) Emails() []*StoredEmail {
 	msgs := make([]*StoredEmail, len(s.emails))
 	copy(msgs, s.emails)
 	return msgs
+}
+
+// EmailsForWorkspace returns stored emails tagged with the given workspace ID.
+func (s *Store) EmailsForWorkspace(workspaceID string) []*StoredEmail {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []*StoredEmail
+	for _, e := range s.emails {
+		if e != nil && e.WorkspaceID == workspaceID {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// EmailByIDForWorkspace returns an email by ID only if it belongs to the workspace.
+func (s *Store) EmailByIDForWorkspace(id, workspaceID string) *StoredEmail {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, e := range s.emails {
+		if e != nil && e.ID == id && e.WorkspaceID == workspaceID {
+			return e
+		}
+	}
+	return nil
+}
+
+// DeleteEmailByIDForWorkspace deletes an email if it belongs to the workspace.
+func (s *Store) DeleteEmailByIDForWorkspace(id, workspaceID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, e := range s.emails {
+		if e != nil && e.ID == id && e.WorkspaceID == workspaceID {
+			s.emails = append(s.emails[:i], s.emails[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// StatsForWorkspace returns counts for messages belonging to workspace (email only until SMS/Push/Chat are tagged).
+func (s *Store) StatsForWorkspace(workspaceID string) map[string]int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := 0
+	for _, e := range s.emails {
+		if e != nil && e.WorkspaceID == workspaceID {
+			n++
+		}
+	}
+	return map[string]int{
+		"emails": n,
+		"sms":    0,
+		"push":   0,
+		"chat":   0,
+		"total":  n,
+	}
+}
+
+// ClearWorkspace removes in-memory messages for a single workspace (emails only for now).
+func (s *Store) ClearWorkspace(workspaceID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := s.emails[:0]
+	for _, e := range s.emails {
+		if e == nil || e.WorkspaceID != workspaceID {
+			kept = append(kept, e)
+		}
+	}
+	s.emails = kept
 }
 
 // EmailByID returns a stored email by its ID, or nil if not found.

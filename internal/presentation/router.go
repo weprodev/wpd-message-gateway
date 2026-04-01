@@ -1,101 +1,158 @@
 package presentation
 
 import (
-	"time"
+	"log/slog"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
+	"github.com/labstack/echo/v4"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
+	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 )
 
-// Router holds all HTTP handlers and provides route configuration.
+// Router holds HTTP handlers and Echo configuration.
 type Router struct {
-	gatewayHandler *handler.GatewayHandler
-	devboxHandler  *handler.DevBoxHandler
+	gatewayHandler     *handler.GatewayHandler
+	portalInboxHandler *handler.PortalInboxHandler
+	portalHandler      *handler.PortalHandler
+	jwtSecret          string
+	apiKeyRepo         port.APIKeyRepository
+	workspaceRepo      port.WorkspaceRepository
+	memberRepo         port.WorkspaceMemberRepository
 }
 
-// NewRouter creates a new router with the given handlers.
-func NewRouter(gateway *handler.GatewayHandler, devbox *handler.DevBoxHandler) *Router {
+// NewRouter creates a new router bundle.
+func NewRouter(
+	gateway *handler.GatewayHandler,
+	portalInbox *handler.PortalInboxHandler,
+	apiKeyRepo port.APIKeyRepository,
+	workspaceRepo port.WorkspaceRepository,
+	memberRepo port.WorkspaceMemberRepository,
+	portal *handler.PortalHandler,
+	jwtSecret string,
+) *Router {
 	return &Router{
-		gatewayHandler: gateway,
-		devboxHandler:  devbox,
+		gatewayHandler:     gateway,
+		portalInboxHandler: portalInbox,
+		portalHandler:      portal,
+		jwtSecret:          jwtSecret,
+		apiKeyRepo:         apiKeyRepo,
+		workspaceRepo:      workspaceRepo,
+		memberRepo:         memberRepo,
 	}
 }
 
-// Setup creates and configures the chi router with all routes.
-func (rt *Router) Setup() chi.Router {
-	r := chi.NewRouter()
+// Setup configures Echo with all routes.
+func (rt *Router) Setup() *echo.Echo {
+	e := echo.New()
+	e.HideBanner = true
 
-	// Middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type"},
+	e.Use(echomiddleware.Recover())
+	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{
+		LogStatus:   true,
+		LogURI:      true,
+		LogMethod:   true,
+		LogLatency:  true,
+		LogRemoteIP: true,
+		LogValuesFunc: func(c echo.Context, v echomiddleware.RequestLoggerValues) error {
+			slog.Info("request",
+				slog.String("method", v.Method),
+				slog.String("uri", v.URI),
+				slog.Int("status", v.Status),
+				slog.Duration("latency", v.Latency),
+				slog.String("remote_ip", v.RemoteIP),
+			)
+			return nil
+		},
+	}))
+	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.PATCH, echo.DELETE, echo.OPTIONS},
+		AllowHeaders: []string{
+			echo.HeaderAccept,
+			echo.HeaderContentType,
+			echo.HeaderAuthorization,
+			customMiddleware.HeaderWorkspaceKey,
+			customMiddleware.HeaderWorkspaceAPIClientID,
+			customMiddleware.HeaderWorkspaceAPISecret,
+			customMiddleware.HeaderInternalSecret,
+		},
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
 
-	// Gateway API - for sending messages
-	r.Route("/v1", func(r chi.Router) {
-		r.Post("/email", rt.gatewayHandler.HandleSendEmail)
-		r.Post("/sms", rt.gatewayHandler.HandleSendSMS)
-		r.Post("/push", rt.gatewayHandler.HandleSendPush)
-		r.Post("/chat", rt.gatewayHandler.HandleSendChat)
-	})
+	v1 := e.Group("/v1")
+	v1.Use(customMiddleware.APIKeyAuthMiddleware(rt.apiKeyRepo, rt.workspaceRepo))
+	v1.POST("/email", rt.gatewayHandler.HandleSendEmail)
+	v1.POST("/sms", rt.gatewayHandler.HandleSendSMS)
+	v1.POST("/push", rt.gatewayHandler.HandleSendPush)
+	v1.POST("/chat", rt.gatewayHandler.HandleSendChat)
 
-	// DevBox API - for viewing intercepted messages
-	if rt.devboxHandler != nil {
-		r.Mount("/api/v1", rt.devboxRoutes())
+	api := e.Group("/api/v1")
+
+	// Portal API — always enabled.
+	ph := rt.portalHandler
+	api.POST("/auth/register", ph.Register)
+	api.POST("/auth/login", ph.Login)
+
+	protected := api.Group("")
+	protected.Use(customMiddleware.PortalJWT(rt.jwtSecret))
+	protected.GET("/auth/me", ph.Me)
+	protected.POST("/workspaces/join", ph.JoinWorkspace)
+	protected.GET("/workspaces", ph.ListWorkspaces)
+	protected.POST("/workspaces", ph.CreateWorkspace)
+	protected.GET("/workspaces/:wid", ph.GetWorkspace)
+	protected.PATCH("/workspaces/:wid", ph.PatchWorkspace)
+	protected.GET("/workspaces/:wid/members", ph.ListMembers)
+	protected.DELETE("/workspaces/:wid/members/:userId", ph.RemoveMember)
+	protected.GET("/workspaces/:wid/api-keys", ph.ListAPIKeys)
+	protected.POST("/workspaces/:wid/api-keys", ph.CreateAPIKey)
+	protected.DELETE("/workspaces/:wid/api-keys/:keyId", ph.DeleteAPIKey)
+	protected.POST("/workspaces/:wid/api-keys/:keyId/regenerate", ph.RegenerateAPIKey)
+	protected.GET("/workspaces/:wid/logs", ph.ListLogs)
+	protected.GET("/workspaces/:wid/integrations", ph.ListIntegrations)
+	protected.POST("/workspaces/:wid/integrations", ph.UpsertIntegration)
+	protected.DELETE("/workspaces/:wid/integrations/:iid", ph.DeleteIntegration)
+	protected.GET("/workspaces/:wid/templates", ph.ListTemplates)
+	protected.POST("/workspaces/:wid/templates", ph.CreateTemplate)
+	protected.PATCH("/workspaces/:wid/templates/:tid", ph.PatchTemplate)
+	protected.DELETE("/workspaces/:wid/templates/:tid", ph.DeleteTemplate)
+	protected.GET("/workspaces/:wid/settings", ph.GetSettings)
+	protected.PATCH("/workspaces/:wid/settings", ph.PatchSettings)
+	protected.GET("/workspaces/:wid/invitations", ph.ListInvitations)
+	protected.POST("/workspaces/:wid/invitations", ph.CreateInvitation)
+
+	// Inbox API — always enabled (portal is always on).
+	if rt.memberRepo != nil {
+		inbox := rt.portalInboxHandler
+		inboxGroup := api.Group("/workspaces/:wid/inbox")
+		inboxGroup.Use(customMiddleware.PortalJWTBearerOrQuery(rt.jwtSecret))
+		inboxGroup.Use(customMiddleware.RequireWorkspaceMember(rt.memberRepo))
+		inboxGroup.Use(customMiddleware.RequireWorkspaceAPIKey(rt.apiKeyRepo))
+		inboxGroup.GET("/stats", inbox.HandleStats)
+		inboxGroup.GET("/emails", inbox.HandleGetEmails)
+		inboxGroup.GET("/emails/:id", inbox.HandleGetEmailByID)
+		inboxGroup.DELETE("/emails/:id", inbox.HandleDeleteEmailByID)
+		inboxGroup.GET("/sms", inbox.HandleGetSMS)
+		inboxGroup.GET("/sms/:id", inbox.HandleGetSMSByID)
+		inboxGroup.DELETE("/sms/:id", inbox.HandleDeleteSMSByID)
+		inboxGroup.GET("/push", inbox.HandleGetPush)
+		inboxGroup.GET("/push/:id", inbox.HandleGetPushByID)
+		inboxGroup.DELETE("/push/:id", inbox.HandleDeletePushByID)
+		inboxGroup.GET("/chat", inbox.HandleGetChat)
+		inboxGroup.GET("/chat/:id", inbox.HandleGetChatByID)
+		inboxGroup.DELETE("/chat/:id", inbox.HandleDeleteChatByID)
+		inboxGroup.DELETE("/messages", inbox.HandleClearAll)
+		inboxGroup.GET("/events", inbox.HandleSSE)
+
+		internal := api.Group("/workspaces/:wid/internal")
+		internal.Use(customMiddleware.InternalIngestSecret())
+		internal.POST("/email", inbox.HandleIngestEmail)
+		internal.POST("/sms", inbox.HandleIngestSMS)
+		internal.POST("/push", inbox.HandleIngestPush)
+		internal.POST("/chat", inbox.HandleIngestChat)
 	}
 
-	return r
-}
-
-// devboxRoutes returns a chi router with all devbox API endpoints.
-func (rt *Router) devboxRoutes() chi.Router {
-	r := chi.NewRouter()
-
-	// Stats
-	r.Get("/stats", rt.devboxHandler.HandleStats)
-
-	// Emails
-	r.Get("/emails", rt.devboxHandler.HandleGetEmails)
-	r.Get("/emails/{id}", rt.devboxHandler.HandleGetEmailByID)
-	r.Delete("/emails/{id}", rt.devboxHandler.HandleDeleteEmailByID)
-
-	// SMS
-	r.Get("/sms", rt.devboxHandler.HandleGetSMS)
-	r.Get("/sms/{id}", rt.devboxHandler.HandleGetSMSByID)
-	r.Delete("/sms/{id}", rt.devboxHandler.HandleDeleteSMSByID)
-
-	// Push
-	r.Get("/push", rt.devboxHandler.HandleGetPush)
-	r.Get("/push/{id}", rt.devboxHandler.HandleGetPushByID)
-	r.Delete("/push/{id}", rt.devboxHandler.HandleDeletePushByID)
-
-	// Chat
-	r.Get("/chat", rt.devboxHandler.HandleGetChat)
-	r.Get("/chat/{id}", rt.devboxHandler.HandleGetChatByID)
-	r.Delete("/chat/{id}", rt.devboxHandler.HandleDeleteChatByID)
-
-	// Clear all
-	r.Delete("/messages", rt.devboxHandler.HandleClearAll)
-
-	// SSE
-	r.Get("/events", rt.devboxHandler.HandleSSE)
-
-	// Internal ingest endpoints
-	r.Route("/internal", func(r chi.Router) {
-		r.Post("/email", rt.devboxHandler.HandleIngestEmail)
-		r.Post("/sms", rt.devboxHandler.HandleIngestSMS)
-		r.Post("/push", rt.devboxHandler.HandleIngestPush)
-		r.Post("/chat", rt.devboxHandler.HandleIngestChat)
-	})
-
-	return r
+	return e
 }

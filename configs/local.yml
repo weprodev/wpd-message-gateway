@@ -3,9 +3,13 @@ environment: local
 server:
   port: 10101
 
-devbox:
-  enabled: true
-  port: 10104
+# Portal: JWT auth + workspace API; UI + message inbox (memory preview).
+# Override JWT with MESSAGE_JWT_SECRET.
+portal:
+  jwt_secret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  jwt_ttl_hours: 72
+  ui_enabled: true
+  ui_port: 10104
 
 # Mailpit Integration (optional)
 # To use Mailpit, start it with: make mailpit

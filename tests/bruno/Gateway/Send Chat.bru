@@ -7,7 +7,16 @@ meta {
 post {
   url: {{baseUrl}}/v1/chat
   body: json
-  auth: none
+  auth: basic
+}
+
+auth:basic {
+  username: demo-client-id
+  password: demo-secret
+}
+
+headers {
+  X-Workspace-Key: {{workspaceKey}}
 }
 
 body:json {
@@ -19,12 +28,7 @@ body:json {
 }
 
 tests {
-  test("should return 200", function() {
-    expect(res.status).to.equal(200);
-  });
-
-  test("should return non-empty message ID", function() {
-    expect(res.body.id).to.be.a("string");
-    expect(res.body.id.length).to.be.greaterThan(0);
+  test("should return 501 (Chat not implemented)", function() {
+    expect(res.status).to.equal(501);
   });
 }

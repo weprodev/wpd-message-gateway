@@ -1,0 +1,24 @@
+meta {
+  name: Delete Chat
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/inbox/chat/{{chatId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{portalJwt}}
+  X-Api-Client-Id: {{apiClientId}}
+  X-Api-Client-Secret: {{apiSecret}}
+}
+
+
+tests {
+  test("should return 204", function() {
+    expect(res.status).to.equal(204);
+  });
+}

@@ -1,0 +1,157 @@
+import { Meta, ColorPalette, ColorItem } from '@storybook/addon-docs/blocks';
+
+<Meta title="Foundations/Colors" />
+
+# Color foundations
+
+Message Gateway uses **semantic tokens** as CSS variables (`hsl()` without the wrapper in variables). Components read `hsl(var(--token))` so one codebase supports **light** (default `:root`) and **dark** (`.dark` on an ancestor—typically `document.documentElement` or a layout shell).
+
+Design intent:
+
+- **Brand:** vivid indigo / purple primary for actions, focus ring, and logo-adjacent accents.
+- **Light mode:** off-white surfaces, slate text hierarchy, soft semantic tints for badges.
+- **Dark mode:** deep navy shell (`--background`), elevated cards (`--card`), muted blue-gray text, pill-style status colors with paired foregrounds.
+
+---
+
+## Light mode
+
+Default theme; Storybook docs canvas uses these values unless a parent has `class="dark"`.
+
+<ColorPalette>
+  <ColorItem
+    title="Brand"
+    subtitle="Primary actions, focus ring, interactive emphasis"
+    colors={{
+      Primary: 'hsl(var(--primary))',
+      'On primary': 'hsl(var(--primary-foreground))',
+      Ring: 'hsl(var(--ring))',
+    }}
+  />
+  <ColorItem
+    title="Text"
+    subtitle="Headings, body, and de-emphasized copy"
+    colors={{
+      Foreground: 'hsl(var(--foreground))',
+      'Muted foreground': 'hsl(var(--muted-foreground))',
+      'Secondary foreground': 'hsl(var(--secondary-foreground))',
+      'Card foreground': 'hsl(var(--card-foreground))',
+    }}
+  />
+  <ColorItem
+    title="Surfaces"
+    subtitle="Page, cards, popovers, secondary panels"
+    colors={{
+      Background: 'hsl(var(--background))',
+      Card: 'hsl(var(--card))',
+      Popover: 'hsl(var(--popover))',
+      Muted: 'hsl(var(--muted))',
+      Secondary: 'hsl(var(--secondary))',
+    }}
+  />
+  <ColorItem
+    title="Semantic"
+    subtitle="Status badges, alerts, toasts (pair with *-foreground for text/icons)"
+    colors={{
+      Success: 'hsl(var(--success))',
+      'On success': 'hsl(var(--success-foreground))',
+      Warning: 'hsl(var(--warning))',
+      'On warning': 'hsl(var(--warning-foreground))',
+      Destructive: 'hsl(var(--destructive))',
+      'On destructive': 'hsl(var(--destructive-foreground))',
+    }}
+  />
+  <ColorItem
+    title="Accent"
+    subtitle="Hover surfaces and accent foreground"
+    colors={{
+      Accent: 'hsl(var(--accent))',
+      'Accent foreground': 'hsl(var(--accent-foreground))',
+    }}
+  />
+  <ColorItem
+    title="Borders & inputs"
+    subtitle="Dividers, fields, subtle chrome"
+    colors={{
+      Border: 'hsl(var(--border))',
+      Input: 'hsl(var(--input))',
+    }}
+  />
+</ColorPalette>
+
+---
+
+## Dark mode
+
+Same token names; values swap when an ancestor has the **`dark`** class. The preview below uses `class="dark"`. Typography in this block is adjusted via `.mg-color-docs-dark` in `.storybook/docs-foundations.css` so labels stay readable on dark surfaces.
+
+<div className="dark mg-color-docs-dark rounded-xl border border-border bg-card p-8 shadow-sm ring-1 ring-border/60">
+  <ColorPalette>
+    <ColorItem
+      title="Brand"
+      subtitle="Primary actions, focus ring, interactive emphasis"
+      colors={{
+        Primary: 'hsl(var(--primary))',
+        'On primary': 'hsl(var(--primary-foreground))',
+        Ring: 'hsl(var(--ring))',
+      }}
+    />
+    <ColorItem
+      title="Text"
+      subtitle="Headings, body, muted and secondary copy"
+      colors={{
+        Foreground: 'hsl(var(--foreground))',
+        'Muted foreground': 'hsl(var(--muted-foreground))',
+        'Secondary foreground': 'hsl(var(--secondary-foreground))',
+        'Card foreground': 'hsl(var(--card-foreground))',
+      }}
+    />
+    <ColorItem
+      title="Surfaces"
+      subtitle="Deep navy app background, elevated cards, popovers"
+      colors={{
+        Background: 'hsl(var(--background))',
+        Card: 'hsl(var(--card))',
+        Popover: 'hsl(var(--popover))',
+        Muted: 'hsl(var(--muted))',
+        Secondary: 'hsl(var(--secondary))',
+      }}
+    />
+    <ColorItem
+      title="Semantic"
+      subtitle="Status rows, badges, API log status chips"
+      colors={{
+        Success: 'hsl(var(--success))',
+        'On success': 'hsl(var(--success-foreground))',
+        Warning: 'hsl(var(--warning))',
+        'On warning': 'hsl(var(--warning-foreground))',
+        Destructive: 'hsl(var(--destructive))',
+        'On destructive': 'hsl(var(--destructive-foreground))',
+      }}
+    />
+    <ColorItem
+      title="Accent"
+      subtitle="Sidebar highlights, hover surfaces"
+      colors={{
+        Accent: 'hsl(var(--accent))',
+        'Accent foreground': 'hsl(var(--accent-foreground))',
+      }}
+    />
+    <ColorItem
+      title="Borders & inputs"
+      subtitle="Table rules, panels, form fields"
+      colors={{
+        Border: 'hsl(var(--border))',
+        Input: 'hsl(var(--input))',
+      }}
+    />
+  </ColorPalette>
+</div>
+
+---
+
+## Implementation
+
+- Toggle `dark` on the document or layout root to switch themes; components keep using the same token names.
+- Use paired `*-foreground` tokens for text/icons on semantic fills.
+- Token values: `src/index.css` (`:root` and `.dark`).

@@ -1,0 +1,29 @@
+meta {
+  name: Get SMS by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/inbox/sms/{{smsId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{portalJwt}}
+  X-Api-Client-Id: {{apiClientId}}
+  X-Api-Client-Secret: {{apiSecret}}
+}
+
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return SMS object", function() {
+    expect(res.body).to.have.property("id");
+    expect(res.body).to.have.property("sms");
+  });
+}

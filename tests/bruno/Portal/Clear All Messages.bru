@@ -1,0 +1,24 @@
+meta {
+  name: Clear All Messages
+  type: http
+  seq: 99
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/inbox/messages
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{portalJwt}}
+  X-Api-Client-Id: {{apiClientId}}
+  X-Api-Client-Secret: {{apiSecret}}
+}
+
+
+tests {
+  test("should return 204", function() {
+    expect(res.status).to.equal(204);
+  });
+}

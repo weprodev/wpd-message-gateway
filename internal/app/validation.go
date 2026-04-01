@@ -2,9 +2,10 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
+	"github.com/weprodev/wpd-message-gateway/internal/registry"
 )
 
 // ValidateConfig validates required configuration.
@@ -61,9 +62,9 @@ func ValidateConfig(cfg *Config) error {
 		)
 	}
 
-	// Log warnings for missing providers
 	if len(missingProviders) > 0 {
-		fmt.Printf("Note: No default provider configured for: %s\n", strings.Join(missingProviders, ", "))
+		slog.Warn("no default provider configured for channels; those channels will use memory fallback",
+			"channels", strings.Join(missingProviders, ", "))
 	}
 
 	return nil

@@ -1,158 +1,157 @@
-// Package gateway provides an embedded SDK for the message gateway.
+// Package gateway provides the public embedded SDK for wpd-message-gateway.
 //
-// Usage:
+// There are two ways to use this package:
 //
-//	gw, err := gateway.New(gateway.Config{
-//	    DefaultEmailProvider: "memory",
-//	})
+//  1. Static config (no server, no DB) — call New() with provider credentials
+//     declared in code. Providers must be imported to trigger self-registration:
 //
-//	result, err := gw.SendEmail(ctx, &contracts.Email{
-//	    To:      []string{"user@example.com"},
-//	    Subject: "Hello",
-//	    HTML:    "<p>World</p>",
-//	})
+//     import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
+//
+//  2. DB-backed (server mode) — call NewWithService() with an already-wired
+//     GatewayService. This is used internally by the HTTP server.
 package gateway
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
-func (c *configAdapter) DefaultEmailProvider() string { return c.cfg.DefaultEmailProvider }
-func (c *configAdapter) DefaultSMSProvider() string   { return c.cfg.DefaultSMSProvider }
-func (c *configAdapter) DefaultPushProvider() string  { return c.cfg.DefaultPushProvider }
-func (c *configAdapter) DefaultChatProvider() string  { return c.cfg.DefaultChatProvider }
+// Gateway sends messages. Construct via New() or NewWithService().
+type Gateway struct {
+	// DB-backed mode — set by NewWithService.
+	svc         *service.GatewayService
+	workspaceID string
 
-// New creates a new Gateway instance.
+	// Static config mode — set by New().
+	emailSenders map[string]port.EmailSender
+	smsSenders   map[string]port.SMSSender
+	pushSenders  map[string]port.PushSender
+	chatSenders  map[string]port.ChatSender
+	defaultEmail string
+	defaultSMS   string
+	defaultPush  string
+	defaultChat  string
+}
+
+// NewWithService creates a Gateway scoped to a workspace using a wired
+// GatewayService (database-backed integrations). Used internally by the server.
+func NewWithService(svc *service.GatewayService, workspaceID string) *Gateway {
+	return &Gateway{svc: svc, workspaceID: workspaceID}
+}
+
+// New constructs a Gateway from static config without a database or HTTP server.
+// Providers must have been registered via init() before New() is called —
+// import the provider packages with a blank import in your main package:
+//
+//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
+//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
 func New(cfg Config) (*Gateway, error) {
-	serviceRegistry := service.NewRegistry()
-
-	gw := &Gateway{cfg: cfg}
-
-	if err := gw.initializeProviders(serviceRegistry); err != nil {
+	g := &Gateway{
+		emailSenders: make(map[string]port.EmailSender),
+		smsSenders:   make(map[string]port.SMSSender),
+		pushSenders:  make(map[string]port.PushSender),
+		chatSenders:  make(map[string]port.ChatSender),
+		defaultEmail: cfg.DefaultEmailProvider,
+		defaultSMS:   cfg.DefaultSMSProvider,
+		defaultPush:  cfg.DefaultPushProvider,
+		defaultChat:  cfg.DefaultChatProvider,
+	}
+	if err := buildEmailSenders(g, cfg); err != nil {
 		return nil, err
 	}
-
-	gw.service = service.NewGatewayService(&configAdapter{cfg}, serviceRegistry)
-
-	return gw, nil
+	if err := buildSMSSenders(g, cfg); err != nil {
+		return nil, err
+	}
+	if err := buildPushSenders(g, cfg); err != nil {
+		return nil, err
+	}
+	if err := buildChatSenders(g, cfg); err != nil {
+		return nil, err
+	}
+	return g, nil
 }
 
-func (g *Gateway) initializeProviders(serviceRegistry *service.Registry) error {
-	if name := g.cfg.DefaultEmailProvider; name != "" {
-		provider, err := g.createEmailProvider(name)
-		if err != nil {
-			return fmt.Errorf("failed to create email provider %s: %w", name, err)
-		}
-		serviceRegistry.RegisterEmailProvider(name, provider)
-	}
-
-	if name := g.cfg.DefaultSMSProvider; name != "" {
-		provider, err := g.createSMSProvider(name)
-		if err != nil {
-			return fmt.Errorf("failed to create SMS provider %s: %w", name, err)
-		}
-		serviceRegistry.RegisterSMSProvider(name, provider)
-	}
-
-	if name := g.cfg.DefaultPushProvider; name != "" {
-		provider, err := g.createPushProvider(name)
-		if err != nil {
-			return fmt.Errorf("failed to create push provider %s: %w", name, err)
-		}
-		serviceRegistry.RegisterPushProvider(name, provider)
-	}
-
-	if name := g.cfg.DefaultChatProvider; name != "" {
-		provider, err := g.createChatProvider(name)
-		if err != nil {
-			return fmt.Errorf("failed to create chat provider %s: %w", name, err)
-		}
-		serviceRegistry.RegisterChatProvider(name, provider)
-	}
-
-	return nil
-}
-
-// SendEmail sends an email using the default provider.
+// SendEmail sends an email. In static mode, uses the default email provider.
+// In server mode, delegates to the workspace's active integration.
 func (g *Gateway) SendEmail(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-	return g.service.SendEmail(ctx, email)
+	if g.svc != nil {
+		return g.svc.SendEmail(ctx, g.workspaceID, email)
+	}
+	sender, err := g.emailSender()
+	if err != nil {
+		return nil, err
+	}
+	return sender.Send(ctx, email)
 }
 
-// SendEmailWith sends an email using a specific provider.
-func (g *Gateway) SendEmailWith(ctx context.Context, provider string, email *contracts.Email) (*contracts.SendResult, error) {
-	return g.service.SendEmailWith(ctx, provider, email)
-}
-
-// SendSMS sends an SMS using the default provider.
+// SendSMS sends an SMS. In static mode, uses the default SMS provider.
 func (g *Gateway) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.SendResult, error) {
-	return g.service.SendSMS(ctx, sms)
+	if g.svc != nil {
+		return g.svc.SendSMS(ctx, g.workspaceID, sms)
+	}
+	sender, err := g.smsSender()
+	if err != nil {
+		return nil, err
+	}
+	return sender.Send(ctx, sms)
 }
 
-// SendSMSWith sends an SMS using a specific provider.
-func (g *Gateway) SendSMSWith(ctx context.Context, provider string, sms *contracts.SMS) (*contracts.SendResult, error) {
-	return g.service.SendSMSWith(ctx, provider, sms)
-}
-
-// SendPush sends a push notification using the default provider.
+// SendPush sends a push notification. In static mode, uses the default push provider.
 func (g *Gateway) SendPush(ctx context.Context, push *contracts.PushNotification) (*contracts.SendResult, error) {
-	return g.service.SendPush(ctx, push)
+	if g.svc != nil {
+		return g.svc.SendPush(ctx, g.workspaceID, push)
+	}
+	sender, err := g.pushSender()
+	if err != nil {
+		return nil, err
+	}
+	return sender.Send(ctx, push)
 }
 
-// SendPushWith sends a push notification using a specific provider.
-func (g *Gateway) SendPushWith(ctx context.Context, provider string, push *contracts.PushNotification) (*contracts.SendResult, error) {
-	return g.service.SendPushWith(ctx, provider, push)
-}
-
-// SendChat sends a chat message using the default provider.
+// SendChat sends a chat message. In static mode, uses the default chat provider.
 func (g *Gateway) SendChat(ctx context.Context, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
-	return g.service.SendChat(ctx, chat)
-}
-
-// SendChatWith sends a chat message using a specific provider.
-func (g *Gateway) SendChatWith(ctx context.Context, provider string, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
-	return g.service.SendChatWith(ctx, provider, chat)
-}
-
-func (g *Gateway) createEmailProvider(name string) (port.EmailSender, error) {
-	factory, err := registry.GetEmailFactory(name)
+	if g.svc != nil {
+		return g.svc.SendChat(ctx, g.workspaceID, chat)
+	}
+	sender, err := g.chatSender()
 	if err != nil {
 		return nil, err
 	}
-
-	cfg := g.cfg.EmailProviders[name]
-	mailpit := registry.MailpitConfig{Enabled: g.cfg.MailpitEnabled}
-	return factory(cfg, mailpit)
+	return sender.Send(ctx, chat)
 }
 
-func (g *Gateway) createSMSProvider(name string) (port.SMSSender, error) {
-	factory, err := registry.GetSMSFactory(name)
-	if err != nil {
-		return nil, err
+func (g *Gateway) emailSender() (port.EmailSender, error) {
+	s, ok := g.emailSenders[g.defaultEmail]
+	if !ok {
+		return nil, fmt.Errorf("gateway: email provider %q not configured", g.defaultEmail)
 	}
-
-	return factory(g.cfg.SMSProviders[name])
+	return s, nil
 }
 
-func (g *Gateway) createPushProvider(name string) (port.PushSender, error) {
-	factory, err := registry.GetPushFactory(name)
-	if err != nil {
-		return nil, err
+func (g *Gateway) smsSender() (port.SMSSender, error) {
+	s, ok := g.smsSenders[g.defaultSMS]
+	if !ok {
+		return nil, fmt.Errorf("gateway: SMS provider %q not configured", g.defaultSMS)
 	}
-
-	return factory(g.cfg.PushProviders[name])
+	return s, nil
 }
 
-func (g *Gateway) createChatProvider(name string) (port.ChatSender, error) {
-	factory, err := registry.GetChatFactory(name)
-	if err != nil {
-		return nil, err
+func (g *Gateway) pushSender() (port.PushSender, error) {
+	s, ok := g.pushSenders[g.defaultPush]
+	if !ok {
+		return nil, fmt.Errorf("gateway: push provider %q not configured", g.defaultPush)
 	}
+	return s, nil
+}
 
-	return factory(g.cfg.ChatProviders[name])
+func (g *Gateway) chatSender() (port.ChatSender, error) {
+	s, ok := g.chatSenders[g.defaultChat]
+	if !ok {
+		return nil, fmt.Errorf("gateway: chat provider %q not configured", g.defaultChat)
+	}
+	return s, nil
 }

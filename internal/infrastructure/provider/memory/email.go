@@ -3,7 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/smtp"
 	"strings"
 	"time"
@@ -44,7 +44,7 @@ func (f *smtpForwarder) forward(email *contracts.Email) {
 
 	from := email.From
 	if from == "" {
-		from = "devbox@local.dev"
+		from = "portal@local.dev"
 	}
 
 	if len(email.To) == 0 {
@@ -56,22 +56,22 @@ func (f *smtpForwarder) forward(email *contracts.Email) {
 
 	addr := fmt.Sprintf("%s:%s", f.host, f.port)
 	if err := smtp.SendMail(addr, nil, from, recipients, []byte(msg)); err != nil {
-		log.Printf("SMTP forward to Mailpit failed: %v", err)
+		slog.Warn("SMTP forward to Mailpit failed", "addr", addr, "error", err)
 		return
 	}
 
-	log.Printf("Email forwarded to Mailpit: %s -> %v", email.Subject, email.To)
+	slog.Info("email forwarded to Mailpit", "subject", email.Subject, "to", email.To)
 }
 
 func (f *smtpForwarder) buildMessage(email *contracts.Email, from string) string {
 	var msg strings.Builder
 
-	msg.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	msg.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(email.To, ", ")))
-	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", email.Subject))
+	fmt.Fprintf(&msg, "From: %s\r\n", from)
+	fmt.Fprintf(&msg, "To: %s\r\n", strings.Join(email.To, ", "))
+	fmt.Fprintf(&msg, "Subject: %s\r\n", email.Subject)
 
 	if len(email.CC) > 0 {
-		msg.WriteString(fmt.Sprintf("Cc: %s\r\n", strings.Join(email.CC, ", ")))
+		fmt.Fprintf(&msg, "Cc: %s\r\n", strings.Join(email.CC, ", "))
 	}
 
 	if email.HTML != "" {
@@ -100,13 +100,20 @@ func (f *smtpForwarder) collectRecipients(email *contracts.Email) []string {
 type EmailProvider struct {
 	store         *Store
 	smtpForwarder *smtpForwarder
+	workspaceID   string
 }
 
-// NewEmailProvider creates a new memory email provider.
+// NewEmailProvider creates a new memory email provider (no workspace scope; legacy / global inbox).
 func NewEmailProvider(store *Store, mailpitCfg MailpitConfig) *EmailProvider {
+	return NewEmailProviderForWorkspace(store, mailpitCfg, "")
+}
+
+// NewEmailProviderForWorkspace tags stored emails with workspaceID for multi-tenant portal inbox.
+func NewEmailProviderForWorkspace(store *Store, mailpitCfg MailpitConfig, workspaceID string) *EmailProvider {
 	return &EmailProvider{
 		store:         store,
 		smtpForwarder: newSMTPForwarder(mailpitCfg),
+		workspaceID:   workspaceID,
 	}
 }
 
@@ -120,9 +127,10 @@ func (e *EmailProvider) Send(ctx context.Context, email *contracts.Email) (*cont
 	id := uuid.New().String()
 
 	stored := &StoredEmail{
-		ID:        id,
-		CreatedAt: time.Now(),
-		Email:     email,
+		ID:          id,
+		WorkspaceID: e.workspaceID,
+		CreatedAt:   time.Now(),
+		Email:       email,
 	}
 	e.store.AddEmail(stored)
 

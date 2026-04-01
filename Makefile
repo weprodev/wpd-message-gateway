@@ -1,4 +1,4 @@
-.PHONY: install upgrade start stop test audit build clean dev dev-down mailpit mailpit-down help
+.PHONY: install upgrade start stop test audit build clean docker-check dev dev-down mailpit mailpit-down help ui-install ui ui-build ui-format ui-test ui-lint storybook
 
 # ============================================================================
 # ANSI Color Codes
@@ -29,8 +29,8 @@ upgrade:
 	@printf "$(GREEN)✅ Go dependencies upgraded!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🌐 Upgrading frontend dependencies...$(RESET)\n"
-	@cd web && npm update
-	@cd web && npm audit fix --force 2>/dev/null || true
+	@cd frontend && npm update
+	@cd frontend && npm audit fix --force 2>/dev/null || true
 	@printf "$(GREEN)✅ Frontend dependencies upgraded!$(RESET)\n"
 	@printf "\n"
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
@@ -55,7 +55,7 @@ install:
 	@printf "$(GREEN)✅ Development tools installed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🌐 Installing frontend dependencies...$(RESET)\n"
-	@cd web && npm install
+	@cd frontend && npm install
 	@printf "$(GREEN)✅ Frontend dependencies installed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
@@ -65,14 +65,14 @@ install:
 	@printf "$(BOLD)$(MAGENTA)💡 Next step:$(RESET) Run $(YELLOW)make start$(RESET) to begin development\n"
 	@printf "\n"
 
-## Start development environment (Gateway + DevBox UI)
+## Start development environment (Gateway + Portal UI)
 start: stop
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🚀 Starting development environment...$(RESET)\n"
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
-	@if [ ! -d "web/node_modules" ]; then \
+	@if [ ! -d "frontend/node_modules" ]; then \
 		printf "$(YELLOW)📦 Installing frontend dependencies...$(RESET)\n"; \
-		cd web && npm install; \
+		cd frontend && npm install; \
 	fi
 	@# Build fresh binary - force rebuild to avoid cache issues
 	@printf "$(YELLOW)🔨 Building server...$(RESET)\n"
@@ -92,7 +92,7 @@ start: stop
 		fi
 	@printf "\n"
 	@printf "   $(BOLD)Gateway API:$(RESET)  http://localhost:10101\n"
-	@printf "   $(BOLD)DevBox UI:$(RESET)    http://localhost:10104\n"
+	@printf "   $(BOLD)Portal UI:$(RESET)    http://localhost:10104\n"
 	@printf "\n"
 	@printf "$(YELLOW)Press Ctrl+C to stop both servers$(RESET)\n"
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
@@ -100,7 +100,7 @@ start: stop
 		env -u MESSAGE_DEFAULT_EMAIL_PROVIDER -u MESSAGE_DEFAULT_SMS_PROVIDER \
 		-u MESSAGE_DEFAULT_PUSH_PROVIDER -u MESSAGE_DEFAULT_CHAT_PROVIDER \
 		CONFIG_PATH=configs/local.yml ./bin/server & \
-		cd web && npm run dev
+		cd frontend && npm run dev
 
 ## Stop any running gateway processes
 stop:
@@ -121,39 +121,57 @@ test:
 	@go test ./...
 	@printf "$(GREEN)✅ All tests passed!$(RESET)\n"
 
-## Full quality check: format, lint, test, security scan
+## Full quality check: format + lint + test (Go + frontend), govulncheck, then compile checks (Go + Vite + Storybook)
 audit:
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🔍 Running full audit...$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🔍 Running full audit (Go + frontend)...$(RESET)\n"
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
 	@printf "\n"
-	@printf "$(BOLD)$(YELLOW)🎨 Formatting code...$(RESET)\n"
+	@printf "$(BOLD)$(YELLOW)🎨 Formatting Go...$(RESET)\n"
 	@find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' | xargs goimports -local github.com/weprodev/wpd-message-gateway -w 2>/dev/null || \
 		find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' | xargs gofmt -w
 	@go mod tidy
-	@printf "$(GREEN)✅ Code formatted!$(RESET)\n"
+	@printf "$(GREEN)✅ Go formatted!$(RESET)\n"
 	@printf "\n"
-	@printf "$(BOLD)$(YELLOW)🔍 Running linter...$(RESET)\n"
+	@printf "$(BOLD)$(YELLOW)🎨 Formatting frontend (ESLint --fix)...$(RESET)\n"
+	@cd frontend && npm run format
+	@printf "$(GREEN)✅ Frontend formatted!$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)🔍 Linting Go...$(RESET)\n"
 	@golangci-lint run ./...
-	@printf "$(GREEN)✅ Linting passed!$(RESET)\n"
+	@printf "$(GREEN)✅ Go lint passed!$(RESET)\n"
 	@printf "\n"
-	@printf "$(BOLD)$(YELLOW)🧪 Running tests...$(RESET)\n"
+	@printf "$(BOLD)$(YELLOW)🔍 Linting frontend...$(RESET)\n"
+	@cd frontend && npm run lint
+	@printf "$(GREEN)✅ Frontend lint passed!$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)🧪 Testing Go...$(RESET)\n"
 	@go test ./...
-	@printf "$(GREEN)✅ All tests passed!$(RESET)\n"
+	@printf "$(GREEN)✅ Go tests passed!$(RESET)\n"
 	@printf "\n"
-	@printf "$(BOLD)$(YELLOW)🔒 Running security scan...$(RESET)\n"
+	@printf "$(BOLD)$(YELLOW)🧪 Testing frontend...$(RESET)\n"
+	@cd frontend && npm run test
+	@printf "$(GREEN)✅ Frontend tests passed!$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)🔒 govulncheck (Go)...$(RESET)\n"
 	@govulncheck ./...
-	@printf "$(GREEN)✅ No vulnerabilities found!$(RESET)\n"
+	@printf "$(GREEN)✅ No Go vulnerabilities reported!$(RESET)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)🔨 Verifying builds (Go + Vite app + Storybook)...$(RESET)\n"
+	@go build ./...
+	@cd frontend && npm run build:all
+	@printf "$(GREEN)✅ All builds succeeded!$(RESET)\n"
 	@printf "\n"
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
-	@printf "$(BOLD)$(GREEN)✅ All audit checks passed!$(RESET)\n"
+	@printf "$(BOLD)$(GREEN)✅ Audit complete.$(RESET)\n"
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
 
-## Build all packages
+## Build: Go packages + frontend production bundle + static Storybook
 build:
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🔨 Building all packages...$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🔨 Building Go + frontend (app + Storybook)...$(RESET)\n"
 	@go build ./...
+	@cd frontend && npm run build:all
 	@printf "$(GREEN)✅ Build successful!$(RESET)\n"
 
 ## Clean build artifacts
@@ -166,22 +184,83 @@ clean:
 	@printf "$(GREEN)✅ Cleaned!$(RESET)\n"
 
 # ============================================================================
+# UI (Frontend) Commands
+# ============================================================================
+
+## Install front-end dependencies
+ui-install:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)📦 Installing UI dependencies...$(RESET)\n"
+	@cd frontend && npm install
+	@printf "$(GREEN)✅ Installed UI dependencies!$(RESET)\n"
+
+## Start UI in development mode
+ui:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🚀 Starting local UI server...$(RESET)\n"
+	@cd frontend && npm run dev
+
+## Build UI: Vite app + static Storybook (same as npm run build:all)
+ui-build:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🔨 Building UI (app + Storybook)...$(RESET)\n"
+	@cd frontend && npm run build:all
+	@printf "$(GREEN)✅ UI build successful!$(RESET)\n"
+
+## Format frontend (ESLint --fix)
+ui-format:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🎨 Formatting frontend...$(RESET)\n"
+	@cd frontend && npm run format
+	@printf "$(GREEN)✅ Frontend formatted!$(RESET)\n"
+
+## Run UI tests
+ui-test:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🧪 Running UI tests...$(RESET)\n"
+	@cd frontend && npm run test
+	@printf "$(GREEN)✅ UI Tests passed!$(RESET)\n"
+
+## Run UI linter
+ui-lint:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🔍 Running UI linter...$(RESET)\n"
+	@cd frontend && npm run lint
+	@printf "$(GREEN)✅ UI Linter passed!$(RESET)\n"
+
+## Start Storybook server
+storybook:
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)📚 Starting Storybook server...$(RESET)\n"
+	@printf "$(YELLOW)Storybook UI:$(RESET) http://localhost:6006\n"
+	@cd frontend && npm run storybook
+
+# ============================================================================
 # Docker
 # ============================================================================
 
-## Start Gateway, and DevBox UI via Docker Compose
-dev:
+## Verify Docker daemon is reachable (used by dev, dev-down, mailpit targets)
+docker-check:
+	@docker info >/dev/null 2>&1 || ( \
+		printf "\n$(BOLD)$(YELLOW)Docker is not running.$(RESET)\n"; \
+		printf "Start Docker Desktop (macOS: open Docker from Applications), wait until it finishes starting, then retry.\n"; \
+		printf "To run without Docker: $(YELLOW)make start$(RESET) (Gateway + Portal UI on localhost).\n\n"; \
+		exit 1; \
+	)
+
+## Start Gateway and Portal UI via Docker Compose
+dev: docker-check
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway, and DevBox UI via Docker...$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway and Portal UI via Docker...$(RESET)\n"
 	@docker compose up -d
 	@printf "$(GREEN)✅ Gateway started!$(RESET)\n"
 	@printf "\n"
 	@printf "   $(BOLD)Gateway API:$(RESET)  http://localhost:10101\n"
-	@printf "   $(BOLD)DevBox UI:$(RESET)    Run $(YELLOW)make start$(RESET) → http://localhost:10104\n"
+	@printf "   $(BOLD)Portal UI:$(RESET)    Run $(YELLOW)make start$(RESET) → http://localhost:10104\n"
 	@printf "\n"
 
 ## Stop Docker Compose
-dev-down:
+dev-down: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🛑 Stopping Docker...$(RESET)\n"
 	@docker compose down
@@ -192,7 +271,7 @@ dev-down:
 # ============================================================================
 
 ## Start Mailpit (SMTP testing server)
-mailpit:
+mailpit: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)📬 Starting Mailpit...$(RESET)\n"
 	@docker compose -f docker-compose.mailpit.yml up -d
@@ -207,7 +286,7 @@ mailpit:
 	@printf "\n"
 
 ## Stop Mailpit
-mailpit-down:
+mailpit-down: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🛑 Stopping Mailpit...$(RESET)\n"
 	@docker compose -f docker-compose.mailpit.yml down
@@ -223,16 +302,24 @@ help:
 	@printf "$(BOLD)$(CYAN)           WPD Message Gateway                              $(RESET)\n"
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
 	@printf "\n"
-	@printf "$(BOLD)$(GREEN)🚀 Development$(RESET)\n"
+	@printf "$(BOLD)$(GREEN)🚀 Core Development$(RESET)\n"
 	@printf "   $(YELLOW)make install$(RESET)      Install all dependencies\n"
 	@printf "   $(YELLOW)make upgrade$(RESET)      Upgrade all dependencies\n"
-	@printf "   $(YELLOW)make start$(RESET)        Start Gateway + DevBox UI\n"
+	@printf "   $(YELLOW)make start$(RESET)        Start Gateway + Portal UI\n"
 	@printf "   $(YELLOW)make stop$(RESET)         Stop running servers\n"
-	@printf "   $(YELLOW)make test$(RESET)         Run tests\n"
-	@printf "   $(YELLOW)make audit$(RESET)        Full check (fmt + lint + test + security)\n"
+	@printf "   $(YELLOW)make test$(RESET)         Run Go tests only\n"
+	@printf "   $(YELLOW)make audit$(RESET)        Full check: fmt+lint+test (Go+UI), govulncheck, builds (Go+Vite+Storybook)\n"
+	@printf "\n"
+	@printf "$(BOLD)$(GREEN)🎨 UI / Frontend Development$(RESET)\n"
+	@printf "   $(YELLOW)make ui$(RESET)           Start UI development server\n"
+	@printf "   $(YELLOW)make storybook$(RESET)    Start Storybook server (port 6006)\n"
+	@printf "   $(YELLOW)make ui-format$(RESET)    ESLint --fix in frontend\n"
+	@printf "   $(YELLOW)make ui-test$(RESET)      Run frontend tests\n"
+	@printf "   $(YELLOW)make ui-lint$(RESET)      Run frontend linter\n"
+	@printf "   $(YELLOW)make ui-build$(RESET)     Build Vite app + static Storybook\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🔨 Build$(RESET)\n"
-	@printf "   $(YELLOW)make build$(RESET)        Build all packages\n"
+	@printf "   $(YELLOW)make build$(RESET)        Go compile + frontend build:all (no tests)\n"
 	@printf "   $(YELLOW)make clean$(RESET)        Clean build artifacts\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🐳 Docker$(RESET)\n"

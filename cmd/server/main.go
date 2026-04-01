@@ -2,54 +2,65 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net/http"
+	"log/slog"
 	"os"
 
 	"github.com/weprodev/wpd-message-gateway/internal/app"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 )
 
 func main() {
+	// Initialise the structured logger first so every subsequent slog call is
+	// formatted and levelled correctly. Uses APP_ENVIRONMENT to pick text (local)
+	// vs JSON (production) format.
+	env := os.Getenv("APP_ENVIRONMENT")
+	if _, err := logger.New(env); err != nil {
+		// Logger not yet up — fall back to bare stderr before exiting.
+		fmt.Fprintf(os.Stderr, "FATAL: init logger: %v\n", err)
+		os.Exit(1)
+	}
+
 	configPath := os.Getenv("CONFIG_PATH")
 	cfg, err := app.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	if err := app.ValidateConfig(cfg); err != nil {
-		log.Fatalf("Configuration error: %v\n\n"+
-			"Each message type requires a valid default provider (e.g. 'memory', 'mailgun', 'twilio').\n"+
-			"Please configure these in configs/local.yml or via environment variables.\n\n"+
-			"💡 Tip: Copy configs/local.example.yml to configs/local.yml and configure your providers", err)
+		slog.Error("configuration error",
+			"error", err,
+			"hint", "each message type requires a default provider (e.g. memory, mailgun); "+
+				"copy configs/local.example.yml to configs/local.yml and configure providers",
+		)
+		os.Exit(1)
 	}
 
 	application, err := app.Wire(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
+		slog.Error("failed to initialise application", "error", err)
+		os.Exit(1)
 	}
 
 	logConfiguration(cfg)
 
-	router := application.Router.Setup()
-
 	port := resolvePort(cfg)
-	log.Printf("Gateway server listening on :%s", port)
+	slog.Info("gateway server starting", "port", port, "environment", cfg.Environment)
 
-	if err := http.ListenAndServe(":"+port, router); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	if err := application.Echo.Start(":" + port); err != nil {
+		slog.Error("server stopped", "error", err)
+		os.Exit(1)
 	}
 }
 
 func logConfiguration(cfg *app.Config) {
-	log.Printf("Loaded Configuration:")
-	log.Printf("- Email Provider: %s (Default)", cfg.DefaultEmailProvider())
-	log.Printf("- SMS Provider:   %s (Default)", cfg.DefaultSMSProvider())
-	log.Printf("- Push Provider:  %s (Default)", cfg.DefaultPushProvider())
-	log.Printf("- Chat Provider:  %s (Default)", cfg.DefaultChatProvider())
-
-	if cfg.Mailpit.Enabled {
-		log.Printf("- Mailpit:        enabled")
-	}
+	slog.Info("loaded configuration",
+		"email_provider", cfg.DefaultEmailProvider(),
+		"sms_provider", cfg.DefaultSMSProvider(),
+		"push_provider", cfg.DefaultPushProvider(),
+		"chat_provider", cfg.DefaultChatProvider(),
+		"mailpit_enabled", cfg.Mailpit.Enabled,
+	)
 }
 
 func resolvePort(cfg *app.Config) string {

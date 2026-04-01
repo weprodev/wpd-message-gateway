@@ -7,14 +7,14 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
+	"github.com/weprodev/wpd-message-gateway/internal/registry"
 )
 
 // Config represents the application configuration.
 type Config struct {
 	Environment string         `yaml:"environment"`
 	Server      ServerConfig   `yaml:"server"`
-	DevBox      DevBoxConfig   `yaml:"devbox"`
+	Portal      PortalConfig   `yaml:"portal,omitempty"`
 	Providers   ProviderConfig `yaml:"providers"`
 	Mailpit     MailpitConfig  `yaml:"mailpit,omitempty"`
 
@@ -35,10 +35,11 @@ type ServerConfig struct {
 	Port int `yaml:"port"`
 }
 
-// DevBoxConfig holds devbox configuration.
-type DevBoxConfig struct {
-	Enabled bool `yaml:"enabled"`
-	Port    int  `yaml:"port"`
+// PortalConfig holds JWT settings for the web portal.
+type PortalConfig struct {
+	JWTSecret   string `yaml:"jwt_secret"`
+	JWTTTLHours int    `yaml:"jwt_ttl_hours"`
+	UIPort      int    `yaml:"ui_port"`
 }
 
 // ProviderConfig holds provider configuration.
@@ -123,6 +124,8 @@ func (c *Config) applyEnvOverrides() {
 			c.Providers.Defaults.Push = val
 		case "MESSAGE_DEFAULT_CHAT_PROVIDER":
 			c.Providers.Defaults.Chat = val
+		case "MESSAGE_JWT_SECRET":
+			c.Portal.JWTSecret = val
 		}
 	}
 }

@@ -70,7 +70,7 @@ Runs on **pull requests** to `master`:
 | 🔨 Build | Compile binary |
 | 🔒 Security | `govulncheck` |
 | 🌐 API Test | Bruno CLI tests (`bru run --env memory`) |
-| 🎨 Web UI | Build DevBox frontend |
+| 🎨 Web UI | Build Portal frontend |
 
 ```bash
 # Run locally
@@ -118,7 +118,7 @@ Dependencies are checked **weekly** for security updates:
 
 Use the gateway Docker image to capture and verify messages in your CI tests.
 
-→ See **[E2E Testing Guide](./e2e-testing.md)** for complete examples.
+→ See **[E2E Testing Guide](./backend/e2e-testing.md)** for complete examples.
 
 Quick example:
 
@@ -134,7 +134,7 @@ steps:
     env:
       EMAIL_API: http://localhost:10101
   
-  - run: curl http://localhost:10101/api/v1/emails | jq '.emails[0].email.subject'
+  - run: curl -H "Authorization: Bearer $JWT" -H "X-Api-Client-Id: $ID" -H "X-Api-Client-Secret: $SECRET" "http://localhost:10101/api/v1/workspaces/$WID/inbox/emails" | jq '.emails[0].email.subject'
 ```
 
 ## Branch Strategy
@@ -154,6 +154,6 @@ master ───●─────●─────●───── (releases
 
 ## Related
 
-- [E2E Testing](./e2e-testing.md) — Test your app's messages
-- [Contributing](./contributing.md) — Add new providers
-- [Code Conventions](./code-conventions.md) — Coding standards
+- [E2E Testing](./backend/e2e-testing.md) — Test your app's messages
+- [Contributing](./backend/contributing.md) — Add new providers
+- [Code Conventions](./backend/code-conventions.md) — Coding standards

@@ -5,8 +5,15 @@ on:
     branches: [master]
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
   NODE_VERSION: "20"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -63,7 +70,7 @@ jobs:
 
       - name: Upload coverage
         if: success()
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
           fail_ci_if_error: false
@@ -227,11 +234,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install & Build
         run: |
-          cd web
+          cd frontend
           npm ci
           npm run build
 
@@ -239,8 +246,8 @@ jobs:
         run: |
           echo "## 🎨 Web UI Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -d "web/dist" ]; then
-            SIZE=$(du -sh web/dist | cut -f1)
+          if [ -d "frontend/dist" ]; then
+            SIZE=$(du -sh frontend/dist | cut -f1)
             echo "✅ Build successful ($SIZE)" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Build failed" >> $GITHUB_STEP_SUMMARY

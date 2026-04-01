@@ -1,0 +1,151 @@
+<mxfile host="65bd71144e">
+    <diagram id="erd-gateway" name="PostgreSQL ERD">
+        <mxGraphModel dx="2175" dy="1583" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="workspaces" value="&lt;b&gt;workspaces&lt;/b&gt;&lt;hr&gt;&lt;b&gt;id:&lt;/b&gt;&amp;nbsp;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;PK&amp;nbsp;&lt;/span&gt;UUID DEFAULT gen_random_uuid()&lt;br&gt;name: VARCHAR(255) NOT NULL&lt;br&gt;slug:&amp;nbsp; TEXT NOT NULL UNIQUE&lt;br&gt;owner_id: FK -&amp;gt; users (id)&lt;br&gt;status: TEXT (active | suspended)&lt;br&gt;is_private: BOOL , default: true&lt;br&gt;hashed_pin_code: TEXT&lt;br&gt;icon_key: VARCHAR(64)&lt;br&gt;&lt;br&gt;&lt;div&gt;created_at, updated_at TIMESTAMPTZ&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="70" width="380" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="users" value="&lt;b&gt;users&lt;/b&gt;&lt;hr&gt;&lt;b&gt;id:&amp;nbsp;&lt;/b&gt;PK UUID&lt;br&gt;email: TEXT NOT NULL UNIQUE&lt;br&gt;password:&amp;nbsp; TEXT - Hashed&lt;br&gt;first_name: TEXT&lt;br&gt;last_name: TEXT - NULL&lt;div&gt;&lt;div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;status: active | suspended | blocked&lt;br&gt;&lt;/font&gt;&lt;div&gt;created_at, updated_at&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="-80" y="20" width="290" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" style="edgeStyle=orthogonalEdgeStyle;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;rounded=1;endArrow=ERone;endFill=0;startArrow=ERmany;startFill=0;strokeWidth=2;" parent="1" source="workspace_members" target="3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="workspace_members" value="&lt;b&gt;workspace_members&lt;/b&gt;&lt;hr&gt;PK (&lt;b&gt;workspace_id&lt;/b&gt;, &lt;b&gt;user_id&lt;/b&gt;)&lt;br&gt;FK workspace_id → workspaces(id) CASCADE&lt;br&gt;FK user_id → users(id) CASCADE&lt;br&gt;FK &lt;b&gt;role_id&lt;/b&gt; → roles(id) RESTRICT&lt;br&gt;joined_at TIMESTAMPTZ" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="110" y="310" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="invitations" value="&lt;b&gt;invitations&lt;/b&gt;&lt;hr&gt;&lt;b&gt;id: &lt;/b&gt;PK&amp;nbsp;UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;email, role, token_hash&lt;br&gt;expires_at, status (pending | accepted | revoked)&lt;br&gt;created_at&lt;br&gt;UNIQUE partial idx: (workspace_id, email) WHERE pending" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="-400" y="160" width="300" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="workspace_channels" value="&lt;b&gt;workspace_channels&lt;/b&gt;&lt;hr&gt;PK (workspace_id, channel_type)&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;channel_type ( email | sms | push | chat )&lt;br&gt;enabled BOOLEAN" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="-260" y="520" width="260" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="integrations" value="&lt;b&gt;integrations&lt;/b&gt;&lt;hr&gt;&lt;b&gt;id:&lt;/b&gt;&amp;nbsp;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;PK&amp;nbsp;&lt;/span&gt;UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;FK provider_id&amp;nbsp;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;→ providers RESTRICTED&amp;nbsp;&lt;/span&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;channel_type&lt;br&gt;&lt;/font&gt;encrypted_config BYTEA&lt;br&gt;status ( connected | error | disconnected )&lt;br&gt;is_default: BOOLEAN&lt;/div&gt;&lt;div&gt;&lt;br&gt;UNIQUE (workspace_id, provider_id)&lt;br&gt;UNIQUE partial: one default per (workspace_id, channel_type)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="345" y="-235" width="360" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="api_keys" value="&lt;b&gt;api_keys&lt;/b&gt;&lt;hr&gt;PK &lt;b&gt;id&lt;/b&gt; UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;client_id UNIQUE,&amp;nbsp;&lt;div&gt;client_secret_hash&lt;br&gt;name,&amp;nbsp;&lt;/div&gt;&lt;div&gt;is_active,&amp;nbsp;&lt;/div&gt;&lt;div&gt;last_used_at&lt;br&gt;created_at,&amp;nbsp;&lt;/div&gt;&lt;div&gt;expires_at&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="20" width="260" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="message_request_logs" value="&lt;b&gt;message_request_logs&lt;/b&gt;&lt;hr&gt;PK &lt;b&gt;id&lt;/b&gt; UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;FK &lt;b&gt;api_key_id&lt;/b&gt; → api_keys(id) SET NULL&lt;br&gt;channel_type,&amp;nbsp;&lt;div&gt;&lt;b&gt;provider_name&lt;/b&gt; VARCHAR(64)&lt;br&gt;http_method,&amp;nbsp;&lt;/div&gt;&lt;div&gt;status_code,&amp;nbsp;&lt;/div&gt;&lt;div&gt;endpoint&lt;br&gt;request_id,&amp;nbsp;&lt;/div&gt;&lt;div&gt;duration_ms,&amp;nbsp;&lt;/div&gt;&lt;div&gt;error_message&lt;br&gt;created_at&lt;/div&gt;&lt;div&gt;&lt;br&gt;idx:&amp;nbsp;&lt;/div&gt;&lt;div&gt;(workspace_id, created_at DESC);&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;(api_key_id);&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;(workspace_id, api_key_id, created_at)&lt;/span&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="1140" y="170" width="320" height="275" as="geometry"/>
+                </mxCell>
+                <mxCell id="templates" value="&lt;b&gt;templates&lt;/b&gt;&lt;hr&gt;PK &lt;b&gt;id&lt;/b&gt; UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;name,&amp;nbsp;&lt;div&gt;&lt;b&gt;unique_key&lt;/b&gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;UNIQUE (workspace_id, unique_key)&lt;br&gt;channel_type,&amp;nbsp;&lt;/div&gt;&lt;div&gt;subject,&amp;nbsp;&lt;/div&gt;&lt;div&gt;content TEXT&amp;nbsp;&lt;br&gt;&lt;b&gt;category&lt;/b&gt; VARCHAR(64) — portal&lt;br&gt;is_active,&amp;nbsp;&lt;/div&gt;&lt;div&gt;is_default,&amp;nbsp;&lt;/div&gt;&lt;div&gt;timestamps&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="620" width="260" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="template_components" value="&lt;b&gt;template_components&lt;/b&gt;&lt;hr&gt;PK &lt;b&gt;id&lt;/b&gt; UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;kind (header | footer | snippet),&amp;nbsp;&lt;div&gt;name&lt;br&gt;content TEXT&lt;br&gt;&lt;b&gt;metadata&lt;/b&gt; JSONB — portal&lt;br&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;UNIQUE (workspace_id, kind, name)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="630" width="280" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="workspace_settings" value="&lt;b&gt;workspace_settings&lt;/b&gt;&lt;hr&gt;PK &lt;b&gt;id&lt;/b&gt; UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;key,&amp;nbsp;&lt;div&gt;value TEXT&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;UNIQUE (workspace_id, key)&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;timestamps&lt;/span&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="680" width="240" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="workspace_access_audits" value="&lt;b&gt;workspace_access_audits&lt;/b&gt;&lt;hr&gt;PK &lt;b&gt;id&lt;/b&gt; UUID&lt;br&gt;FK workspace_id → workspaces CASCADE&lt;br&gt;FK actor_user_id → users(id) SET NULL&lt;br&gt;event VARCHAR(64),&amp;nbsp;&lt;div&gt;ip_address&lt;br&gt;metadata JSONB,&amp;nbsp;&lt;/div&gt;&lt;div&gt;created_at&lt;/div&gt;&lt;div&gt;&lt;br&gt;idx (workspace_id, created_at DESC)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="990" y="540" width="300" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_wm_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.4;entryDx=0;entryDy=0;curved=0;strokeWidth=2;" parent="1" source="workspaces" target="workspace_members" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_wm_usr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;curved=0;strokeWidth=2;" parent="1" source="users" target="workspace_members" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_inv_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.35;entryDx=0;entryDy=0;curved=0;strokeWidth=2;" parent="1" source="workspaces" target="invitations" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_wch_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;strokeWidth=2;" parent="1" target="workspace_channels" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="440" y="271"/>
+                            <mxPoint x="440" y="470"/>
+                            <mxPoint x="-130" y="470"/>
+                        </Array>
+                        <mxPoint x="440" y="271" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_int_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;strokeWidth=2;curved=0;" parent="1" source="workspaces" target="integrations" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_key_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;exitX=1;exitY=0.55;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;strokeWidth=2;curved=0;" parent="1" source="workspaces" target="api_keys" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_log_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.849;exitY=0.995;exitDx=0;exitDy=0;exitPerimeter=0;strokeWidth=2;curved=0;" parent="1" source="workspaces" target="message_request_logs" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="663" y="500"/>
+                            <mxPoint x="1300" y="500"/>
+                        </Array>
+                        <mxPoint x="540" y="310" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_log_key" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;curved=0;" parent="1" source="api_keys" target="message_request_logs" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1300" y="100"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_tpl_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;curved=0;" parent="1" target="templates" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="480" y="269"/>
+                            <mxPoint x="480" y="520"/>
+                            <mxPoint x="155" y="520"/>
+                        </Array>
+                        <mxPoint x="480" y="269" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_tcomp_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;entryX=0.445;entryY=-0.008;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeWidth=2;curved=0;entryPerimeter=0;" parent="1" target="template_components" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="525" y="629"/>
+                        </Array>
+                        <mxPoint x="525" y="270" as="sourcePoint"/>
+                        <mxPoint x="535" y="630" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_wset_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;curved=0;strokeWidth=2;" parent="1" target="workspace_settings" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="580" y="520"/>
+                            <mxPoint x="780" y="520"/>
+                        </Array>
+                        <mxPoint x="780" y="660" as="targetPoint"/>
+                        <mxPoint x="580" y="270" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_aud_wks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;exitX=1;exitY=0.95;exitDx=0;exitDy=0;strokeWidth=2;curved=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" parent="1" source="workspaces" target="workspace_access_audits" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1065" y="260"/>
+                        </Array>
+                        <mxPoint x="1030" y="650" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_aud_usr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=ERmany;startArrow=ERone;endFill=0;startFill=0;dashed=1;exitX=0.379;exitY=0.997;exitDx=0;exitDy=0;strokeWidth=2;curved=0;exitPerimeter=0;" parent="1" edge="1" source="users">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="30" y="570"/>
+                        </Array>
+                        <mxPoint x="30" y="170" as="sourcePoint"/>
+                        <mxPoint x="990" y="570" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="&lt;b&gt;roles&lt;/b&gt;&lt;hr&gt;&lt;b&gt;id:&amp;nbsp;&lt;/b&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;PK&amp;nbsp;-&lt;/span&gt;&amp;nbsp;UUID&lt;br&gt;name: TEXT unique&lt;br&gt;display_name: TEXT&lt;br&gt;created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="-300" y="320" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" style="edgeStyle=orthogonalEdgeStyle;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;endArrow=ERmany;endFill=0;startArrow=ERzeroToOne;startFill=0;" parent="1" source="6" target="integrations" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" style="edgeStyle=orthogonalEdgeStyle;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;strokeWidth=2;endArrow=ERoneToMany;endFill=0;startArrow=ERone;startFill=0;" parent="1" source="6" target="8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="&lt;b&gt;providers&lt;/b&gt;&lt;hr&gt;&lt;b&gt;id:&amp;nbsp;&lt;/b&gt;PK UUID&lt;br&gt;name: TEXT NOT NULL&amp;nbsp;&lt;br&gt;channel_type:&amp;nbsp; email | sms | push | chat&lt;br&gt;status: active | not_supported | blocked&lt;br&gt;&lt;br&gt;&lt;div&gt;&lt;div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;div&gt;created_at, updated_at&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="-80" y="-210" width="290" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;&lt;b&gt;provider_config_fields&lt;/b&gt;&lt;/span&gt;&lt;br&gt;&lt;hr&gt;&lt;b&gt;id:&amp;nbsp;&lt;/b&gt;PK UUID&lt;br&gt;provider_id:&amp;nbsp; FK UUID&amp;nbsp;&amp;nbsp;&lt;span style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); color: rgb(0, 0, 0);&quot;&gt;→ providers RESTRICTED&amp;nbsp;&lt;/span&gt;&lt;br&gt;key TEXT NOT NULL&amp;nbsp; &amp;nbsp;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;-- &quot;api_key&quot;, &quot;domain&quot;, &quot;from_email&quot;&lt;/span&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;label TEXT NOT NULL&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;color: rgb(63, 63, 63); white-space-collapse: preserve; background-color: transparent;&quot;&gt;-- &quot;API Key&quot;, &quot;Sending Domain&quot;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;description TEXT NULL&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;color: rgb(63, 63, 63); white-space-collapse: preserve; background-color: transparent;&quot;&gt;- shown as help text in Portal UI&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;field_type TEXT NOT NULL [text, password, email, url, boolean, textarea, select]&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;font color=&quot;#000000&quot;&gt;required BOOLEAN&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;font color=&quot;#000000&quot;&gt;default_value TEXT&amp;nbsp;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;-- NULL means no default&lt;/span&gt;&lt;br style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); color: rgb(63, 63, 63);&quot;&gt;&lt;/font&gt;&lt;/font&gt;&lt;/font&gt;&lt;div&gt;&lt;div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;options JSONB&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;color: rgb(63, 63, 63); white-space-collapse: preserve; background-color: transparent;&quot;&gt;-- for field_type=&#39;select&#39;: [&quot;tls&quot;,&quot;ssl&quot;,&quot;none&quot;]&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;sort_order     SMALLINT NOT NULL DEFAULT 0,&lt;/span&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;UNIQUE (provider_id, key)&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;created_at, updated_at&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="-90" y="-490" width="460" height="230" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

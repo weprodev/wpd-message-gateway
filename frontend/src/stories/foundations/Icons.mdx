@@ -1,0 +1,103 @@
+import { Meta, IconGallery, IconItem } from '@storybook/addon-docs/blocks';
+import { Icon } from '@/components/ui/icon';
+
+<Meta title="Foundations/Icons" />
+
+# Iconography
+
+We use **Material Symbols Outlined** as our primary iconography set. The system relies on semantic tokens, meaning icons automatically adapt their colors based on their parent context (`currentColor`) unless heavily overridden.
+
+<a href="https://fonts.google.com/icons?icon.set=Material+Symbols&icon.style=Outlined" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Browse the full Google Fonts Icon Catalog &rarr;</a>
+
+---
+
+## Usage & API
+
+The `<Icon />` component is a lightweight wrapper that handles size scaling, accessibility (`aria-label`), and exact ligature alignments.
+
+```tsx
+import { Icon } from '@/components/ui/icon';
+
+// Basic Usage
+<Icon name="mail" />
+
+// Sizing & Theming
+<Icon name="settings" size="sm" className="text-muted-foreground" />
+
+// Accessible Icon-Only Buttons
+<button aria-label="Delete item">
+  <Icon name="delete" />
+</button>
+```
+
+### Props
+
+| Prop | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`name`** | `string` | — | Exact ligature string from the Material Symbols catalog (e.g. `mark_email_unread`). |
+| **`size`** | `'sm' \| 'md' \| 'lg'` | `'md'` | Defined scaling increments. `sm`: 18px, `md`: 24px, `lg`: 28px. |
+| **`aria-label`** | `string` | — | Essential for icon-only components to support screen readers. |
+| **`className`** | `string` | — | Standard `className` injection for margin padding or contextual color classes. |
+
+---
+
+export const SHOWCASE_ICONS = [
+  "menu", "dashboard", "hub", "settings", "search", "notifications",
+  "logout", "login", "person", "group", "rocket_launch",
+  "mail", "inbox", "send", "chat", "forum",
+  "add", "close", "edit", "delete", "visibility", "visibility_off",
+  "download", "upload", "filter_list", "sort", "more_vert",
+  "folder", "folder_open", "description", "article", "api", "code",
+  "terminal", "database", "analytics", "monitoring",
+  "check", "check_circle", "info", "warning", "error", "bolt",
+  "schedule", "calendar_today", "lock", "key",
+];
+
+## Curated Showcase
+
+Below is a curated selection of some widely used icons across our platform, available directly without additional configuration.
+
+### Light Mode
+
+<div className="rounded-xl border border-border bg-card p-8 shadow-sm ring-1 ring-border/60">
+  <IconGallery>
+    {SHOWCASE_ICONS.map(name => (
+      <IconItem name={name} key={name}>
+        <Icon name={name} size="md" className="text-foreground" />
+      </IconItem>
+    ))}
+  </IconGallery>
+</div>
+
+### Dark Mode
+
+<div className="dark mg-icon-docs-dark rounded-xl border border-border bg-card p-8 shadow-sm ring-1 ring-border/60 mt-8">
+  <IconGallery>
+    {SHOWCASE_ICONS.map(name => (
+      <IconItem name={name} key={name}>
+        <Icon name={name} size="md" className="text-foreground" />
+      </IconItem>
+    ))}
+  </IconGallery>
+</div>
+
+---
+
+## Sizing Scale
+
+To maintain proportional alignment across layout densities, avoid arbitrary pixel sizing and strictly utilize the mapped sizing configurations.
+
+<div className="flex flex-wrap items-end gap-16 rounded-xl border border-border bg-muted/30 p-8 shadow-inner mt-4">
+  <div className="flex flex-col items-center gap-3">
+    <Icon name="widgets" size="sm" className="text-foreground" />
+    <span className="text-[11px] font-mono font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">sm (18px)</span>
+  </div>
+  <div className="flex flex-col items-center gap-3">
+    <Icon name="widgets" size="md" className="text-foreground" />
+    <span className="text-[11px] font-mono font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">md (24px)</span>
+  </div>
+  <div className="flex flex-col items-center gap-3">
+    <Icon name="widgets" size="lg" className="text-foreground" />
+    <span className="text-[11px] font-mono font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">lg (28px)</span>
+  </div>
+</div>

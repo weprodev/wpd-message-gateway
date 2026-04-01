@@ -19,7 +19,7 @@ updates:
 
   # npm (web UI)
   - package-ecosystem: "npm"
-    directory: "/web"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
       day: "monday"

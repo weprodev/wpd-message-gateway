@@ -1,211 +1,294 @@
+// Package service contains application services that orchestrate domain logic.
+// Services depend only on port interfaces — never on infrastructure implementations.
 package service
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
-// GatewayService handles provider registration and message dispatching.
+const (
+	channelEmail = "email"
+	channelSMS   = "sms"
+	channelPush  = "push"
+	channelChat  = "chat"
+
+	// memoryProviderName is the sentinel name stored in the integrations table
+	// when a workspace uses memory dispatch. Checked here to skip DB lookup.
+	memoryProviderName = "memory"
+)
+
+// GatewayService orchestrates message dispatch for a single workspace.
+//
+// It resolves the workspace dispatch mode from WorkspaceSettingsRepository,
+// then routes the message to the in-process InboxWriter, a real provider
+// fetched via IntegrationRepository, or both — depending on the mode.
+//
+// Provider instances are cached per (integrationID, updatedAt) so HTTP clients
+// are reused across requests while auto-invalidating on config changes.
 type GatewayService struct {
-	config   GatewayConfig
-	registry *Registry
+	integrations port.IntegrationRepository
+	templates    port.TemplateRepository
+	settings     port.WorkspaceSettingsRepository
+	inbox        port.InboxWriter
+
+	emailCache *emailSenderCache
+	smsCache   *smsSenderCache
+	pushCache  *pushSenderCache
+	chatCache  *chatSenderCache
 }
 
-// GatewayConfig holds the configuration needed by the service.
-type GatewayConfig interface {
-	DefaultEmailProvider() string
-	DefaultSMSProvider() string
-	DefaultPushProvider() string
-	DefaultChatProvider() string
-}
-
-// NewGatewayService creates a new GatewayService.
-func NewGatewayService(cfg GatewayConfig, registry *Registry) *GatewayService {
+// NewGatewayService constructs a GatewayService.
+//
+// inbox is the in-process capture store (implements port.InboxWriter).
+// Pass nil to disable memory capture — memory_only dispatch will then error.
+func NewGatewayService(
+	integrations port.IntegrationRepository,
+	templates port.TemplateRepository,
+	settings port.WorkspaceSettingsRepository,
+	inbox port.InboxWriter,
+) *GatewayService {
 	return &GatewayService{
-		config:   cfg,
-		registry: registry,
+		integrations: integrations,
+		templates:    templates,
+		settings:     settings,
+		inbox:        inbox,
+		emailCache:   newProviderCache[port.EmailSender](),
+		smsCache:     newProviderCache[port.SMSSender](),
+		pushCache:    newProviderCache[port.PushSender](),
+		chatCache:    newProviderCache[port.ChatSender](),
 	}
 }
 
-// SendEmail sends an email using the default provider.
-func (s *GatewayService) SendEmail(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-	provider, err := s.Email()
+// SendEmail dispatches an email for workspaceID according to its dispatch mode.
+func (s *GatewayService) SendEmail(ctx context.Context, workspaceID string, email *contracts.Email) (*contracts.SendResult, error) {
+	mode := s.resolveDispatchMode(ctx, workspaceID)
+	return s.dispatch(ctx, workspaceID, mode, channelEmail,
+		func() (*contracts.SendResult, error) { return s.writeEmailToInbox(ctx, workspaceID, email) },
+		func(intg *domain.Integration) (*contracts.SendResult, error) {
+			sender, err := resolveEmailSender(s.emailCache, intg)
+			if err != nil {
+				return nil, err
+			}
+			return sender.Send(ctx, email)
+		},
+	)
+}
+
+// SendSMS dispatches an SMS for workspaceID according to its dispatch mode.
+func (s *GatewayService) SendSMS(ctx context.Context, workspaceID string, sms *contracts.SMS) (*contracts.SendResult, error) {
+	mode := s.resolveDispatchMode(ctx, workspaceID)
+	return s.dispatch(ctx, workspaceID, mode, channelSMS,
+		func() (*contracts.SendResult, error) { return s.writeSMSToInbox(ctx, workspaceID, sms) },
+		func(intg *domain.Integration) (*contracts.SendResult, error) {
+			sender, err := resolveSMSSender(s.smsCache, intg)
+			if err != nil {
+				return nil, err
+			}
+			return sender.Send(ctx, sms)
+		},
+	)
+}
+
+// SendPush dispatches a push notification for workspaceID according to its dispatch mode.
+func (s *GatewayService) SendPush(ctx context.Context, workspaceID string, push *contracts.PushNotification) (*contracts.SendResult, error) {
+	mode := s.resolveDispatchMode(ctx, workspaceID)
+	return s.dispatch(ctx, workspaceID, mode, channelPush,
+		func() (*contracts.SendResult, error) { return s.writePushToInbox(ctx, workspaceID, push) },
+		func(intg *domain.Integration) (*contracts.SendResult, error) {
+			sender, err := resolvePushSender(s.pushCache, intg)
+			if err != nil {
+				return nil, err
+			}
+			return sender.Send(ctx, push)
+		},
+	)
+}
+
+// SendChat dispatches a chat message for workspaceID according to its dispatch mode.
+func (s *GatewayService) SendChat(ctx context.Context, workspaceID string, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
+	mode := s.resolveDispatchMode(ctx, workspaceID)
+	return s.dispatch(ctx, workspaceID, mode, channelChat,
+		func() (*contracts.SendResult, error) { return s.writeChatToInbox(ctx, workspaceID, chat) },
+		func(intg *domain.Integration) (*contracts.SendResult, error) {
+			sender, err := resolveChatSender(s.chatCache, intg)
+			if err != nil {
+				return nil, err
+			}
+			return sender.Send(ctx, chat)
+		},
+	)
+}
+
+// dispatch is the single entry point for all channel dispatch logic.
+// It applies the workspace dispatch mode and calls the appropriate fn(s).
+//
+//   - writeToInbox: captures to in-process RAM (always available)
+//   - sendViaProvider: instantiates provider from DB integration + sends
+func (s *GatewayService) dispatch(
+	ctx context.Context,
+	workspaceID string,
+	mode domain.MessageDispatchMode,
+	channel string,
+	writeToInbox func() (*contracts.SendResult, error),
+	sendViaProvider func(*domain.Integration) (*contracts.SendResult, error),
+) (*contracts.SendResult, error) {
+	switch mode {
+	case domain.DispatchMemoryOnly:
+		r, err := writeToInbox()
+		if err != nil {
+			return nil, err
+		}
+		attachMeta(r, mode, channel, "")
+		return r, nil
+
+	case domain.DispatchProviderOnly:
+		intg, err := s.activeIntegration(ctx, workspaceID, channel)
+		if err != nil {
+			return nil, err
+		}
+		// If the stored integration IS the memory provider, fall through to inbox.
+		if intg.ProviderName == memoryProviderName {
+			r, err := writeToInbox()
+			if err != nil {
+				return nil, err
+			}
+			attachMeta(r, mode, channel, intg.ID)
+			return r, nil
+		}
+		r, err := sendViaProvider(intg)
+		if err != nil {
+			return nil, err
+		}
+		attachMeta(r, mode, channel, intg.ID)
+		return r, nil
+
+	case domain.DispatchMemoryAndProvider:
+		intg, err := s.activeIntegration(ctx, workspaceID, channel)
+		if err != nil {
+			return nil, err
+		}
+		// If the integration is already memory, a single write is enough.
+		if intg.ProviderName == memoryProviderName {
+			r, err := writeToInbox()
+			if err != nil {
+				return nil, err
+			}
+			attachMeta(r, mode, channel, intg.ID)
+			return r, nil
+		}
+		// Both paths: capture to inbox first (non-fatal), then send via provider.
+		inboxResult, _ := writeToInbox() // inbox failure does not abort the send
+		provResult, err := sendViaProvider(intg)
+		if err != nil {
+			return nil, err
+		}
+		if inboxResult != nil {
+			if provResult.Meta == nil {
+				provResult.Meta = make(map[string]string)
+			}
+			provResult.Meta["inbox_message_id"] = inboxResult.ID
+		}
+		attachMeta(provResult, mode, channel, intg.ID)
+		return provResult, nil
+
+	default:
+		// Undefined modes fall back to memory_only (safe default).
+		r, err := writeToInbox()
+		if err != nil {
+			return nil, err
+		}
+		attachMeta(r, domain.DispatchMemoryOnly, channel, "")
+		return r, nil
+	}
+}
+
+// resolveDispatchMode reads the workspace setting, defaulting gracefully.
+func (s *GatewayService) resolveDispatchMode(ctx context.Context, workspaceID string) domain.MessageDispatchMode {
+	if s.settings == nil {
+		return domain.DefaultMessageDispatchMode()
+	}
+	v, err := s.settings.Get(ctx, workspaceID, domain.SettingKeyMessageDispatchMode)
+	if err != nil || v == "" {
+		return domain.DefaultMessageDispatchMode()
+	}
+	if m, ok := domain.ParseMessageDispatchMode(v); ok {
+		return m
+	}
+	return domain.DefaultMessageDispatchMode()
+}
+
+// activeIntegration fetches the active (connected) integration for a workspace+channel.
+func (s *GatewayService) activeIntegration(ctx context.Context, workspaceID, channel string) (*domain.Integration, error) {
+	intg, err := s.integrations.GetActiveByWorkspaceAndChannel(ctx, workspaceID, channel)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("no active %s integration for workspace %s: %w", channel, workspaceID, err)
 	}
-	return provider.Send(ctx, email)
+	return intg, nil
 }
 
-// SendEmailWith sends an email using a specific provider.
-func (s *GatewayService) SendEmailWith(ctx context.Context, providerName string, email *contracts.Email) (*contracts.SendResult, error) {
-	provider, err := s.EmailProvider(providerName)
+// inbox write helpers — each converts a domain error into meaningful context.
+
+func (s *GatewayService) writeEmailToInbox(ctx context.Context, workspaceID string, email *contracts.Email) (*contracts.SendResult, error) {
+	if s.inbox == nil {
+		return nil, fmt.Errorf("inbox writer not configured")
+	}
+	id, err := s.inbox.WriteEmail(ctx, workspaceID, email)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write email to inbox: %w", err)
 	}
-	return provider.Send(ctx, email)
+	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-// Email returns the default email provider.
-func (s *GatewayService) Email() (port.EmailSender, error) {
-	providerName := s.config.DefaultEmailProvider()
-	if providerName == "" {
-		return nil, NewProviderNotFoundError("email", "default (none configured)")
+func (s *GatewayService) writeSMSToInbox(ctx context.Context, workspaceID string, sms *contracts.SMS) (*contracts.SendResult, error) {
+	if s.inbox == nil {
+		return nil, fmt.Errorf("inbox writer not configured")
 	}
-	return s.EmailProvider(providerName)
-}
-
-// EmailProvider returns a specific email provider by name.
-func (s *GatewayService) EmailProvider(name string) (port.EmailSender, error) {
-	provider, ok := s.registry.GetEmailProvider(name)
-	if !ok {
-		return nil, NewProviderNotFoundError("email", name)
-	}
-	return provider, nil
-}
-
-// RegisterEmailProvider registers a custom email provider.
-func (s *GatewayService) RegisterEmailProvider(name string, provider port.EmailSender) {
-	s.registry.RegisterEmailProvider(name, provider)
-}
-
-// SendSMS sends an SMS using the default provider.
-func (s *GatewayService) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.SendResult, error) {
-	provider, err := s.SMS()
+	id, err := s.inbox.WriteSMS(ctx, workspaceID, sms)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write SMS to inbox: %w", err)
 	}
-	return provider.Send(ctx, sms)
+	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-// SendSMSWith sends an SMS using a specific provider.
-func (s *GatewayService) SendSMSWith(ctx context.Context, providerName string, sms *contracts.SMS) (*contracts.SendResult, error) {
-	provider, err := s.SMSProvider(providerName)
+func (s *GatewayService) writePushToInbox(ctx context.Context, workspaceID string, push *contracts.PushNotification) (*contracts.SendResult, error) {
+	if s.inbox == nil {
+		return nil, fmt.Errorf("inbox writer not configured")
+	}
+	id, err := s.inbox.WritePush(ctx, workspaceID, push)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write push to inbox: %w", err)
 	}
-	return provider.Send(ctx, sms)
+	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-// SMS returns the default SMS provider.
-func (s *GatewayService) SMS() (port.SMSSender, error) {
-	providerName := s.config.DefaultSMSProvider()
-	if providerName == "" {
-		return nil, NewProviderNotFoundError("sms", "default (none configured)")
+func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID string, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
+	if s.inbox == nil {
+		return nil, fmt.Errorf("inbox writer not configured")
 	}
-	return s.SMSProvider(providerName)
-}
-
-// SMSProvider returns a specific SMS provider by name.
-func (s *GatewayService) SMSProvider(name string) (port.SMSSender, error) {
-	provider, ok := s.registry.GetSMSProvider(name)
-	if !ok {
-		return nil, NewProviderNotFoundError("sms", name)
-	}
-	return provider, nil
-}
-
-// RegisterSMSProvider registers a custom SMS provider.
-func (s *GatewayService) RegisterSMSProvider(name string, provider port.SMSSender) {
-	s.registry.RegisterSMSProvider(name, provider)
-}
-
-// SendPush sends a push notification using the default provider.
-func (s *GatewayService) SendPush(ctx context.Context, notification *contracts.PushNotification) (*contracts.SendResult, error) {
-	provider, err := s.Push()
+	id, err := s.inbox.WriteChat(ctx, workspaceID, chat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write chat to inbox: %w", err)
 	}
-	return provider.Send(ctx, notification)
+	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-// SendPushWith sends a push notification using a specific provider.
-func (s *GatewayService) SendPushWith(ctx context.Context, providerName string, notification *contracts.PushNotification) (*contracts.SendResult, error) {
-	provider, err := s.PushProvider(providerName)
-	if err != nil {
-		return nil, err
+// attachMeta stamps standard dispatch metadata onto a result without allocating
+// if Meta is already populated.
+func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID string) {
+	if r == nil {
+		return
 	}
-	return provider.Send(ctx, notification)
-}
-
-// Push returns the default push provider.
-func (s *GatewayService) Push() (port.PushSender, error) {
-	providerName := s.config.DefaultPushProvider()
-	if providerName == "" {
-		return nil, NewProviderNotFoundError("push", "default (none configured)")
+	if r.Meta == nil {
+		r.Meta = make(map[string]string, 3)
 	}
-	return s.PushProvider(providerName)
-}
-
-// PushProvider returns a specific push provider by name.
-func (s *GatewayService) PushProvider(name string) (port.PushSender, error) {
-	provider, ok := s.registry.GetPushProvider(name)
-	if !ok {
-		return nil, NewProviderNotFoundError("push", name)
-	}
-	return provider, nil
-}
-
-// RegisterPushProvider registers a custom push provider.
-func (s *GatewayService) RegisterPushProvider(name string, provider port.PushSender) {
-	s.registry.RegisterPushProvider(name, provider)
-}
-
-// SendChat sends a chat message using the default provider.
-func (s *GatewayService) SendChat(ctx context.Context, message *contracts.ChatMessage) (*contracts.SendResult, error) {
-	provider, err := s.Chat()
-	if err != nil {
-		return nil, err
-	}
-	return provider.Send(ctx, message)
-}
-
-// SendChatWith sends a chat message using a specific provider.
-func (s *GatewayService) SendChatWith(ctx context.Context, providerName string, message *contracts.ChatMessage) (*contracts.SendResult, error) {
-	provider, err := s.ChatProvider(providerName)
-	if err != nil {
-		return nil, err
-	}
-	return provider.Send(ctx, message)
-}
-
-// Chat returns the default chat provider.
-func (s *GatewayService) Chat() (port.ChatSender, error) {
-	providerName := s.config.DefaultChatProvider()
-	if providerName == "" {
-		return nil, NewProviderNotFoundError("chat", "default (none configured)")
-	}
-	return s.ChatProvider(providerName)
-}
-
-// ChatProvider returns a specific chat provider by name.
-func (s *GatewayService) ChatProvider(name string) (port.ChatSender, error) {
-	provider, ok := s.registry.GetChatProvider(name)
-	if !ok {
-		return nil, NewProviderNotFoundError("chat", name)
-	}
-	return provider, nil
-}
-
-// RegisterChatProvider registers a custom chat provider.
-func (s *GatewayService) RegisterChatProvider(name string, provider port.ChatSender) {
-	s.registry.RegisterChatProvider(name, provider)
-}
-
-type ProviderNotFoundError struct {
-	ProviderType string
-	ProviderName string
-}
-
-func (e *ProviderNotFoundError) Error() string {
-	return fmt.Sprintf("%s provider '%s' not found", e.ProviderType, e.ProviderName)
-}
-
-func NewProviderNotFoundError(providerType, providerName string) *ProviderNotFoundError {
-	return &ProviderNotFoundError{
-		ProviderType: providerType,
-		ProviderName: providerName,
+	r.Meta["dispatch_mode"] = string(mode)
+	r.Meta["channel"] = channel
+	if integrationID != "" {
+		r.Meta["integration_id"] = integrationID
 	}
 }

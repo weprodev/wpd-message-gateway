@@ -1,8 +1,8 @@
 package memory
 
 import (
-	"github.com/weprodev/wpd-message-gateway/internal/app/registry"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	"github.com/weprodev/wpd-message-gateway/internal/registry"
 )
 
 func init() {

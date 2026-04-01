@@ -1,0 +1,116 @@
+/**
+ * Storybook ColorPalette blocks read typography from the Storybook UI theme (usually "light"),
+ * so titles and token labels stay dark grey even inside our `.dark` token preview. These overrides
+ * tie docs text to design tokens when nested under `.mg-color-docs-dark`.
+ */
+
+/* Titles, table header, and swatch captions — use semantic foreground tokens */
+.mg-color-docs-dark .docblock-colorpalette * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Section subtitles (token group descriptions) */
+.mg-color-docs-dark
+  .docblock-colorpalette
+  > div:not(:first-child)
+  > div:first-child
+  > div:nth-child(2) {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* "Name" / "Swatches" column header row */
+.mg-color-docs-dark .docblock-colorpalette > div:first-child {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* HSL value line under each swatch name */
+.mg-color-docs-dark .docblock-colorpalette span {
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 1 !important;
+}
+
+/* Swatch strip: replace flat white + grey checker with card-toned field + subtle grid */
+.mg-color-docs-dark
+  .docblock-colorpalette
+  > div:not(:first-child)
+  > div:last-child
+  > div:first-child
+  > div:first-child {
+  background-color: hsl(var(--background)) !important;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--border) / 0.55),
+    hsl(var(--border) / 0.55) 1px,
+    hsl(var(--background)) 1px,
+    hsl(var(--background)) 14px
+  ) !important;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  overflow: hidden;
+}
+
+/* Per-swatch cell outline so similar navy surfaces remain distinguishable */
+.mg-color-docs-dark
+  .docblock-colorpalette
+  > div:not(:first-child)
+  > div:last-child
+  > div:first-child
+  > div:first-child
+  > div {
+  box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.85);
+}
+
+/**
+ * Foundations Icons MDX — Storybook docs chrome stays "light" while nested `.dark`
+ * previews use design tokens; align copy with foreground on card surfaces.
+ */
+.mg-icon-docs-dark {
+  color: hsl(var(--foreground));
+}
+
+.mg-icon-docs-dark h1,
+.mg-icon-docs-dark h2,
+.mg-icon-docs-dark h3,
+.mg-icon-docs-dark p,
+.mg-icon-docs-dark span {
+  color: inherit;
+}
+
+.mg-icon-docs-dark .text-muted-foreground {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.mg-icon-docs-dark .text-foreground {
+  color: hsl(var(--foreground)) !important;
+}
+
+.mg-icon-docs-dark .text-primary {
+  color: hsl(var(--primary)) !important;
+}
+
+/* Deep CSS hammer: Force all Storybook internally generated Emotion blocks to adopt Dark Mode tokens */
+.mg-icon-docs-dark div,
+.mg-icon-docs-dark span,
+.mg-icon-docs-dark article,
+.mg-icon-docs-dark section {
+  background-color: transparent !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+/* Fix text labels to clearly contrast against the dark background */
+.mg-icon-docs-dark div,
+.mg-icon-docs-dark span {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Ensure the actual icon components retain their core foreground color */
+.mg-icon-docs-dark .text-foreground {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Restore minimal hover interaction using the structural div boundary */
+.mg-icon-docs-dark > div > div > div:hover {
+  background-color: hsl(var(--muted) / 0.5) !important;
+  border-radius: 6px;
+}
