@@ -8,15 +8,17 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/weprodev/wpd-packages/common"
-	pkgconfig "github.com/weprodev/wpd-packages/config"
+	pkgconfig "github.com/weprodev/go-pkg/config"
+	pkglogger "github.com/weprodev/go-pkg/logger"
+	"github.com/weprodev/go-pkg/pgsql"
+
+	"github.com/weprodev/go-pkg/crypto"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
-	"github.com/weprodev/wpd-message-gateway/pkg/encryption"
 )
 
 // Application holds all wired dependencies produced by Wire().
@@ -24,16 +26,16 @@ type Application struct {
 	Config         *Config
 	GatewayService *service.GatewayService
 	MemoryStore    *memory.Store
-	PgClient       *common.PgClient
+	PgClient       *pgsql.PgClient
 	Echo           *echo.Echo
 }
 
 // Wire builds and connects all application dependencies.
 // It returns an error if any required secret is missing or the DB is unreachable.
-func Wire(cfg *Config) (*Application, error) {
+func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	// ── Database ────────────────────────────────────────────────────────────
 	dbConfig := pkgconfig.ApplyDatabaseOverrides(pkgconfig.DatabaseConfig{})
-	pgClient, err := common.NewPgClient(common.PgConfig{
+	pgClient, err := pgsql.NewPgClient(pgsql.PgConfig{
 		Host:           dbConfig.Host,
 		ConnectionName: dbConfig.ConnectionName,
 		DatabaseURL:    dbConfig.DatabaseURL,
@@ -54,7 +56,7 @@ func Wire(cfg *Config) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	encService, err := encryption.NewAESService([]byte(encKey))
+	encService, err := crypto.NewAESService([]byte(encKey))
 	if err != nil {
 		return nil, fmt.Errorf("setup encryption: %w", err)
 	}
@@ -115,7 +117,7 @@ func Wire(cfg *Config) (*Application, error) {
 	router := presentation.NewRouter(
 		gatewayHandler, portalInboxHandler,
 		apiKeyRepo, workspaceRepo, memberRepo,
-		portalHandler, jwtSecret,
+		portalHandler, jwtSecret, sysLogger,
 	)
 
 	return &Application{

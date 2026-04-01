@@ -13,10 +13,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/weprodev/go-pkg/crypto"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/authjwt"
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	"github.com/weprodev/wpd-message-gateway/pkg/auth"
 )
 
 // PortalDeps groups all dependencies for PortalService.
@@ -84,7 +85,7 @@ func (s *PortalService) Register(ctx context.Context, email, password, displayNa
 		return nil, "", err
 	}
 
-	hash, err := auth.HashSecret(password)
+	hash, err := crypto.HashSecret(password)
 	if err != nil {
 		return nil, "", err
 	}
@@ -115,7 +116,7 @@ func (s *PortalService) Login(ctx context.Context, email, password string) (*dom
 	if err != nil {
 		return nil, "", errors.New("invalid credentials")
 	}
-	if !auth.CheckSecretHash(password, u.PasswordHash) {
+	if !crypto.CheckSecretHash(password, u.PasswordHash) {
 		return nil, "", errors.New("invalid credentials")
 	}
 	token, err := authjwt.Sign(u.ID, u.Email, s.JWTSecret, s.JWTTTL)
@@ -177,7 +178,7 @@ func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, unique
 	if ws.HashedPin == "" {
 		return errors.New("workspace does not use PIN join")
 	}
-	if !auth.CheckSecretHash(pin, ws.HashedPin) {
+	if !crypto.CheckSecretHash(pin, ws.HashedPin) {
 		return errors.New("invalid PIN")
 	}
 	return s.members.Add(ctx, ws.ID, userID, "member")
@@ -190,7 +191,7 @@ func (s *PortalService) RandomAPIKeyCredentials() (clientID, secret string, secr
 	}
 	secret = base64.RawURLEncoding.EncodeToString(raw)
 	clientID = "wk_" + strings.ReplaceAll(uuid.New().String(), "-", "")
-	hash, err := auth.HashSecret(secret)
+	hash, err := crypto.HashSecret(secret)
 	if err != nil {
 		return "", "", "", err
 	}

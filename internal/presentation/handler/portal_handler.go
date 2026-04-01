@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/weprodev/go-pkg/sanitizer"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
@@ -442,7 +444,7 @@ func (h *PortalHandler) CreateTemplate(c echo.Context) error {
 		ChannelType: body.ChannelType,
 		Category:    body.Category,
 		Subject:     body.Subject,
-		ContentHTML: body.ContentHTML,
+		ContentHTML: sanitizer.SanitizeHTML(body.ContentHTML),
 		IsActive:    true,
 		IsDefault:   false,
 	}
@@ -476,6 +478,10 @@ func (h *PortalHandler) PatchTemplate(c echo.Context) error {
 		Name: body.Name, UniqueKey: body.UniqueKey, ChannelType: body.ChannelType,
 		Category: body.Category, Subject: body.Subject, ContentHTML: body.ContentHTML,
 		IsActive: body.IsActive, IsDefault: body.IsDefault,
+	}
+	if body.ContentHTML != nil {
+		clean := sanitizer.SanitizeHTML(*body.ContentHTML)
+		patch.ContentHTML = &clean
 	}
 	if err := h.svc.PatchTemplate(c.Request().Context(), wid, tid, patch); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())

@@ -7,8 +7,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/weprodev/go-pkg/crypto"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	"github.com/weprodev/wpd-message-gateway/pkg/auth"
 )
 
 type contextKey string
@@ -51,7 +52,7 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized: invalid or inactive client ID")
 			}
 
-			if !auth.CheckSecretHash(secret, apiKey.ClientSecretHash) {
+			if !crypto.CheckSecretHash(secret, apiKey.ClientSecretHash) {
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized: invalid secret")
 			}
 

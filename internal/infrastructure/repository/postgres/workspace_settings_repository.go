@@ -4,16 +4,16 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/weprodev/wpd-packages/common"
+	"github.com/weprodev/go-pkg/pgsql"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
 type WorkspaceSettingsRepository struct {
-	client *common.PgClient
+	client *pgsql.PgClient
 }
 
-func NewWorkspaceSettingsRepository(client *common.PgClient) port.WorkspaceSettingsRepository {
+func NewWorkspaceSettingsRepository(client *pgsql.PgClient) port.WorkspaceSettingsRepository {
 	return &WorkspaceSettingsRepository{client: client}
 }
 

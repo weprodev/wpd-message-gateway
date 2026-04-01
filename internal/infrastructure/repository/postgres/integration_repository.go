@@ -6,18 +6,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/weprodev/wpd-packages/common"
+	"github.com/weprodev/go-pkg/pgsql"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
 type IntegrationRepository struct {
-	client *common.PgClient
+	client *pgsql.PgClient
 	enc    port.EncryptionService
 }
 
-func NewIntegrationRepository(client *common.PgClient, enc port.EncryptionService) port.IntegrationRepository {
+func NewIntegrationRepository(client *pgsql.PgClient, enc port.EncryptionService) port.IntegrationRepository {
 	return &IntegrationRepository{
 		client: client,
 		enc:    enc,

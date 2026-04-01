@@ -6,17 +6,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/weprodev/wpd-packages/common"
+	"github.com/weprodev/go-pkg/pgsql"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
 type WorkspaceRepository struct {
-	client *common.PgClient
+	client *pgsql.PgClient
 }
 
-func NewWorkspaceRepository(client *common.PgClient) port.WorkspaceRepository {
+func NewWorkspaceRepository(client *pgsql.PgClient) port.WorkspaceRepository {
 	return &WorkspaceRepository{client: client}
 }
 
