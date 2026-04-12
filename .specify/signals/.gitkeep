@@ -1,0 +1,2 @@
+# .gitkeep — This directory holds runtime signal files created by agents.
+# Signal files are transient and NOT committed to git.

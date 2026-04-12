@@ -6,41 +6,76 @@
 </p>
 
 <p align="center">
-  <a href="https://pkg.go.dev/github.com/weprodev/wpd-message-gateway"><img src="https://pkg.go.dev/badge/github.com/weprodev/wpd-message-gateway.svg" alt="Go Reference"></a>
+  <!-- Build & CI -->
+  <a href="https://github.com/weprodev/wpd-message-gateway/actions/workflows/ci.yml"><img src="https://github.com/weprodev/wpd-message-gateway/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
+  <!-- Quality & Go -->
   <a href="https://goreportcard.com/report/github.com/weprodev/wpd-message-gateway"><img src="https://goreportcard.com/badge/github.com/weprodev/wpd-message-gateway" alt="Go Report Card"></a>
+  <a href="https://pkg.go.dev/github.com/weprodev/wpd-message-gateway"><img src="https://pkg.go.dev/badge/github.com/weprodev/wpd-message-gateway.svg" alt="Go Reference"></a>
+  <!-- License -->
   <a href="https://github.com/weprodev/wpd-message-gateway/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 </p>
+
 <p align="center">
-  <strong>A unified Go library and HTTP API for sending Email, SMS, Push, and Chat messages.</strong>
-
-One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
-
+  <strong>A unified messaging solution for Email, SMS, Push, and Chat.</strong>
+<br>
+Use it as an <strong>Embedded Go SDK</strong> in your existing Go applications, or deploy it as a <strong>Standalone HTTP Gateway</strong> for any language. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
 </p>
+
+---
+
+## Key Features
+
+- **Unified Interface:** Send Email, SMS, Push, and Chat messages through one consistent API.
+- **Provider Abstraction:** Change a configuration value to switch providers, not your code.
+- **DB-First Configuration:** Manage all provider credentials securely in PostgreSQL via the Portal UI.
+- **Workspace Isolation:** Multi-tenant support for separate providers, API keys, and templates per workspace.
+- **Developer-Friendly:** Includes a local Memory provider to capture messages locally and assert real payloads without mocking.
 
 ---
 
 ## Two Ways to Use
 
-```
-┌──────────────────────────────────┬──────────────────────────────────┐
-│  Go Package (Embedded SDK)       │  HTTP Server (any language)      │
-│                                  │                                  │
-│  go get .../wpd-message-gateway  │  git clone → make start          │
-│  gateway.New(config)             │  POST /v1/email (HTTP)           │
-│                                  │                                  │
-│  ✓ No server needed              │  ✓ Any language (Python, JS...)  │
-│  ✓ No database needed            │  ✓ React UI to manage config     │
-│  ✓ Config in your code           │  ✓ PostgreSQL stores everything  │
-└──────────────────────────────────┴──────────────────────────────────┘
+```mermaid
+graph TD
+    classDef main fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef feature fill:#e1f5fe,stroke:#0288d1,stroke-width:1px;
+    classDef embedded fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef standalone fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+
+    %% SDK Usage Path
+    subgraph SDK ["Go Package (Embedded SDK)"]
+        direction TB
+        A["💻 go get wpd-message-gateway"] --> B["📦 gateway.New(config)"]
+        B -.-> C["✓ No server needed"]:::feature
+        B -.-> D["✓ No database needed"]:::feature
+        B -.-> E["✓ Config in your code"]:::feature
+    end
+    class SDK embedded;
+
+    %% Server Usage Path
+    subgraph Server ["HTTP Server (Standalone Gateway)"]
+        direction TB
+        F["🐳 make dev (Docker)"] --> G["🌐 POST /v1/email (HTTP)"]
+        G -.-> H["✓ Any language (Python, JS...)"]:::feature
+        G -.-> I["✓ React Portal UI included"]:::feature
+        G -.-> J["✓ PostgreSQL stores secrets"]:::feature
+    end
+    class Server standalone;
 ```
 
 ---
 
-## Quick Start: Go Package
+## Quick Start
+
+### Option A: Go Package
+
+Install the SDK:
 
 ```bash
 go get github.com/weprodev/wpd-message-gateway
 ```
+
+Send an email in 10 lines:
 
 ```go
 package main
@@ -84,18 +119,26 @@ No server. No database. Just `go get` and send.
 
 ---
 
-## Quick Start: HTTP Server
+### Option B: HTTP Server
+
+The quickest way to run the Standalone HTTP Gateway is using Docker Compose.
+
+**Prerequisites:** Docker and Docker Compose
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
-cp configs/local.example.yml configs/local.yml
-make start
+
+# 2. Start the gateway, PostgreSQL, and Portal UI
+make dev
 ```
 
+Once running:
+
 1. Open **http://localhost:10104** — the Portal UI
-2. Create an account (**email + password**) and sign in
-3. Create a **workspace**, add an **Integration** (Mailgun, etc.), generate an **API key**
+2. Create an account (email + password) and sign in
+3. Create a **Workspace** → add an **Integration** (Mailgun, etc.) → generate an **API Key**
 4. Send messages from any language:
 
 ```bash
@@ -106,67 +149,120 @@ curl -X POST http://localhost:10101/v1/email \
   -d '{"to":["user@example.com"],"subject":"Hello","html":"<h1>World</h1>"}'
 ```
 
+#### Alternative: Manual Setup
+
+If you prefer to run the components directly on your host machine without Docker:
+
+**Prerequisites:** Go 1.22+, PostgreSQL, Node.js 20+
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/weprodev/wpd-message-gateway.git
+cd wpd-message-gateway
+cp configs/local.example.yml configs/local.yml   # edit DB credentials here
+
+# 2. Install dependencies and start
+make install
+make start
+```
+
 ---
 
 ## Why Message Gateway?
 
-Building applications that send messages across multiple channels is complex. You need to integrate different APIs, handle various authentication methods, manage provider-specific quirks, and test everything without spamming real users.
-
-**Message Gateway provides:**
-
-- **Unified API** — Email, SMS, Push, and Chat through a single, consistent interface
-- **Provider abstraction** — Switch from Mailgun to SendGrid with a config change—no code changes
-- **DB-first config** — In server mode, all provider credentials live in PostgreSQL, managed via the Portal UI
-- **Workspace isolation** — Multiple workspaces, each with its own providers, API keys, templates, and members
-- **Memory provider** — Captures messages locally for dev and testing, no external services needed
-- **E2E testing** — Assert real message payloads in CI/CD without mocking
+| Problem | Solution |
+|---------|----------|
+| Each provider has a different API | **Unified interface** — Email, SMS, Push, Chat through one consistent API |
+| Switching providers means rewriting code | **Provider abstraction** — change a config value, not your code |
+| Credentials scattered in env vars | **DB-first config** — all secrets in PostgreSQL, managed via Portal UI |
+| Hard to test messaging in CI | **Memory provider** — captures messages locally, assert real payloads without mocking |
+| Multi-tenant apps need isolation | **Workspace isolation** — separate providers, API keys, templates per workspace |
 
 ---
 
-## Supported Message Types
+## Supported Providers
 
-| Type      | Description                           | Providers                 |
-| --------- | ------------------------------------- | ------------------------- |
-| **Email** | HTML, plain text, CC/BCC, attachments | Mailgun, Memory           |
-| **SMS**   | Text to mobile numbers                | Memory (Twilio planned)   |
-| **Push**  | Mobile and web notifications          | Memory (Firebase planned) |
-| **Chat**  | Slack, WhatsApp, Telegram             | Memory (planned)          |
+| Type | Providers | Status |
+|------|----------|--------|
+| **Email** | Mailgun, Memory | ✅ Available |
+| **SMS** | Memory | ✅ Memory · 🔜 Twilio |
+| **Push** | Memory | ✅ Memory · 🔜 Firebase |
+| **Chat** | Memory | ✅ Memory · 🔜 Slack, WhatsApp, Telegram |
 
----
-
-## Portal: Configuration UI
-
-The Portal is **always available** at `http://localhost:10104` when the server runs.
-
-**Access**: Email + password (Portal JWT)
-
-**Manage per workspace:**
-
-- **Integrations** — add provider credentials (encrypted in DB, not in files)
-- **API Keys** — credentials for your apps to send messages
-- **Templates** — reusable HTML email templates
-- **Settings** — dispatch mode (`memory_only` | `provider_only` | `memory_and_provider`)
-- **Members** — invite colleagues to your workspace
-- **Inbox** — view all captured messages (in `memory_only` mode)
-- **Logs** — full audit trail of send requests
+> **Adding a provider?** See [Contributing: Adding Providers](docs/backend/contributing.md).
 
 ---
 
-## Authentication & Gateway Modes
+## Portal UI
 
-Message Gateway features multiple dispatch modes (`memory_only`, `provider_only`, `memory_and_provider`).
+The Portal is available at **http://localhost:10104** when the server runs.
 
-To interact with the Portal, users authenticate via **Email + Password** to receive a JWT. Client applications interacting with the **Send API** use an isolated **Workspace API Key**.
+| Feature | Description |
+|---------|------------|
+| **Integrations** | Add provider credentials (encrypted in DB, not in config files) |
+| **API Keys** | Generate credentials for your apps to send messages |
+| **Templates** | Create reusable HTML email templates |
+| **Inbox** | View all captured messages (in `memory_only` mode) |
+| **Members** | Invite team members to your workspace |
+| **Logs** | Full audit trail of every send request |
+| **Settings** | Dispatch mode: `memory_only` · `provider_only` · `memory_and_provider` |
 
-For detailed authentication flow and dispatch mode behavior, see the [Usage Guide](docs/backend/usage.md).
+---
+
+## Configuration
+
+The gateway uses a strict separation between server infrastructure configuration and messaging credentials:
+
+1. **Server Configuration (`configs/local.yml`):**
+   This file (copied from `configs/local.example.yml`) configures the infrastructure. It defines ports, database connections, and operational modes.
+   - `DISPATCH_MODE`: Can be `provider_only`, `memory_only`, or `memory_and_provider`.
+   - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`: PostgreSQL credentials.
+   - `JWT_SECRET`: Secret for signing Portal UI auth tokens.
+
+2. **Messaging Credentials (Portal UI):**
+   *Do NOT put your Twilio, Mailgun, or Firebase credentials in the configuration file.* All messaging provider credentials are created via the **Portal UI** (http://localhost:10104) and are stored securely encrypted in PostgreSQL. This allows dynamic configuration without server restarts.
 
 ---
 
 ## E2E Testing
 
-Instead of mocking messy email or SMS interactions in your test suite, use the Message Gateway's `memory_only` dispatch mode in CI/CD. It intercepts calls over HTTP, storing them in-memory, allowing you to use the Portal Inbox API to strictly assert sent payloads without sending real messages.
+Use `memory_only` dispatch mode in CI/CD to capture messages without sending real emails or SMS. Then assert the payloads via the Portal Inbox API.
 
-Read the [End-to-End Testing Guide](docs/backend/e2e-testing.md) for full docker-compose and GitHub Actions setups.
+No mocking. Real HTTP calls. Full payload assertions.
+
+```yaml
+# docker-compose.test.yml — drop in with your CI
+services:
+  message-gateway:
+    image: weprodev/wpd-message-gateway
+    environment:
+      DISPATCH_MODE: memory_only
+```
+
+📖 Full setup guide: [E2E Testing with Docker & GitHub Actions](docs/backend/e2e-testing.md)
+
+---
+
+## Development Environment & Workflow
+
+There are two primary ways to set up the development environment:
+
+1. **Local Setup:** Using `make install` and `make start` with local dependencies (Go, Node, PostgreSQL).
+2. **Docker Setup:** Using `make dev` as the recommended one-command method to run everything via Docker Compose.
+
+| Command | Description |
+|---------|------------|
+| `make install` | Install Go + frontend dependencies |
+| `make start` | Start Gateway API + Portal UI |
+| `make dev` | Run via Docker Compose (includes PostgreSQL) |
+| `make test` | Run Go tests |
+| `make audit` | Full quality gate: fmt + lint + test (Go + frontend) + govulncheck + build |
+| `make build` | Compile Go binary + build frontend (no tests) |
+| `make ui` | Portal UI only (Vite dev server, port 10104) |
+| `make storybook` | Component library (Storybook, port 6006) |
+| `make upgrade` | Upgrade all dependencies |
+
+This project uses a spec-driven, AI-assisted development workflow. See the [Development Flow](docs/development-flow.md) documentation for details on Spec Kit commands and Agent Mapping.
 
 ---
 
@@ -175,175 +271,75 @@ Read the [End-to-End Testing Guide](docs/backend/e2e-testing.md) for full docker
 ```
 wpd-message-gateway/
 ├── cmd/server/          # HTTP server entry point
-├── configs/             # Server config (port, JWT) — NO provider credentials
+├── configs/             # Server config (ports, JWT) — NOT provider credentials
 ├── database/
 │   ├── migrations/      # SQL schema migrations
 │   └── seeds/           # Optional demo data
 ├── internal/
-│   ├── app/             # Config, wire, validation, provider blank imports
-│   ├── core/            # Domain, services, ports
-│   ├── infrastructure/ # Providers (mailgun, memory…) + Postgres repos + logger
+│   ├── app/             # Config, wire, validation, provider registration
+│   ├── core/            # Domain models, services, ports (interfaces)
+│   ├── infrastructure/  # Providers (mailgun, memory…) + Postgres repos + logger
 │   ├── presentation/    # HTTP router, handlers, middleware
 │   └── registry/        # Provider factory registry (self-registration via init)
-├── pkg/                 # Public packages (contracts, gateway SDK, auth, encryption)
-│   ├── contracts/       # Email, SMS, Push, Chat types
-│   ├── gateway/         # Embedded Go SDK — gateway.New()
-│   ├── auth/            # Password hashing (portal)
-│   └── encryption/      # AES helpers
+├── pkg/                 # Public Go packages
+│   ├── contracts/       # Email, SMS, Push, Chat message types
+│   └── gateway/         # Embedded SDK — gateway.New()
 ├── frontend/            # React Portal UI (Vite + TypeScript + Tailwind)
-├── tests/bruno/         # HTTP API test collection
+├── tests/bruno/         # HTTP API test collection (Bruno)
+├── specs/               # Feature specifications (Spec Kit)
 └── docs/                # Documentation
-```
-
----
-
-## AI-Assisted Development (GitHub Spec Kit)
-
-We use [GitHub Spec Kit](https://github.com/github/spec-kit) **inside this repository** to enforce a strict Specification‑Driven Development workflow (spec → plan → tasks → implement → review).
-
-The key to “best outcomes” is that Spec Kit is _not_ free-form prompting here: our Spec Kit commands are bound to **repository agents** (Principal personas) and must follow our backend DDD + frontend composition rules.
-
-### What Spec Kit Creates (Where to Look)
-
-Every feature gets a directory under `specs/` named after the feature branch, for example `specs/023-portal-inbox-search/`:
-
-- `spec.md`: requirements, user stories, success criteria
-- `plan.md`: technical plan + design artifacts (research/data model/contracts/quickstart)
-- `tasks.md`: dependency-ordered, file-path-specific implementation tasks
-- `checklists/*.md`: “unit tests for requirements writing” (not implementation tests)
-
-### Agent Mapping (How “created Agents” are used)
-
-- **`/speckit.specify` + `/speckit.plan`**: must follow **Master Agent** (`docs/agents/master-agent.md`)
-- **`/speckit.tasks` + `/speckit.implement`**: must follow **Delivery Agent** (`docs/agents/delivery-agent.md`)
-- **`/speckit.checklist` + `/speckit.analyze`**: must follow **Review Agent** (`docs/agents/review-agent.md`)
-
-Those playbooks are the source of truth for DDD layering, frontend composition, security, and verification.
-
-### The Happy Path (Recommended Sequence)
-
-1. **Create a spec + feature branch**
-
-   Run:
-   - **`/speckit.specify <your feature description>`**
-
-   This creates and checks out a feature branch and initializes `specs/<branch>/spec.md`.
-
-2. **Clarify (optional but recommended)**
-
-   Run:
-   - **`/speckit.clarify`**
-
-   This asks up to 5 high-impact questions and writes the answers back into `spec.md`.
-
-3. **Plan the implementation**
-
-   Run:
-   - **`/speckit.plan`**
-
-   This generates `plan.md` plus Phase 0/1 design artifacts (research, data model, contracts, quickstart) and updates agent context.
-
-4. **Generate tasks**
-
-   Run:
-   - **`/speckit.tasks`**
-
-   This generates `tasks.md` with atomic tasks, strict file paths, and dependency ordering.
-
-5. **Sanity-check for consistency (recommended)**
-
-   Run:
-   - **`/speckit.analyze`**
-
-   This is read-only and highlights gaps (requirements with no tasks, tasks with no requirement, constitution violations).
-
-6. **Implement**
-
-   Run:
-   - **`/speckit.implement`**
-
-   Complete tasks phase-by-phase; keep tasks checked off in `tasks.md` as you go.
-
-7. **Pre-PR quality gates**
-
-   Run:
-   - **`/speckit.checklist <domain>`** (e.g. `security`, `api`, `ux`)
-   - `make audit`
-
-### Troubleshooting
-
-- **Wrong branch / “not on a feature branch”**: Spec Kit expects to run on a branch that matches a `specs/<branch>/` directory. Re-run `/speckit.specify ...` or set `SPECIFY_FEATURE` in your shell to point at the intended feature directory.
-- **“tasks.md not found”**: run `/speckit.tasks` before `/speckit.implement`.
-- **CI/quality mismatch**: this repo’s hard quality gate is `make audit`; plans and tasks should always include it as a final validation step.
-
----
-
-## Commands
-
-```bash
-make install    # Install Go + frontend dependencies
-make start      # Gateway + Portal UI (Vite)
-make ui         # Portal UI only (Vite, port 10104)
-make storybook  # Storybook (port 6006)
-make test       # Go tests only
-make audit      # fmt+lint+test (Go+frontend), govulncheck, builds (Go+Vite+Storybook)
-make build      # Go compile + frontend build:all (no tests)
-make upgrade    # Upgrade dependencies
-make dev        # Run via Docker Compose
 ```
 
 ---
 
 ## Documentation
 
-| Document                                                     | Description                                                                 |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| [Docs hub](docs/README.md)                                   | Index of backend + frontend documentation                                   |
-| [Usage](docs/backend/usage.md)                               | SDK and HTTP API reference, authentication, multi-language examples         |
-| [Architecture](docs/backend/architecture.md)                 | System design, two modes of operation, DB schema                            |
-| [Portal inbox](docs/backend/portal-inbox.md)                 | Message inbox, dispatch modes, inbox API                                    |
-| [Frontend docs](docs/frontend/README.md)                     | Portal UI index — Vite, TypeScript, shadcn skill, conventions               |
-| [Frontend engineer role](docs/frontend/frontend-engineer.md) | Principal-style workflow, architecture, security, Storybook, self-review    |
-| [shadcn/ui skill (in-repo)](docs/frontend/shadcn/SKILL.md)   | Component rules, CLI patterns ([official docs](https://ui.shadcn.com/docs)) |
-| [Backend engineer role](docs/backend/backend-engineer.md)    | Go layers, registry, security, quality gate                                 |
-| [E2E Testing](docs/backend/e2e-testing.md)                   | CI/CD integration, capturing and asserting messages                         |
-| [Contributing](docs/backend/contributing.md)                 | Adding new providers                                                        |
-| [Code Conventions](docs/backend/code-conventions.md)         | Go coding standards                                                         |
-| [Workflow](docs/workflow.md)                                 | CI/CD and release process                                                   |
-| [Bruno collections](tests/bruno/)                            | HTTP API tests (`bru run`)                                                  |
+| Document | Description |
+|----------|------------|
+| [Docs Hub](docs/README.md) | Index of all backend + frontend documentation |
+| [Usage Guide](docs/backend/usage.md) | SDK and HTTP API reference, authentication, multi-language examples |
+| [Architecture](docs/backend/architecture.md) | System design, two modes of operation, DB schema |
+| [Portal Inbox](docs/backend/portal-inbox.md) | Message inbox, dispatch modes, inbox API |
+| [E2E Testing](docs/backend/e2e-testing.md) | CI/CD integration, capturing and asserting messages |
+| [Contributing](docs/backend/contributing.md) | Adding new providers, code quality gates |
+| [Code Conventions](docs/backend/code-conventions.md) | Go coding standards |
+| [Frontend Docs](docs/frontend/README.md) | Portal UI — Vite, TypeScript, shadcn/ui, conventions |
+| [Frontend Engineer](docs/frontend/frontend-engineer.md) | Principal-style workflow, architecture, Storybook |
+| [Backend Engineer](docs/backend/backend-engineer.md) | Go layers, registry, security, quality gate |
+| [Workflow](docs/workflow.md) | CI/CD and release process |
+| [Development Flow](docs/development-flow.md) | Spec Kit workflow and AI-Assisted Development |
+| [Bruno Collections](tests/bruno/) | HTTP API tests |
 
 ---
 
-## Licensing and Sponsorship
+## Contributing
 
-Released under the **[MIT License](LICENSE)**. The same grant applies to everyone who receives the code.
+1. **Report bugs** — [Open an issue](https://github.com/weprodev/wpd-message-gateway/issues)
+2. **Suggest features** — Ideas and discussions welcome
+3. **Pull requests** — Code, docs, and tests
+4. **Add providers** — See [Contributing Guide](docs/backend/contributing.md)
+5. **Sponsor** — Support ongoing development
 
-We want Message Gateway to stay easy to adopt for individuals and small teams, while asking larger organizations that get sustained value from it to help fund maintenance and features.
+> Run `make audit` before opening a PR — it's the quality gate.
 
-| Who                                      | What we ask                                                                  |
-| ---------------------------------------- | ---------------------------------------------------------------------------- |
-| **Individuals, learning, side projects** | Use freely under MIT. Sponsorship optional.                                  |
-| **Small teams**                          | Use freely under MIT. Consider sponsoring if it's central to your stack.     |
-| **Mid-size companies and enterprises**   | **Please sponsor** — [GitHub Sponsors](https://github.com/sponsors/weprodev) |
-| **Qualifying non-profits**               | Use freely under MIT; sponsorship optional.                                  |
+---
+
+## Licensing & Sponsorship
+
+Released under the **[MIT License](LICENSE)**.
+
+| Who | What we ask |
+|-----|------------|
+| Individuals, learning, side projects | Use freely. Sponsorship optional. |
+| Small teams | Use freely. Consider sponsoring if it's central to your stack. |
+| Mid-size companies & enterprises | **Please [sponsor](https://github.com/sponsors/weprodev)** |
+| Qualifying non-profits | Use freely. Sponsorship optional. |
 
 <p align="center">
   <a href="https://github.com/sponsors/weprodev">
     <img src="https://img.shields.io/badge/Sponsor-❤️-ea4aaa?style=for-the-badge" alt="Sponsor on GitHub">
   </a>
 </p>
-
----
-
-## Contributing
-
-1. **Report bugs** — Open an issue
-2. **Suggest features** — Ideas welcome
-3. **Pull requests** — Code and docs
-4. **Add providers** — Expand integrations
-5. **Sponsor** — Support ongoing work
-
-See [docs/backend/contributing.md](docs/backend/contributing.md). Run `make audit` before opening a PR.
 
 ---
 
