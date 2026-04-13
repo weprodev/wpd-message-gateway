@@ -17,9 +17,13 @@
 
 <p align="center">
   <strong>A unified messaging solution for Email, SMS, Push, and Chat.</strong>
-<br>
-Use it as an <strong>Embedded Go SDK</strong> in your existing Go applications, or deploy it as a <strong>Standalone HTTP Gateway</strong> for any language. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
 </p>
+
+This project offers two distinct ways to integrate messaging into your architecture:
+1. **Embedded Go SDK:** A lightweight library for your Go applications. Send messages natively without running a separate server or database.
+2. **Standalone HTTP Gateway:** A fully-featured service deployable via Docker. Provides a unified REST API for any programming language, backed by PostgreSQL and a React UI.
+
+Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
 
 ---
 
@@ -67,7 +71,7 @@ graph TD
 
 ## Quick Start
 
-### Option A: Go Package
+### Option A: Embedded Go SDK
 
 Install the SDK:
 
@@ -119,9 +123,9 @@ No server. No database. Just `go get` and send.
 
 ---
 
-### Option B: HTTP Server
+### Option B: Standalone HTTP Gateway
 
-The quickest way to run the Standalone HTTP Gateway is using Docker Compose.
+The easiest way to get the standalone server running is with Docker Compose.
 
 **Prerequisites:** Docker and Docker Compose
 
@@ -137,9 +141,9 @@ make dev
 Once running:
 
 1. Open **http://localhost:10104** — the Portal UI
-2. Create an account (email + password) and sign in
-3. Create a **Workspace** → add an **Integration** (Mailgun, etc.) → generate an **API Key**
-4. Send messages from any language:
+2. Create an account and sign in
+3. Create a **Workspace** → add an **Integration** (e.g., Mailgun) → generate an **API Key**
+4. Send a message from any language:
 
 ```bash
 curl -X POST http://localhost:10101/v1/email \
@@ -149,22 +153,21 @@ curl -X POST http://localhost:10101/v1/email \
   -d '{"to":["user@example.com"],"subject":"Hello","html":"<h1>World</h1>"}'
 ```
 
-#### Alternative: Manual Setup
+<details>
+<summary><strong>Alternative: Manual Setup (No Docker)</strong></summary>
 
-If you prefer to run the components directly on your host machine without Docker:
-
+If you prefer to run components directly on your machine:
 **Prerequisites:** Go 1.22+, PostgreSQL, Node.js 20+
 
 ```bash
-# 1. Clone and configure
 git clone https://github.com/weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
 cp configs/local.example.yml configs/local.yml   # edit DB credentials here
 
-# 2. Install dependencies and start
 make install
 make start
 ```
+</details>
 
 ---
 
@@ -211,16 +214,17 @@ The Portal is available at **http://localhost:10104** when the server runs.
 
 ## Configuration
 
-The gateway uses a strict separation between server infrastructure configuration and messaging credentials:
+The gateway enforces a strict separation between **server infrastructure** and **messaging credentials**:
 
 1. **Server Configuration (`configs/local.yml`):**
-   This file (copied from `configs/local.example.yml`) configures the infrastructure. It defines ports, database connections, and operational modes.
-   - `DISPATCH_MODE`: Can be `provider_only`, `memory_only`, or `memory_and_provider`.
-   - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`: PostgreSQL credentials.
-   - `JWT_SECRET`: Secret for signing Portal UI auth tokens.
+   This file handles the operational infrastructure. Copy `configs/local.example.yml` to `configs/local.yml`.
+   - `DISPATCH_MODE`: Defines if messages are sent for real (`provider_only`), captured (`memory_only`), or both.
+   - Database credentials (`DB_HOST`, `DB_USER`, etc.) for PostgreSQL.
+   - `JWT_SECRET` for Portal UI session authentication.
+   *(Note: Never place provider credentials like Mailgun API keys in this file.)*
 
-2. **Messaging Credentials (Portal UI):**
-   *Do NOT put your Twilio, Mailgun, or Firebase credentials in the configuration file.* All messaging provider credentials are created via the **Portal UI** (http://localhost:10104) and are stored securely encrypted in PostgreSQL. This allows dynamic configuration without server restarts.
+2. **Provider Credentials (Portal UI):**
+   All third-party credentials (Mailgun, Twilio, Firebase) are managed dynamically via the **Portal UI** (http://localhost:10104). They are stored securely in PostgreSQL. This allows you to add or change messaging providers instantly without restarting the server.
 
 ---
 
