@@ -1,4 +1,4 @@
-.PHONY: install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync start stop test audit build clean docker-check dev dev-down help ui-install ui ui-build ui-format ui-test ui-lint storybook
+.PHONY: it install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync agents agents-kill start stop test audit build clean docker-check dev dev-down help ui-install ui ui-build ui-format ui-test ui-lint storybook
 
 # ============================================================================
 # ANSI Color Codes
@@ -65,49 +65,45 @@ install:
 	@printf "$(BOLD)$(MAGENTA)💡 Next step:$(RESET) Run $(YELLOW)make start$(RESET) to begin development\n"
 	@printf "\n"
 
-## Interactive local setup (macOS only): install CLIs + choose models/tools
+## Initialize configuration for FlowAI
 setup:
-	@bash ./scripts/setup.sh
+	@flowai init
 
 # ============================================================================
 # Spec Kit / AI Workflow Commands
 # ============================================================================
 
+## Spec Kit: Interactive workflow orchestrator
+it:
+	@flowai run master
+
 ## Spec Kit: create a new feature spec (FEATURE="...")
 specify spec:
-	@bash ./scripts/feature.sh specify
-
-## Spec Kit: ask targeted questions and update spec.md
-clarify clr:
-	@bash ./scripts/speckit.sh clarify
+	@flowai run spec
 
 ## Spec Kit: produce plan.md (+ design artifacts)
 plan pln:
-	@bash ./scripts/speckit.sh plan
+	@flowai run plan
 
 ## Spec Kit: produce tasks.md
 tasks tsk:
-	@bash ./scripts/speckit.sh tasks
+	@flowai run tasks
 
 ## Spec Kit: implement tasks.md phase-by-phase
 implement impl:
-	@bash ./scripts/speckit.sh implement
+	@flowai run implement
 
-## Spec Kit: read-only consistency analysis (spec/plan/tasks)
-analyze alyz:
-	@bash ./scripts/speckit.sh analyze
+## Spec Kit: review implementation natively
+review rv:
+	@flowai run review
 
-## Spec Kit: requirements-quality checklist (DOMAIN="security|api|ux|...")
-checklist chk:
-	@bash ./scripts/speckit.sh checklist "$(DOMAIN)"
+## Launch tmux multi-agent session (requires make setup first)
+agents:
+	@flowai start
 
-## Create PR linked to the feature issue (if present)
-pr:
-	@bash ./scripts/feature.sh pr
-
-## Sync local spec kit files to the linked GitHub issue body
-sync:
-	@bash ./scripts/feature.sh sync
+## Kill the active tmux agent session
+agents-kill:
+	@flowai kill
 
 # ============================================================================
 # Local Server Operations
@@ -336,6 +332,7 @@ help:
 	@printf "   $(YELLOW)make audit$(RESET)        Full check: fmt+lint+test (Go+UI), govulncheck, builds\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🤖 Spec Kit / AI Workflow$(RESET)\n"
+	@printf "   $(YELLOW)make it$(RESET)           Start interactive end-to-end AI orchestrator\n"
 	@printf "   $(YELLOW)make specify|spec$(RESET)   Create spec (FEATURE=\"...\")\n"
 	@printf "   $(YELLOW)make clarify|clr$(RESET)    Ask questions to clarify spec\n"
 	@printf "   $(YELLOW)make plan|pln$(RESET)       Generate plan.md (+ design artifacts)\n"
@@ -343,8 +340,6 @@ help:
 	@printf "   $(YELLOW)make analyze|alyz$(RESET)   Read-only consistency analysis\n"
 	@printf "   $(YELLOW)make implement|impl$(RESET) Implement tasks.md phase-by-phase\n"
 	@printf "   $(YELLOW)make checklist|chk$(RESET)  Requirements-quality check (DOMAIN=\"...\")\n"
-	@printf "   $(YELLOW)make sync$(RESET)         Sync local specs to GitHub Issue\n"
-	@printf "   $(YELLOW)make pr$(RESET)           Create PR (auto-syncs and links issue)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🎨 UI / Frontend Development$(RESET)\n"
 	@printf "   $(YELLOW)make ui$(RESET)           Start UI development server\n"

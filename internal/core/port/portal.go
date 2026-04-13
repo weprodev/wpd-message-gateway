@@ -7,13 +7,6 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 )
 
-// UserRepository persists portal users.
-type UserRepository interface {
-	Create(ctx context.Context, u *domain.User) error
-	GetByEmail(ctx context.Context, email string) (*domain.User, error)
-	GetByID(ctx context.Context, id string) (*domain.User, error)
-}
-
 // WorkspaceMemberRepository manages workspace membership.
 type WorkspaceMemberRepository interface {
 	Add(ctx context.Context, workspaceID, userID, role string) error
@@ -21,6 +14,7 @@ type WorkspaceMemberRepository interface {
 	GetRole(ctx context.Context, workspaceID, userID string) (string, error)
 	ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error)
 }
+
 
 // InvitationRepository stores pending invites.
 type InvitationRepository interface {

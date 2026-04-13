@@ -233,7 +233,7 @@ internal/infrastructure/provider/
 ```text
 ┌─────────────────────┐   init()   ┌────────────────────────────┐
 │  Provider Package   │──────────▶ │  Provider Registry         │
-│  (register.go)      │            │  (internal/app/registry)   │
+│  (register.go)      │            │  (internal/registry)       │
 │                     │            │                            │
 │  emailFactories[    │            │  emailFactories[           │
 │    "sendgrid"       │            │    "sendgrid"              │

@@ -2,6 +2,10 @@
 .history/
 .cursor/
 .agent/
+.flowai/
+.gemini/
+.claude/
+.specify/
 
 # OS generated files
 .DS_Store
@@ -55,3 +59,6 @@ configs/*.yml
 
 # Vendor
 vendor/
+
+# Agent signal files (transient, not committed)
+.specify/signals/*.ready

@@ -116,10 +116,11 @@ HTTP handlers map sentinels to status codes:
 
 ```go
 switch {
-case errors.Is(err, port.ErrNotFound):     return c.JSON(http.StatusNotFound, ...)
-case errors.Is(err, port.ErrConflict):     return c.JSON(http.StatusConflict, ...)
-case errors.Is(err, port.ErrUnauthorized): return c.JSON(http.StatusUnauthorized, ...)
-default:                                    return c.JSON(http.StatusInternalServerError, ...)
+case errors.Is(err, port.ErrNotFound):           return c.JSON(http.StatusNotFound, ...)
+case errors.Is(err, port.ErrConflict):           return c.JSON(http.StatusConflict, ...)
+case errors.Is(err, port.ErrUnauthorized):       return c.JSON(http.StatusUnauthorized, ...)
+case errors.Is(err, port.ErrInvalidCredentials): return c.JSON(http.StatusUnauthorized, ...)
+default:                                        return c.JSON(http.StatusInternalServerError, ...)
 }
 ```
 

@@ -17,11 +17,11 @@ The gateway is designed to serve two completely different use cases from a singl
 │  ┌────────────────┐     ┌─────────────────────┐                      │
 │  │  Your Go App   │────▶│  pkg/gateway.New()  │                      │
 │  └────────────────┘     │  (no server, no DB) │                      │
-│                          └──────┬──────────────┘                     │
+│                         └──────┬──────────────┘                      │
 │                                 │ uses registry                      │
 │                                 ▼                                    │
 │                   ┌─────────────────────────┐                        │
-│                   │  Provider (Mailgun, etc) │                       │
+│                   │  Provider (Mailgun, etc)│                        │
 │                   └─────────────────────────┘                        │
 │                                                                      │
 │  Config lives in your code. No infrastructure required.               │
@@ -90,6 +90,7 @@ gw.SendEmail(ctx, &contracts.Email{
 ```
 
 **Key characteristics:**
+
 - No PostgreSQL required
 - No HTTP server required
 - Provider credentials live in your application config (env vars, secrets manager, etc.)
@@ -131,7 +132,7 @@ gw.SendEmail(ctx, &contracts.Email{
 │                    (internal/core/)                             │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │   PortalService                                          │   │
-│  │   Email+PIN auth · Workspaces · Members · API keys       │   │
+│  │   Email+password auth · Workspaces · Members · API keys  │   │
 │  │   Integrations · Templates · Settings · Logs             │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -204,6 +205,7 @@ X-Workspace-Key: <workspace-unique-key>
 ```
 
 **Workspace API keys** are managed per-workspace in the Portal:
+
 - Created in Portal UI → Settings → API Keys
 - Used by your app/service to send messages
 - Scoped to a single workspace
@@ -238,13 +240,14 @@ This doc intentionally does **not** duplicate full column lists.
 
 Each workspace independently controls how outbound messages are handled:
 
-| Mode | Behavior |
-|------|----------|
-| `memory_only` | Captured in-process RAM only. No external provider called. Default for development. |
-| `provider_only` | Sent through the connected integration only. No in-memory copy. |
-| `memory_and_provider` | Stored in memory AND sent through the integration. |
+| Mode                  | Behavior                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. |
+| `provider_only`       | Sent through the connected integration only. No in-memory copy.                     |
+| `memory_and_provider` | Stored in memory AND sent through the integration.                                  |
 
 Configured via Portal UI → Settings, or directly via:
+
 ```
 PATCH /api/v1/workspaces/:wid/settings
 { "message_dispatch_mode": "provider_only" }
@@ -350,8 +353,7 @@ wpd-message-gateway/
 │   │   ├── config.go        # Server config (port, JWT)
 │   │   ├── wire.go          # Dependency injection — wires all layers
 │   │   ├── validation.go    # Config validation
-│   │   ├── imports.go       # Blank imports to trigger provider init()
-│   │   └── registry/        # Provider factory registry (shared by SDK + server)
+│   │   └── imports.go       # Blank imports to trigger provider init()
 │   │
 │   ├── core/                # Business logic (domain-pure)
 │   │   ├── domain/          # Types: Workspace, User, APIKey, Integration...
@@ -368,16 +370,18 @@ wpd-message-gateway/
 │   │   └── repository/
 │   │       └── postgres/    # All PostgreSQL repository implementations
 │   │
-│   └── presentation/        # HTTP layer
-│       ├── router.go        # All route definitions
-│       ├── handler/
-│       │   ├── gateway_handler.go       # POST /v1/* (send messages)
-│       │   ├── portal_handler.go        # /api/v1/* (auth, workspace CRUD)
-│       │   └── portal_inbox_handler.go  # /api/v1/workspaces/:wid/inbox/*
-│       └── middleware/
-│           ├── auth.go              # API key auth for /v1/*
-│           ├── portal_jwt.go        # Portal JWT for /api/v1/*
-│           └── portal_inbox_auth.go # Inbox-specific auth (JWT + member + key)
+│   ├── presentation/        # HTTP layer
+│   │   ├── router.go        # All route definitions
+│   │   ├── handler/
+│   │   │   ├── gateway_handler.go       # POST /v1/* (send messages)
+│   │   │   ├── portal_handler.go        # /api/v1/* (auth, workspace CRUD)
+│   │   │   └── portal_inbox_handler.go  # /api/v1/workspaces/:wid/inbox/*
+│   │   └── middleware/
+│   │       ├── auth.go              # API key auth for /v1/*
+│   │       ├── portal_jwt.go        # Portal JWT for /api/v1/*
+│   │       └── portal_inbox_auth.go # Inbox-specific auth (JWT + member + key)
+│   │
+│   └── registry/            # Provider factory registry (shared by SDK + server)
 │
 ├── pkg/                     # Public packages (imported by external Go apps)
 │   ├── contracts/           # Message types: Email, SMS, PushNotification...
@@ -413,7 +417,8 @@ In server mode, provider credentials (Mailgun API keys, etc.) are stored **encry
 Ports define **capabilities** — the "What" (Send Email), not the "How" (using Mailgun API).
 
 - **Location**: `internal/core/port/`
-- **Interfaces**: `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`
+- **Interfaces**: `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`, repository contracts, `InboxWriter`
+- **Message payloads** (`Email`, `SMS`, `SendResult`, …): defined **only** in `pkg/contracts/` — ports and services use those types; they are not duplicated under `internal/core/domain/`.
 - **Benefit**: Providers are interchangeable — any implementation that satisfies the interface works
 
 ### 4. Provider Self-Registration
@@ -422,7 +427,7 @@ Providers register via Go's `init()` mechanism (Open/Closed Principle):
 
 ```text
 Provider Package          Provider Registry
-(register.go)   ──init()──▶  (internal/app/registry)
+(register.go)   ──init()──▶  (internal/registry)
                  RegisterEmailProvider("mailgun", factory)
 
 Adding a new provider requires NO changes to existing code.
@@ -432,6 +437,7 @@ Only create new files in internal/infrastructure/provider/<name>/
 ### 5. Memory Provider & Dispatch Modes
 
 The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with `dispatch_mode`, you can:
+
 - Use `memory_only` for local development (see messages in Portal inbox)
 - Use `provider_only` in production (messages go to real provider)
 - Use `memory_and_provider` to keep a local copy AND send to the real provider
@@ -439,6 +445,7 @@ The **memory provider** captures messages in process RAM. It's always available 
 ### 6. Portal (Always On)
 
 The React Portal UI is **always enabled** when running the server. It serves as:
+
 - Authentication entry point (email + password)
 - Workspace management
 - Provider configuration (integrations)
@@ -458,13 +465,13 @@ The React Portal UI is **always enabled** when running the server. It serves as:
 
 ### SOLID Principles
 
-| Principle | Application |
-|-----------|-------------|
+| Principle                 | Application                                                       |
+| ------------------------- | ----------------------------------------------------------------- |
 | **Single Responsibility** | Each provider handles one vendor. GatewayService handles routing. |
-| **Open/Closed** | Add new providers without modifying existing code. |
-| **Liskov Substitution** | Any `EmailSender` implementation works interchangeably. |
-| **Interface Segregation** | Separate interfaces for Email, SMS, Push, Chat. |
-| **Dependency Inversion** | Core depends on abstractions (ports), not implementations. |
+| **Open/Closed**           | Add new providers without modifying existing code.                |
+| **Liskov Substitution**   | Any `EmailSender` implementation works interchangeably.           |
+| **Interface Segregation** | Separate interfaces for Email, SMS, Push, Chat.                   |
+| **Dependency Inversion**  | Core depends on abstractions (ports), not implementations.        |
 
 ### Other Principles
 

@@ -24,6 +24,7 @@ import (
 // Application holds all wired dependencies produced by Wire().
 type Application struct {
 	Config         *Config
+	AuthService    *service.AuthService
 	GatewayService *service.GatewayService
 	MemoryStore    *memory.Store
 	PgClient       *pgsql.PgClient
@@ -100,6 +101,15 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		JWTTTL:       jwtTTL,
 	})
 
+	// ── Auth service ──────────────────────────────────────────────────────
+	authService := service.NewAuthService(
+		userRepo,
+		memory.NewEmailProvider(memory.GetStore()),
+		jwtSecret,
+		true,
+		24*time.Hour,
+	)
+
 	// ── Memory store & inbox writer ─────────────────────────────────────────
 	memoryStore := memory.GetStore()
 	inboxWriter := memory.NewInboxWriter(memoryStore)
@@ -109,7 +119,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
-	portalHandler := handler.NewPortalHandler(portalSvc)
+	portalHandler := handler.NewPortalHandler(portalSvc, authService)
 	portalInboxHandler := handler.NewPortalInboxHandler(memoryStore)
 	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, logRepo)
 
@@ -122,6 +132,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 
 	return &Application{
 		Config:         cfg,
+		AuthService:    authService,
 		GatewayService: gatewaySvc,
 		MemoryStore:    memoryStore,
 		PgClient:       pgClient,

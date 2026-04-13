@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -21,17 +22,19 @@ import (
 
 // PortalHandler exposes REST endpoints for the web portal (JWT, not API keys).
 type PortalHandler struct {
-	svc *service.PortalService
+	svc    *service.PortalService
+	authSvc *service.AuthService
 }
 
-func NewPortalHandler(svc *service.PortalService) *PortalHandler {
-	return &PortalHandler{svc: svc}
+func NewPortalHandler(svc *service.PortalService, authSvc *service.AuthService) *PortalHandler {
+	return &PortalHandler{svc: svc, authSvc: authSvc}
 }
 
 type registerBody struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
 }
 
 type loginBody struct {
@@ -49,11 +52,24 @@ func (h *PortalHandler) Register(c echo.Context) error {
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	u, token, err := h.svc.Register(c.Request().Context(), body.Email, body.Password, body.DisplayName)
+	u, err := h.authSvc.RegisterUser(c.Request().Context(), body.FirstName, body.LastName, body.Email, body.Password)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	return c.JSON(http.StatusCreated, tokenResponse{Token: token, User: u})
+	return c.JSON(http.StatusCreated, u)
+}
+
+func (h *PortalHandler) VerifyEmail(c echo.Context) error {
+	token := c.QueryParam("token")
+	if token == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing token")
+	}
+
+	if err := h.authSvc.VerifyEmail(c.Request().Context(), token); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	return c.NoContent(http.StatusOK)
 }
 
 func (h *PortalHandler) Login(c echo.Context) error {
@@ -61,10 +77,12 @@ func (h *PortalHandler) Login(c echo.Context) error {
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	u, token, err := h.svc.Login(c.Request().Context(), body.Email, body.Password)
+
+	u, token, err := h.authSvc.Login(c.Request().Context(), body.Email, body.Password)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
 	}
+
 	return c.JSON(http.StatusOK, tokenResponse{Token: token, User: u})
 }
 
@@ -72,7 +90,10 @@ func (h *PortalHandler) Me(c echo.Context) error {
 	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	u, err := h.svc.UserByID(c.Request().Context(), uid)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		if errors.Is(err, port.ErrNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load user")
 	}
 	return c.JSON(http.StatusOK, u)
 }

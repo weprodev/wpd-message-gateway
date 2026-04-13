@@ -1,7 +1,5 @@
 package contracts
 
-import "context"
-
 // Email represents an email message to be sent.
 type Email struct {
 	From        string            `json:"from,omitempty"`
@@ -15,10 +13,4 @@ type Email struct {
 	PlainText   string            `json:"plain_text,omitempty"`
 	Attachments []Attachment      `json:"attachments,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
-}
-
-// EmailSender defines the contract for sending emails.
-type EmailSender interface {
-	Send(ctx context.Context, email *Email) (*SendResult, error)
-	Name() string
 }

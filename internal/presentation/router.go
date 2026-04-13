@@ -103,6 +103,7 @@ func (rt *Router) Setup() *echo.Echo {
 	// Portal API — always enabled.
 	ph := rt.portalHandler
 	api.POST("/auth/register", ph.Register)
+	api.GET("/auth/verify-email", ph.VerifyEmail)
 	api.POST("/auth/login", ph.Login)
 
 	protected := api.Group("")

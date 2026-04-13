@@ -15,7 +15,6 @@ import (
 
 	"github.com/weprodev/go-pkg/crypto"
 
-	"github.com/weprodev/wpd-message-gateway/internal/core/authjwt"
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
@@ -74,33 +73,6 @@ func NewPortalService(deps PortalDeps) *PortalService {
 	}
 }
 
-func (s *PortalService) Register(ctx context.Context, email, password, displayName string) (*domain.User, string, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" || password == "" {
-		return nil, "", errors.New("email and password required")
-	}
-	if existing, err := s.users.GetByEmail(ctx, email); err == nil && existing != nil {
-		return nil, "", errors.New("email already registered")
-	} else if err != nil && err.Error() != "user not found" {
-		return nil, "", err
-	}
-
-	hash, err := crypto.HashSecret(password)
-	if err != nil {
-		return nil, "", err
-	}
-	u := &domain.User{Email: email, PasswordHash: hash, DisplayName: strings.TrimSpace(displayName)}
-	if err := s.users.Create(ctx, u); err != nil {
-		return nil, "", err
-	}
-	token, err := authjwt.Sign(u.ID, u.Email, s.JWTSecret, s.JWTTTL)
-	if err != nil {
-		return nil, "", err
-	}
-	u.PasswordHash = ""
-	return u, token, nil
-}
-
 func (s *PortalService) UserByID(ctx context.Context, id string) (*domain.User, error) {
 	u, err := s.users.GetByID(ctx, id)
 	if err != nil {
@@ -108,23 +80,6 @@ func (s *PortalService) UserByID(ctx context.Context, id string) (*domain.User, 
 	}
 	u.PasswordHash = ""
 	return u, nil
-}
-
-func (s *PortalService) Login(ctx context.Context, email, password string) (*domain.User, string, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-	u, err := s.users.GetByEmail(ctx, email)
-	if err != nil {
-		return nil, "", errors.New("invalid credentials")
-	}
-	if !crypto.CheckSecretHash(password, u.PasswordHash) {
-		return nil, "", errors.New("invalid credentials")
-	}
-	token, err := authjwt.Sign(u.ID, u.Email, s.JWTSecret, s.JWTTTL)
-	if err != nil {
-		return nil, "", err
-	}
-	u.PasswordHash = ""
-	return u, token, nil
 }
 
 func (s *PortalService) RequireMember(ctx context.Context, workspaceID, userID string) (string, error) {
