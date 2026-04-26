@@ -3,9 +3,8 @@
 // There are two ways to use this package:
 //
 //  1. Static config (no server, no DB) — call New() with provider credentials
-//     declared in code. Providers must be imported to trigger self-registration:
-//
-//     import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
+//     declared in code. All built-in providers (mailgun, memory, etc.) are
+//     auto-registered via imports.go in this package.
 //
 //  2. DB-backed (server mode) — call NewWithService() with an already-wired
 //     GatewayService. This is used internally by the HTTP server.
@@ -44,11 +43,8 @@ func NewWithService(svc *service.GatewayService, workspaceID string) *Gateway {
 }
 
 // New constructs a Gateway from static config without a database or HTTP server.
-// Providers must have been registered via init() before New() is called —
-// import the provider packages with a blank import in your main package:
-//
-//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
-//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+// All built-in providers are auto-registered via this package's imports.go file.
+// To add new providers, update internal/app/imports.go.
 func New(cfg Config) (*Gateway, error) {
 	g := &Gateway{
 		emailSenders: make(map[string]port.EmailSender),
