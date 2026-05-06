@@ -51,6 +51,14 @@ type ChatConfig struct {
 	WebhookURL string
 }
 
+type OTPConfig struct{
+	CommonConfig
+	PhoneNumber    string
+	Code           string
+	CodeLength     string
+	SenderUsername string
+}
+
 // EmailProviderFactory constructs an EmailSender from static config.
 type EmailProviderFactory func(cfg EmailConfig) (port.EmailSender, error)
 
@@ -62,6 +70,8 @@ type PushProviderFactory func(cfg PushConfig) (port.PushSender, error)
 
 // ChatProviderFactory constructs a ChatSender from static config.
 type ChatProviderFactory func(cfg ChatConfig) (port.ChatSender, error)
+
+type OTPProviderFactory func(cfg OTPConfig) (port.OTPSender, error)
 
 var (
 	mu             sync.RWMutex

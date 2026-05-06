@@ -21,6 +21,7 @@ type Config struct {
 	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
 	PushProviders  map[string]registry.PushConfig  `yaml:"-"`
 	ChatProviders  map[string]registry.ChatConfig  `yaml:"-"`
+	OTPProviders   map[string]registry.OTPConfig   `yaml:"-"`
 }
 
 // ServerConfig holds server configuration.
