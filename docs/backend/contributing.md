@@ -217,6 +217,7 @@ internal/infrastructure/provider/
 │   ├── email.go        # Memory email provider
 │   ├── sms.go          # Memory SMS provider
 │   ├── push.go         # Memory push provider
+│   ├── otp.go         # Memory OTP provider
 │   ├── chat.go         # Memory chat provider
 │   └── register.go     # init() self-registration
 │
@@ -258,6 +259,7 @@ Same pattern — use the corresponding registry function and port interface:
 | SMS | `registry.RegisterSMSProvider(name, factory)` | `port.SMSSender` |
 | Push | `registry.RegisterPushProvider(name, factory)` | `port.PushSender` |
 | Chat | `registry.RegisterChatProvider(name, factory)` | `port.ChatSender` |
+| OTP | `registry.RegisterOTPProvider(name, factory)` | `port.OTPSender` |
 
 ---
 

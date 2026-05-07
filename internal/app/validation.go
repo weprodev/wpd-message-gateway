@@ -49,8 +49,17 @@ func ValidateConfig(cfg *Config) error {
 		)
 	}
 
+	if cfg.DefaultOTPProvider() == "" {
+		missingProviders = append(missingProviders, "OTP")
+	} else if !registry.IsOTPProviderRegistered(cfg.DefaultOTPProvider()) {
+		return fmt.Errorf(
+			"missing or invalid required configuration: MESSAGE_DEFAULT_OTP_PROVIDER (unknown provider: %s)",
+			cfg.DefaultOTPProvider(),
+		)
+	}
+
 	// If ALL providers are missing, that's an error
-	if len(missingProviders) == 4 {
+	if len(missingProviders) == 5 {
 		return fmt.Errorf(
 			"no default providers configured. Please set at least one in configs/local.yml:\n" +
 				"  providers:\n" +
@@ -58,7 +67,8 @@ func ValidateConfig(cfg *Config) error {
 				"      email: memory\n" +
 				"      sms: memory\n" +
 				"      push: memory\n" +
-				"      chat: memory",
+				"      chat: memory\n" +
+				"      otp: memory",
 		)
 	}
 

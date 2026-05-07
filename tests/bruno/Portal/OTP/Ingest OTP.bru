@@ -1,0 +1,37 @@
+meta {
+  name: Ingest OTP
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/internal/otp
+  body: json
+  auth: none
+}
+
+headers {
+  X-Internal-Secret: {{internalSecret}}
+}
+
+
+body:json {
+  {
+    "phone_number": ["+49123456789"],
+    "sender_username": ["verify-service"],
+    "code": ["847291"],
+    "code_length": 6
+  }
+}
+
+tests {
+  test("should return 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+    bru.setVar("otpId", res.body.id);
+  });
+}

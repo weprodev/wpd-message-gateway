@@ -51,7 +51,7 @@ type ChatConfig struct {
 	WebhookURL string
 }
 
-type OTPConfig struct{
+type OTPConfig struct {
 	CommonConfig
 	PhoneNumber    string
 	Code           string

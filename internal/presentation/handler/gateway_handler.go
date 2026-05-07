@@ -62,7 +62,15 @@ func (h *GatewayHandler) HandleSendChat(c echo.Context) error {
 	})
 }
 
-// handleSend is the single DRY dispatcher for all four channels.
+// HandleSendOTP handles POST /v1/otp.
+func (h *GatewayHandler) HandleSendOTP(c echo.Context) error {
+	var req contracts.OTP
+	return h.handleSend(c, "otp", &req, func(ctx context.Context, wsID string) (*contracts.SendResult, error) {
+		return h.service.SendOTP(ctx, wsID, &req)
+	})
+}
+
+// handleSend is the single DRY dispatcher for all channels.
 // It decodes the JSON body into dst, calls send, records the audit log, and
 // returns the appropriate HTTP response.
 func (h *GatewayHandler) handleSend(

@@ -52,6 +52,13 @@ type StoredChat struct {
 	Chat      *contracts.ChatMessage `json:"chat"`
 }
 
+// StoredOTP wraps an OTP with metadata for storage.
+type StoredOTP struct {
+	ID        string         `json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	OTP       *contracts.OTP `json:"otp"`
+}
+
 // Store implements an in-memory message store for all message types.
 type Store struct {
 	mu     sync.RWMutex
@@ -59,6 +66,7 @@ type Store struct {
 	sms    []*StoredSMS
 	pushes []*StoredPush
 	chats  []*StoredChat
+	otps   []*StoredOTP
 }
 
 // NewStore creates a new in-memory store.
@@ -68,6 +76,7 @@ func NewStore() *Store {
 		sms:    make([]*StoredSMS, 0),
 		pushes: make([]*StoredPush, 0),
 		chats:  make([]*StoredChat, 0),
+		otps:   make([]*StoredOTP, 0),
 	}
 }
 
@@ -133,6 +142,7 @@ func (s *Store) StatsForWorkspace(workspaceID string) map[string]int {
 		"sms":    0,
 		"push":   0,
 		"chat":   0,
+		"otp":    0,
 		"total":  n,
 	}
 }
@@ -305,11 +315,52 @@ func (s *Store) AddChat(stored *StoredChat) {
 	s.chats = append(s.chats, stored)
 }
 
+// OTPs returns a copy of all stored OTPs.
+func (s *Store) OTPs() []*StoredOTP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	msgs := make([]*StoredOTP, len(s.otps))
+	copy(msgs, s.otps)
+	return msgs
+}
+
+// OTPByID returns a stored OTP by its ID, or nil if not found.
+func (s *Store) OTPByID(id string) *StoredOTP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, o := range s.otps {
+		if o.ID == id {
+			return o
+		}
+	}
+	return nil
+}
+
+// DeleteOTPByID deletes an OTP by ID. Returns true if deleted.
+func (s *Store) DeleteOTPByID(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, o := range s.otps {
+		if o.ID == id {
+			s.otps = append(s.otps[:i], s.otps[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// AddOTP adds a stored OTP.
+func (s *Store) AddOTP(stored *StoredOTP) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.otps = append(s.otps, stored)
+}
+
 // Count returns the total number of stored messages across all types.
 func (s *Store) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats)
+	return len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats) + len(s.otps)
 }
 
 // Stats returns message counts by type.
@@ -321,7 +372,8 @@ func (s *Store) Stats() map[string]int {
 		"sms":    len(s.sms),
 		"push":   len(s.pushes),
 		"chat":   len(s.chats),
-		"total":  len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats),
+		"otp":    len(s.otps),
+		"total":  len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats) + len(s.otps),
 	}
 }
 
@@ -333,4 +385,5 @@ func (s *Store) Clear() {
 	s.sms = make([]*StoredSMS, 0)
 	s.pushes = make([]*StoredPush, 0)
 	s.chats = make([]*StoredChat, 0)
+	s.otps = make([]*StoredOTP, 0)
 }

@@ -16,6 +16,7 @@ const (
 	channelSMS   = "sms"
 	channelPush  = "push"
 	channelChat  = "chat"
+	channelOTP   = "otp"
 
 	// memoryProviderName is the sentinel name stored in the integrations table
 	// when a workspace uses memory dispatch. Checked here to skip DB lookup.
@@ -40,6 +41,7 @@ type GatewayService struct {
 	smsCache   *smsSenderCache
 	pushCache  *pushSenderCache
 	chatCache  *chatSenderCache
+	otpCache   *otpSenderCache
 }
 
 // NewGatewayService constructs a GatewayService.
@@ -61,6 +63,7 @@ func NewGatewayService(
 		smsCache:     newProviderCache[port.SMSSender](),
 		pushCache:    newProviderCache[port.PushSender](),
 		chatCache:    newProviderCache[port.ChatSender](),
+		otpCache:     newProviderCache[port.OTPSender](),
 	}
 }
 
@@ -120,6 +123,21 @@ func (s *GatewayService) SendChat(ctx context.Context, workspaceID string, chat 
 				return nil, err
 			}
 			return sender.Send(ctx, chat)
+		},
+	)
+}
+
+// SendOTP dispatches an OTP message for workspaceID according to its dispatch mode.
+func (s *GatewayService) SendOTP(ctx context.Context, workspaceID string, otp *contracts.OTP) (*contracts.SendResult, error) {
+	mode := s.resolveDispatchMode(ctx, workspaceID)
+	return s.dispatch(ctx, workspaceID, mode, channelOTP,
+		func() (*contracts.SendResult, error) { return s.writeOTPToInbox(ctx, workspaceID, otp) },
+		func(intg *domain.Integration) (*contracts.SendResult, error) {
+			sender, err := resolveOTPSender(s.otpCache, intg)
+			if err != nil {
+				return nil, err
+			}
+			return sender.Send(ctx, otp)
 		},
 	)
 }
@@ -273,6 +291,17 @@ func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID strin
 	id, err := s.inbox.WriteChat(ctx, workspaceID, chat)
 	if err != nil {
 		return nil, fmt.Errorf("write chat to inbox: %w", err)
+	}
+	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
+}
+
+func (s *GatewayService) writeOTPToInbox(ctx context.Context, workspaceID string, otp *contracts.OTP) (*contracts.SendResult, error) {
+	if s.inbox == nil {
+		return nil, fmt.Errorf("inbox writer not configured")
+	}
+	id, err := s.inbox.WriteOTP(ctx, workspaceID, otp)
+	if err != nil {
+		return nil, fmt.Errorf("write OTP to inbox: %w", err)
 	}
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }

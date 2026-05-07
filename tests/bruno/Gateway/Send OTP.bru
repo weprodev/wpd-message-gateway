@@ -1,0 +1,35 @@
+meta {
+  name: Send OTP
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/otp
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: demo-client-id
+  password: demo-secret
+}
+
+headers {
+  X-Workspace-Key: {{workspaceKey}}
+}
+
+body:json {
+  {
+    "phone_number": "+123456789",
+    "sender_username": "Solaris",
+    "code": "895663",
+    "code_length": 6
+  }
+}
+
+tests {
+  test("should return 501 (OTP not implemented)", function() {
+    expect(res.status).to.equal(501);
+  });
+}

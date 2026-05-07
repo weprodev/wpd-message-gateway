@@ -62,6 +62,9 @@ type pushSenderCache = providerCache[port.PushSender]
 // chatSenderCache resolves (and caches) port.ChatSenders from integrations.
 type chatSenderCache = providerCache[port.ChatSender]
 
+// otpSenderCache resolves (and caches) port.OTPSenders from integrations.
+type otpSenderCache = providerCache[port.OTPSender]
+
 // resolveEmailSender returns a cached or newly constructed EmailSender for the integration.
 func resolveEmailSender(cache *emailSenderCache, intg *domain.Integration) (port.EmailSender, error) {
 	if s, ok := cache.get(intg); ok {
@@ -141,6 +144,27 @@ func resolveChatSender(cache *chatSenderCache, intg *domain.Integration) (port.C
 	sender, err := factory(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init chat provider %q: %w", intg.ProviderName, err)
+	}
+	cache.set(intg, sender)
+	return sender, nil
+}
+
+// resolveOTPSender returns a cached or newly constructed OTPSender.
+func resolveOTPSender(cache *otpSenderCache, intg *domain.Integration) (port.OTPSender, error) {
+	if s, ok := cache.get(intg); ok {
+		return s, nil
+	}
+	factory, err := registry.GetOTPFactory(intg.ProviderName)
+	if err != nil {
+		return nil, fmt.Errorf("provider factory: %w", err)
+	}
+	var cfg registry.OTPConfig
+	if err := json.Unmarshal(intg.Config, &cfg); err != nil {
+		return nil, fmt.Errorf("parse integration config: %w", err)
+	}
+	sender, err := factory(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("init OTP provider %q: %w", intg.ProviderName, err)
 	}
 	cache.set(intg, sender)
 	return sender, nil

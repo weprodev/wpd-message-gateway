@@ -31,10 +31,12 @@ type Gateway struct {
 	smsSenders   map[string]port.SMSSender
 	pushSenders  map[string]port.PushSender
 	chatSenders  map[string]port.ChatSender
+	otpSenders   map[string]port.OTPSender
 	defaultEmail string
 	defaultSMS   string
 	defaultPush  string
 	defaultChat  string
+	defaultOTP   string
 }
 
 // NewWithService creates a Gateway scoped to a workspace using a wired
@@ -55,10 +57,12 @@ func New(cfg Config) (*Gateway, error) {
 		smsSenders:   make(map[string]port.SMSSender),
 		pushSenders:  make(map[string]port.PushSender),
 		chatSenders:  make(map[string]port.ChatSender),
+		otpSenders:   make(map[string]port.OTPSender),
 		defaultEmail: cfg.DefaultEmailProvider,
 		defaultSMS:   cfg.DefaultSMSProvider,
 		defaultPush:  cfg.DefaultPushProvider,
 		defaultChat:  cfg.DefaultChatProvider,
+		defaultOTP:   cfg.DefaultOTPProvider,
 	}
 	if err := buildEmailSenders(g, cfg); err != nil {
 		return nil, err
@@ -70,6 +74,9 @@ func New(cfg Config) (*Gateway, error) {
 		return nil, err
 	}
 	if err := buildChatSenders(g, cfg); err != nil {
+		return nil, err
+	}
+	if err := buildOTPSenders(g, cfg); err != nil {
 		return nil, err
 	}
 	return g, nil
@@ -124,6 +131,17 @@ func (g *Gateway) SendChat(ctx context.Context, chat *contracts.ChatMessage) (*c
 	return sender.Send(ctx, chat)
 }
 
+func (g *Gateway) SendOTP(ctx context.Context, otp *contracts.OTP) (*contracts.SendResult, error) {
+	if g.svc != nil {
+		return g.svc.SendOTP(ctx, g.workspaceID, otp)
+	}
+	sender, err := g.otpSender()
+	if err != nil {
+		return nil, err
+	}
+	return sender.Send(ctx, otp)
+}
+
 func (g *Gateway) emailSender() (port.EmailSender, error) {
 	s, ok := g.emailSenders[g.defaultEmail]
 	if !ok {
@@ -152,6 +170,14 @@ func (g *Gateway) chatSender() (port.ChatSender, error) {
 	s, ok := g.chatSenders[g.defaultChat]
 	if !ok {
 		return nil, fmt.Errorf("gateway: chat provider %q not configured", g.defaultChat)
+	}
+	return s, nil
+}
+
+func (g *Gateway) otpSender() (port.OTPSender, error) {
+	s, ok := g.otpSenders[g.defaultOTP]
+	if !ok {
+		return nil, fmt.Errorf("gateway: OTP provider %q not configured", g.defaultOTP)
 	}
 	return s, nil
 }

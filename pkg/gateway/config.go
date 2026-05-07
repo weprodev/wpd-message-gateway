@@ -42,6 +42,12 @@ type ChatConfig struct {
 	WebhookURL string
 }
 
+// OTPConfig holds OTP-specific static provider configuration.
+type OTPConfig struct {
+	CommonConfig
+	SenderID string
+}
+
 // Config is the static gateway configuration used with New().
 // Providers are identified by name and must have been registered via init().
 type Config struct {
@@ -49,11 +55,13 @@ type Config struct {
 	DefaultSMSProvider   string
 	DefaultPushProvider  string
 	DefaultChatProvider  string
+	DefaultOTPProvider   string
 
 	EmailProviders map[string]EmailConfig
 	SMSProviders   map[string]SMSConfig
 	PushProviders  map[string]PushConfig
 	ChatProviders  map[string]ChatConfig
+	OTPProviders   map[string]OTPConfig
 }
 
 // buildEmailSenders constructs email senders from cfg and stores them in g.
@@ -120,6 +128,22 @@ func buildChatSenders(g *Gateway, cfg Config) error {
 	return nil
 }
 
+// buildOTPSenders constructs OTP senders from cfg and stores them in g.
+func buildOTPSenders(g *Gateway, cfg Config) error {
+	for name, oc := range cfg.OTPProviders {
+		factory, err := registry.GetOTPFactory(name)
+		if err != nil {
+			return fmt.Errorf("gateway: OTP provider %q: %w", name, err)
+		}
+		sender, err := factory(toRegistryOTP(oc))
+		if err != nil {
+			return fmt.Errorf("gateway: init OTP provider %q: %w", name, err)
+		}
+		g.otpSenders[name] = sender
+	}
+	return nil
+}
+
 func toRegistryEmail(ec EmailConfig) registry.EmailConfig {
 	return registry.EmailConfig{
 		CommonConfig: registry.CommonConfig{APIKey: ec.APIKey, APISecret: ec.APISecret, Region: ec.Region, BaseURL: ec.BaseURL},
@@ -149,5 +173,12 @@ func toRegistryChat(cc ChatConfig) registry.ChatConfig {
 		CommonConfig: registry.CommonConfig{APIKey: cc.APIKey, APISecret: cc.APISecret, Region: cc.Region, BaseURL: cc.BaseURL},
 		FromPhone:    cc.FromPhone,
 		WebhookURL:   cc.WebhookURL,
+	}
+}
+
+func toRegistryOTP(oc OTPConfig) registry.OTPConfig {
+	return registry.OTPConfig{
+		CommonConfig: registry.CommonConfig{APIKey: oc.APIKey, APISecret: oc.APISecret, Region: oc.Region, BaseURL: oc.BaseURL},
+		SenderID:     oc.SenderID,
 	}
 }
