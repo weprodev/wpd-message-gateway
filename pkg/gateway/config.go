@@ -45,7 +45,7 @@ type ChatConfig struct {
 // OTPConfig holds OTP-specific static provider configuration.
 type OTPConfig struct {
 	CommonConfig
-	SenderID string
+	SenderUsername string
 }
 
 // Config is the static gateway configuration used with New().
@@ -179,6 +179,6 @@ func toRegistryChat(cc ChatConfig) registry.ChatConfig {
 func toRegistryOTP(oc OTPConfig) registry.OTPConfig {
 	return registry.OTPConfig{
 		CommonConfig: registry.CommonConfig{APIKey: oc.APIKey, APISecret: oc.APISecret, Region: oc.Region, BaseURL: oc.BaseURL},
-		SenderID:     oc.SenderID,
+		SenderUsername:     oc.SenderUsername,
 	}
 }

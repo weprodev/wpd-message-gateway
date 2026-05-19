@@ -17,15 +17,14 @@ $$ LANGUAGE plpgsql;
 -- =====================================================
 
 CREATE TABLE users (
-    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    email      TEXT        NOT NULL,
-    password   TEXT,
-    first_name TEXT,
-    last_name  TEXT,
-    status     TEXT        NOT NULL DEFAULT 'active'
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           TEXT        NOT NULL,
+    password_hash        TEXT,
+    display_name    TEXT,       NOT NULL,
+    status          TEXT        NOT NULL DEFAULT 'active'
                            CHECK (status IN ('active', 'suspended', 'blocked')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT users_email_unique      UNIQUE (email),
     CONSTRAINT users_email_lower_check CHECK  (email = lower(email))
@@ -167,7 +166,7 @@ CREATE TABLE provider_config_fields (
     label         TEXT     NOT NULL,
     description   TEXT,
     field_type    TEXT     NOT NULL
-                           CHECK (field_type IN ('text', 'password', 'email', 'url', 'boolean', 'textarea', 'select')),
+                           CHECK (field_type IN ('text', 'password_hash', 'email', 'url', 'boolean', 'textarea', 'select')),
     required      BOOLEAN  NOT NULL DEFAULT FALSE,
     default_value TEXT,
     options       JSONB,    -- for field_type='select': ["tls","ssl","none"]

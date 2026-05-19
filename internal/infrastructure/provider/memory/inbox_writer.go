@@ -72,3 +72,14 @@ func (a *InboxWriterAdapter) WriteChat(_ context.Context, _ string, chat *contra
 	})
 	return id, nil
 }
+
+// WriteOTP stores an OTP message in memory.
+func (a *InboxWriterAdapter) WriteOTP(_ context.Context, _ string, otp *contracts.OTP) (string, error) {
+	id := uuid.New().String()
+	a.store.AddOTP(&StoredOTP{
+		ID:        id,
+		CreatedAt: time.Now(),
+		OTP:       otp,
+	})
+	return id, nil
+}

@@ -2,9 +2,9 @@
   "platform": "macos",
   "default_branch": "develop",
   "tools": {
-    "default": { "tools": ["antigravity"], "model": "gemini-3-pro-preview" },
-    "reviewer": { "tools": ["cursor"], "model": "gemini-3-pro-preview" },
-    "test_docs": { "tools": ["antigravity"], "model": "claude-sonnet" }
+    "default": { "tools": ["cursor"], "model": "claude-sonnet" },
+    "reviewer": { "tools": ["cursor"], "model": "claude-sonnet" },
+    "test_docs": { "tools": ["cursor"], "model": "claude-sonnet" }
   },
-  "default_model": "gemini-3-pro-preview"
+  "default_model": "claude-sonnet"
 }

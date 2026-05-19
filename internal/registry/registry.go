@@ -79,6 +79,7 @@ var (
 	smsFactories   = make(map[string]SMSProviderFactory)
 	pushFactories  = make(map[string]PushProviderFactory)
 	chatFactories  = make(map[string]ChatProviderFactory)
+	otpFactories   = make(map[string]OTPProviderFactory)
 )
 
 // RegisterEmailProvider registers an email provider factory by name.
@@ -108,6 +109,14 @@ func RegisterChatProvider(name string, factory ChatProviderFactory) {
 	mu.Lock()
 	defer mu.Unlock()
 	chatFactories[name] = factory
+}
+
+// RegisterOTPProvider registers an OTP provider factory by name.
+// Call this inside your provider's init() function.
+func RegisterOTPProvider(name string, factory OTPProviderFactory) {
+	mu.Lock()
+	defer mu.Unlock()
+	otpFactories[name] = factory
 }
 
 // GetEmailFactory returns the registered factory for the named email provider.
@@ -154,6 +163,17 @@ func GetChatFactory(name string) (ChatProviderFactory, error) {
 	return f, nil
 }
 
+// GetOTPFactory returns the registered factory for the named OTP provider.
+func GetOTPFactory(name string) (OTPProviderFactory, error) {
+	mu.RLock()
+	defer mu.RUnlock()
+	f, ok := otpFactories[name]
+	if !ok {
+		return nil, fmt.Errorf("registry: unknown OTP provider %q (not registered)", name)
+	}
+	return f, nil
+}
+
 // IsEmailProviderRegistered reports whether an email provider is registered.
 func IsEmailProviderRegistered(name string) bool {
 	mu.RLock()
@@ -183,5 +203,13 @@ func IsChatProviderRegistered(name string) bool {
 	mu.RLock()
 	defer mu.RUnlock()
 	_, ok := chatFactories[name]
+	return ok
+}
+
+// IsOTPProviderRegistered reports whether an OTP provider is registered.
+func IsOTPProviderRegistered(name string) bool {
+	mu.RLock()
+	defer mu.RUnlock()
+	_, ok := otpFactories[name]
 	return ok
 }

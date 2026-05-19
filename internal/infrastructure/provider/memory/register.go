@@ -23,6 +23,6 @@ func init() {
 	})
 
 	registry.RegisterOTPProvider("memory", func(cfg registry.OTPConfig) (port.OTPSender, error) {
-		return NewChatProvider(GetStore()), nil
+		return NewOTPProvider(GetStore()), nil
 	})
 }
