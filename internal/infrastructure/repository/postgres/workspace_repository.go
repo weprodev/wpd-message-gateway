@@ -126,7 +126,7 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.Workspace
+	out := make([]domain.Workspace, 0)
 	for rows.Next() {
 		w, err := scanWorkspace(rows)
 		if err != nil {

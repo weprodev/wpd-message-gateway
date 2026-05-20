@@ -11,12 +11,21 @@ import (
 
 // OTPProvider implements port.OTPSender using an in-memory store.
 type OTPProvider struct {
-	store *Store
+	store       *Store
+	workspaceID string
 }
 
-// NewOTPProvider creates a new memory OTP provider.
+// NewOTPProvider creates a new memory OTP provider (no workspace scope; global inbox).
 func NewOTPProvider(store *Store) *OTPProvider {
-	return &OTPProvider{store: store}
+	return NewOTPProviderForWorkspace(store, "")
+}
+
+// NewOTPProviderForWorkspace tags stored OTPs with workspaceID for multi-tenant portal inbox.
+func NewOTPProviderForWorkspace(store *Store, workspaceID string) *OTPProvider {
+	return &OTPProvider{
+		store:       store,
+		workspaceID: workspaceID,
+	}
 }
 
 // Store returns the underlying memory store.
@@ -34,9 +43,10 @@ func (o *OTPProvider) Send(ctx context.Context, otp *contracts.OTP) (*contracts.
 	id := uuid.New().String()
 
 	stored := &StoredOTP{
-		ID:        id,
-		CreatedAt: time.Now(),
-		OTP:       otp,
+		ID:          id,
+		WorkspaceID: o.workspaceID,
+		CreatedAt:   time.Now(),
+		OTP:         otp,
 	}
 	o.store.AddOTP(stored)
 

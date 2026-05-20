@@ -2,9 +2,9 @@
   "platform": "macos",
   "default_branch": "develop",
   "tools": {
-    "default": { "tools": ["cursor"], "model": "claude-sonnet" },
-    "reviewer": { "tools": ["cursor"], "model": "claude-sonnet" },
-    "test_docs": { "tools": ["cursor"], "model": "claude-sonnet" }
+    "default": { "tools": ["cursor"], "model": "gpt-5" },
+    "reviewer": { "tools": ["cursor"], "model": "gpt-5" },
+    "test_docs": { "tools": ["cursor"], "model": "gpt-5" }
   },
-  "default_model": "claude-sonnet"
+  "default_model": "gpt-5"
 }

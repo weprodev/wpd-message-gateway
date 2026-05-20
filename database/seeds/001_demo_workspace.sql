@@ -1,12 +1,11 @@
 -- Demo workspace, API key, email integration, template (aligned with latest schema)
 
-INSERT INTO users (id, email, password, first_name, last_name, status)
+INSERT INTO users (id, email, password_hash, display_name, status)
 VALUES (
     '00000000-0000-0000-0000-000000000010',
     'demo@weprodev.com',
     '$2a$14$dummy.hash.for.demo.only',
-    'Demo',
-    'User',
+    'Demo User',
     'active'
 )
 ON CONFLICT (id) DO NOTHING;
@@ -17,29 +16,31 @@ VALUES
     ('00000000-0000-0000-0000-000000000021', 'member', 'Member')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspaces (id, name, slug, owner_id, status, is_private, hashed_pin_code, icon_key)
+INSERT INTO workspaces (id, name, unique_key, owner_id, admin_email, status, visibility, hashed_pin, icon_key)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     'Demo Workspace',
     'demo',
     '00000000-0000-0000-0000-000000000010',
+    'demo@weprodev.com',
     'active',
-    true,
+    'private',
     NULL,
     NULL
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_members (workspace_id, user_id, role_id)
+INSERT INTO workspace_members (workspace_id, user_id, role)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     '00000000-0000-0000-0000-000000000010',
-    '00000000-0000-0000-0000-000000000020'
+    'admin'
 )
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
 
 INSERT INTO workspace_channels (workspace_id, channel_type, enabled)
-VALUES ('00000000-0000-0000-0000-000000000001', 'email', true)
+VALUES ('00000000-0000-0000-0000-000000000001', 'email', true),
+       ('00000000-0000-0000-0000-000000000001', 'otp', true)
 ON CONFLICT (workspace_id, channel_type) DO NOTHING;
 
 INSERT INTO api_keys (id, workspace_id, client_id, client_secret_hash, name, is_active)
@@ -69,6 +70,29 @@ VALUES (
     '00000000-0000-0000-0000-000000000001',
     'email',
     '00000000-0000-0000-0000-000000000030',
+    E'\\x720231d45885b8d808a3e2930264f2b60ca166004abf449b6be50328217e',
+    'connected',
+    true
+)
+ON CONFLICT (workspace_id, provider_id) DO NOTHING;
+
+-- OTP memory provider (global catalog)
+INSERT INTO providers (id, name, channel_type, status)
+VALUES (
+    '00000000-0000-0000-0000-000000000031',
+    'memory',
+    'otp',
+    'active'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- OTP default integration for demo workspace
+INSERT INTO integrations (id, workspace_id, channel_type, provider_id, encrypted_config, status, is_default)
+VALUES (
+    '00000000-0000-0000-0000-000000000004',
+    '00000000-0000-0000-0000-000000000001',
+    'otp',
+    '00000000-0000-0000-0000-000000000031',
     E'\\x720231d45885b8d808a3e2930264f2b60ca166004abf449b6be50328217e',
     'connected',
     true

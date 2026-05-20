@@ -20,12 +20,12 @@ func NewWorkspaceMemberRepository(client *pgsql.PgClient) port.WorkspaceMemberRe
 	return &WorkspaceMemberRepository{client: client}
 }
 
-func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID, role string) error {
+func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID, roleID string) error {
 	_, err := r.client.GetDB(ctx).ExecContext(ctx, `
-		INSERT INTO workspace_members (workspace_id, user_id, role)
+		INSERT INTO workspace_members (workspace_id, user_id, role_id)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role
-	`, workspaceID, userID, role)
+		ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = EXCLUDED.role_id
+	`, workspaceID, userID, roleID)
 	return err
 }
 
@@ -45,20 +45,20 @@ func (r *WorkspaceMemberRepository) Remove(ctx context.Context, workspaceID, use
 }
 
 func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, userID string) (string, error) {
-	var role string
+	var roleID string
 	err := r.client.GetDB(ctx).QueryRowContext(ctx,
-		`SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
+		`SELECT role_id FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
 		workspaceID, userID,
-	).Scan(&role)
+	).Scan(&roleID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("workspace member workspace=%s user=%s: %w", workspaceID, userID, port.ErrNotFound)
 	}
-	return role, err
+	return roleID, err
 }
 
 func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error) {
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
-		SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.email, COALESCE(u.display_name, '')
+		SELECT wm.workspace_id, wm.user_id, wm.role_id, wm.joined_at, u.email, COALESCE(u.display_name, '')
 		FROM workspace_members wm
 		INNER JOIN users u ON u.id = wm.user_id
 		WHERE wm.workspace_id = $1
@@ -69,10 +69,10 @@ func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.WorkspaceMember
+	out := make([]domain.WorkspaceMember, 0)
 	for rows.Next() {
 		var m domain.WorkspaceMember
-		if err := rows.Scan(&m.WorkspaceID, &m.UserID, &m.Role, &m.JoinedAt, &m.UserEmail, &m.DisplayName); err != nil {
+		if err := rows.Scan(&m.WorkspaceID, &m.UserID, &m.RoleID, &m.JoinedAt, &m.UserEmail, &m.DisplayName); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

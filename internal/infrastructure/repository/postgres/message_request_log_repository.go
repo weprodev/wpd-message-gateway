@@ -103,7 +103,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.MessageRequestLogWithSource
+	out := make([]domain.MessageRequestLogWithSource, 0)
 	for rows.Next() {
 		var row domain.MessageRequestLogWithSource
 		var apiKeyID sql.NullString

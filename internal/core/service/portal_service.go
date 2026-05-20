@@ -81,7 +81,7 @@ func (s *PortalService) Register(ctx context.Context, email, password, displayNa
 	}
 	if existing, err := s.users.GetByEmail(ctx, email); err == nil && existing != nil {
 		return nil, "", errors.New("email already registered")
-	} else if err != nil && err.Error() != "user not found" {
+	} else if err != nil && !errors.Is(err, port.ErrNotFound) {
 		return nil, "", err
 	}
 

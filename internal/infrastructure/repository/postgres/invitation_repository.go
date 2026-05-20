@@ -40,7 +40,7 @@ func (r *InvitationRepository) ListPendingByWorkspace(ctx context.Context, works
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.Invitation
+	out := make([]domain.Invitation, 0)
 	for rows.Next() {
 		var inv domain.Invitation
 		if err := rows.Scan(&inv.ID, &inv.WorkspaceID, &inv.Email, &inv.Role, &inv.TokenHash, &inv.ExpiresAt, &inv.Status, &inv.CreatedAt); err != nil {

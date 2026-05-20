@@ -20,7 +20,7 @@ CREATE TABLE users (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     email           TEXT        NOT NULL,
     password_hash        TEXT,
-    display_name    TEXT,       NOT NULL,
+    display_name    TEXT        NOT NULL,
     status          TEXT        NOT NULL DEFAULT 'active'
                            CHECK (status IN ('active', 'suspended', 'blocked')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -41,17 +41,18 @@ CREATE TRIGGER trg_users_set_updated_at
 CREATE TABLE workspaces (
     id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name           VARCHAR(255) NOT NULL,
-    slug           TEXT         NOT NULL,
+    unique_key     TEXT         NOT NULL,
     owner_id       UUID         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     status         TEXT         NOT NULL DEFAULT 'active'
                                 CHECK (status IN ('active', 'suspended')),
-    is_private     BOOLEAN      NOT NULL DEFAULT TRUE,
-    hashed_pin_code TEXT,
+    visibility     TEXT         NOT NULL DEFAULT 'private',
+    admin_email    TEXT,
+    hashed_pin     TEXT,
     icon_key       VARCHAR(64),
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT workspaces_slug_unique UNIQUE (slug)
+    CONSTRAINT workspaces_unique_key_unique UNIQUE (unique_key)
 );
 
 COMMENT ON COLUMN workspaces.icon_key IS 'Optional icon identifier for workspace branding (e.g. marketing, product, support)';
@@ -94,7 +95,7 @@ CREATE TABLE workspace_members (
 );
 
 CREATE INDEX idx_workspace_members_user_id ON workspace_members(user_id);
-CREATE INDEX idx_workspace_members_role_id ON workspace_members(role_id);
+CREATE INDEX idx_workspace_members_role ON workspace_members(role);
 
 -- =====================================================
 -- 5. invitations
@@ -104,7 +105,7 @@ CREATE TABLE invitations (
     id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     email        TEXT         NOT NULL,
-    role_id      UUID         NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+    role         TEXT         NOT NULL,
     token_hash   TEXT         NOT NULL,
     expires_at   TIMESTAMPTZ  NOT NULL,
     status       TEXT         NOT NULL DEFAULT 'pending'
@@ -128,7 +129,7 @@ CREATE INDEX idx_invitations_token_hash   ON invitations(token_hash);
 
 CREATE TABLE workspace_channels (
     workspace_id UUID    NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    channel_type TEXT    NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+    channel_type TEXT    NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat', 'otp')),
     enabled      BOOLEAN NOT NULL DEFAULT TRUE,
 
     PRIMARY KEY (workspace_id, channel_type)
@@ -141,7 +142,7 @@ CREATE TABLE workspace_channels (
 CREATE TABLE providers (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT        NOT NULL,
-    channel_type TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+    channel_type TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat', 'otp')),
     status       TEXT        NOT NULL DEFAULT 'active'
                              CHECK (status IN ('active', 'not_supported', 'blocked')),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -189,7 +190,7 @@ CREATE TABLE integrations (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id     UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     provider_id      UUID        NOT NULL,
-    channel_type     TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+    channel_type     TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat', 'otp')),
     encrypted_config BYTEA       NOT NULL,
     status           TEXT        NOT NULL DEFAULT 'connected'
                                  CHECK (status IN ('connected', 'error', 'disconnected')),
@@ -244,7 +245,7 @@ CREATE TABLE message_request_logs (
     id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     api_key_id   UUID         REFERENCES api_keys(id) ON DELETE SET NULL,
-    channel_type TEXT         NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+    channel_type TEXT         NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat', 'otp')),
     provider_name VARCHAR(64),
     http_method  VARCHAR(16)  NOT NULL,
     status_code  SMALLINT     NOT NULL,
@@ -276,7 +277,7 @@ CREATE TABLE templates (
     name         VARCHAR(255) NOT NULL,
     unique_key   VARCHAR(255) NOT NULL,
     channel_type TEXT         NOT NULL DEFAULT 'email'
-                              CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+                              CHECK (channel_type IN ('email', 'sms', 'push', 'chat', 'otp')),
     subject      VARCHAR(512),
     content      TEXT         NOT NULL,
     category     VARCHAR(64),

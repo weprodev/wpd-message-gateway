@@ -102,15 +102,26 @@ func (h *PortalInboxHandler) HandleDeleteChatByID(c echo.Context) error {
 }
 
 func (h *PortalInboxHandler) HandleGetOTP(c echo.Context) error {
-	return c.JSON(http.StatusOK, []any{})
+	otps := h.store.OTPsForWorkspace(wid(c))
+	return c.JSON(http.StatusOK, otps)
 }
 
 func (h *PortalInboxHandler) HandleGetOTPByID(c echo.Context) error {
-	return c.JSON(http.StatusNotFound, map[string]string{"error": "otp not found"})
+	id := c.Param("id")
+	otp := h.store.OTPByIDForWorkspace(id, wid(c))
+	if otp == nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "otp not found"})
+	}
+	return c.JSON(http.StatusOK, otp)
 }
 
 func (h *PortalInboxHandler) HandleDeleteOTPByID(c echo.Context) error {
-	return c.JSON(http.StatusNotFound, map[string]string{"error": "otp not found"})
+	id := c.Param("id")
+	if !h.store.DeleteOTPByIDForWorkspace(id, wid(c)) {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "otp not found"})
+	}
+	h.broadcast(wid(c), "otp_deleted", id)
+	return c.NoContent(http.StatusNoContent)
 }
 
 // HandleClearAll removes in-memory messages for this workspace (emails).

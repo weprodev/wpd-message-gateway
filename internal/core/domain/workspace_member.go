@@ -6,7 +6,7 @@ import "time"
 type WorkspaceMember struct {
 	WorkspaceID string    `json:"workspace_id"`
 	UserID      string    `json:"user_id"`
-	Role        string    `json:"role"`
+	RoleID      string    `json:"role_id"`
 	JoinedAt    time.Time `json:"joined_at"`
 	UserEmail   string    `json:"user_email,omitempty"`
 	DisplayName string    `json:"display_name,omitempty"`

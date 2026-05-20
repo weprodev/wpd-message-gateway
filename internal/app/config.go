@@ -177,7 +177,11 @@ func (c *Config) parseProviderConfigs() {
 
 	for name, m := range c.Providers.OTP {
 		c.OTPProviders[name] = registry.OTPConfig{
-			CommonConfig: buildCommon(map[string]string(m)),
+			CommonConfig:   buildCommon(map[string]string(m)),
+			PhoneNumber:    m["phone_number"],
+			Code:           m["code"],
+			CodeLength:     m["code_length"],
+			SenderUsername: m["sender_username"],
 		}
 	}
 }
