@@ -2,9 +2,9 @@
   "platform": "macos",
   "default_branch": "develop",
   "tools": {
-    "default": { "tools": ["cursor"], "model": "gpt-5" },
-    "reviewer": { "tools": ["cursor"], "model": "gpt-5" },
-    "test_docs": { "tools": ["cursor"], "model": "gpt-5" }
+    "default": { "tools": ["antigravity"], "model": "gemini-3-pro-preview" },
+    "reviewer": { "tools": ["cursor"], "model": "gemini-3-pro-preview" },
+    "test_docs": { "tools": ["antigravity"], "model": "calude-sonnet" }
   },
-  "default_model": "gpt-5"
+  "default_model": "gemini-3-pro-preview"
 }
