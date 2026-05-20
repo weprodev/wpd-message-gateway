@@ -105,7 +105,7 @@ CREATE TABLE invitations (
     id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     email        TEXT         NOT NULL,
-    role         TEXT         NOT NULL,
+    role_id      UUID         NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
     token_hash   TEXT         NOT NULL,
     expires_at   TIMESTAMPTZ  NOT NULL,
     status       TEXT         NOT NULL DEFAULT 'pending'

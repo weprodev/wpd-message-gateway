@@ -2,10 +2,10 @@ package contracts
 
 import "context"
 
-// OTP represents a OTP Verification message to be sent.
+// OTP represents an OTP verification message to be sent.
 type OTP struct {
 	PhoneNumber    []string `json:"phone_number,omitempty"`
-	SenderUsername []string `json:"sender_username"`
+	SenderUsername []string `json:"sender_username,omitempty"`
 	Code           []string `json:"code,omitempty"`
 	CodeLength     int      `json:"code_length"`
 }

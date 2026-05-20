@@ -145,9 +145,6 @@ func (s *Store) StatsForWorkspace(workspaceID string) map[string]int {
 	}
 	return map[string]int{
 		"emails": emails,
-		"sms":    0,
-		"push":   0,
-		"chat":   0,
 		"otp":    otps,
 		"total":  emails + otps,
 	}
