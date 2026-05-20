@@ -4,7 +4,7 @@
   "tools": {
     "default": { "tools": ["antigravity"], "model": "gemini-3-pro-preview" },
     "reviewer": { "tools": ["cursor"], "model": "gemini-3-pro-preview" },
-    "test_docs": { "tools": ["antigravity"], "model": "calude-sonnet" }
+    "test_docs": { "tools": ["antigravity"], "model": "claude-sonnet" }
   },
   "default_model": "gemini-3-pro-preview"
 }
