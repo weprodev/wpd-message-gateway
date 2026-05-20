@@ -107,7 +107,7 @@ func (r *APIKeyRepository) ListByWorkspace(ctx context.Context, workspaceID stri
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.APIKey
+	out := make([]domain.APIKey, 0)
 	for rows.Next() {
 		var key domain.APIKey
 		var lastUsed, exp sql.NullTime

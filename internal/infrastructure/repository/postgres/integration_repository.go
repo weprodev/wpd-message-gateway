@@ -86,7 +86,7 @@ func (r *IntegrationRepository) ListByWorkspace(ctx context.Context, workspaceID
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.Integration
+	out := make([]domain.Integration, 0)
 	for rows.Next() {
 		var intg domain.Integration
 		var enc []byte

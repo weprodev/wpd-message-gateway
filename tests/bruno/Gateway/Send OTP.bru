@@ -1,0 +1,40 @@
+meta {
+  name: Send OTP
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/otp
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: demo-client-id
+  password: demo-secret
+}
+
+headers {
+  X-Workspace-Key: {{workspaceKey}}
+}
+
+body:json {
+  {
+    "phone_number": "+123456789",
+    "sender_username": "Solaris",
+    "code": "895663",
+    "code_length": 6
+  }
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return non-empty message ID", function() {
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.id.length).to.be.greaterThan(0);
+  });
+}

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
@@ -61,6 +60,9 @@ type pushSenderCache = providerCache[port.PushSender]
 
 // chatSenderCache resolves (and caches) port.ChatSenders from integrations.
 type chatSenderCache = providerCache[port.ChatSender]
+
+// otpSenderCache resolves (and caches) port.OTPSenders from integrations.
+type otpSenderCache = providerCache[port.OTPSender]
 
 // resolveEmailSender returns a cached or newly constructed EmailSender for the integration.
 func resolveEmailSender(cache *emailSenderCache, intg *domain.Integration) (port.EmailSender, error) {
@@ -146,5 +148,23 @@ func resolveChatSender(cache *chatSenderCache, intg *domain.Integration) (port.C
 	return sender, nil
 }
 
-// ensure time is used (for cacheKey.updatedAt type alignment).
-var _ = time.Now
+// resolveOTPSender returns a cached or newly constructed OTPSender.
+func resolveOTPSender(cache *otpSenderCache, intg *domain.Integration) (port.OTPSender, error) {
+	if s, ok := cache.get(intg); ok {
+		return s, nil
+	}
+	factory, err := registry.GetOTPFactory(intg.ProviderName)
+	if err != nil {
+		return nil, fmt.Errorf("provider factory: %w", err)
+	}
+	var cfg registry.OTPConfig
+	if err := json.Unmarshal(intg.Config, &cfg); err != nil {
+		return nil, fmt.Errorf("parse integration config: %w", err)
+	}
+	sender, err := factory(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("init OTP provider %q: %w", intg.ProviderName, err)
+	}
+	cache.set(intg, sender)
+	return sender, nil
+}

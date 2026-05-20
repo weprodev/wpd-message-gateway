@@ -11,7 +11,7 @@
   <a href="https://github.com/weprodev/wpd-message-gateway/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 </p>
 <p align="center">
-  <strong>A unified Go library and HTTP API for sending Email, SMS, Push, and Chat messages.</strong>
+  <strong>A unified Go library and HTTP API for sending Email, SMS, Push, Chat and OTP messages.</strong>
 
 One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
 
@@ -114,7 +114,7 @@ Building applications that send messages across multiple channels is complex. Yo
 
 **Message Gateway provides:**
 
-- **Unified API** — Email, SMS, Push, and Chat through a single, consistent interface
+- **Unified API** — Email, SMS, Push, Chat, and OTP through a single, consistent interface
 - **Provider abstraction** — Switch from Mailgun to SendGrid with a config change—no code changes
 - **DB-first config** — In server mode, all provider credentials live in PostgreSQL, managed via the Portal UI
 - **Workspace isolation** — Multiple workspaces, each with its own providers, API keys, templates, and members
@@ -131,6 +131,8 @@ Building applications that send messages across multiple channels is complex. Yo
 | **SMS**   | Text to mobile numbers                | Memory (Twilio planned)   |
 | **Push**  | Mobile and web notifications          | Memory (Firebase planned) |
 | **Chat**  | Slack, WhatsApp, Telegram             | Memory (planned)          |
+| **OTP**   | Slack, WhatsApp, Telegram             | Memory (planned)          |
+
 
 ---
 
@@ -186,7 +188,7 @@ wpd-message-gateway/
 │   ├── presentation/    # HTTP router, handlers, middleware
 │   └── registry/        # Provider factory registry (self-registration via init)
 ├── pkg/                 # Public packages (contracts, gateway SDK, auth, encryption)
-│   ├── contracts/       # Email, SMS, Push, Chat types
+│   ├── contracts/       # Email, SMS, Push, Chat, OTP types
 │   ├── gateway/         # Embedded Go SDK — gateway.New()
 │   ├── auth/            # Password hashing (portal)
 │   └── encryption/      # AES helpers

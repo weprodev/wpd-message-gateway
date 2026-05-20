@@ -121,7 +121,7 @@ gw.SendEmail(ctx, &contracts.Email{
 │  │   Router    │   │  PortalHandler  │  │  GatewayHandler │     │
 │  │             │   │  (auth, WS mgmt)│  │  (send email,   │     │
 │  └─────────────┘   │  InboxHandler   │  │   sms, push,    │     │
-│                    │  (captured msgs)│  │   chat)         │     │
+│                    │  (captured msgs)│  │   chat, otp)    │     │
 │                    └────────┬────────┘  └────────┬────────┘     │
 └─────────────────────────────┼────────────────────┼──────────────┘
                               │                    │
@@ -136,14 +136,14 @@ gw.SendEmail(ctx, &contracts.Email{
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │   GatewayService                                         │   │
-│  │   SendEmail() · SendSMS() · SendPush() · SendChat()      │   │
-│  │   Reads dispatch_mode from workspace_settings            │   │
+│  │   SendEmail() · SendSMS() · SendPush() · SendChat()   ·  │   │
+│  │   SendOTP() Reads dispatch_mode from workspace_setting   │   │
 │  │   Reads provider credentials from integrations table     │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │   Ports (Interfaces)                                     │   │
-│  │   EmailSender · SMSSender · PushSender · ChatSender      │   │
-│  │   Repository interfaces for all DB entities              │   │
+│  │   EmailSender · SMSSender · PushSender · ChatSender  ·   │   │
+│  │   OTPSender Repository interfaces for all DB entities    │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └──────────────────────────────┬──────────────────────────────────┘
                                │ implements
@@ -228,7 +228,7 @@ This doc intentionally does **not** duplicate full column lists.
 
 1. **Open Portal** → select workspace
 2. **Go to Integrations** → Add Integration
-3. **Select channel** (Email, SMS, Push, Chat) and **provider** (Mailgun, etc.)
+3. **Select channel** (Email, SMS, Push, Chat, OTP) and **provider** (Mailgun, etc.)
 4. **Enter credentials** — stored AES-encrypted in `integrations` table
 5. **Set dispatch mode** in Settings → `memory_only` | `provider_only` | `memory_and_provider`
 
@@ -384,7 +384,7 @@ wpd-message-gateway/
 │   ├── auth/                # Hash utilities (shared between SDK and server)
 │   ├── encryption/          # AES encryption (for DB-stored provider config)
 │   └── gateway/             # Embedded SDK — gateway.New() for pure Go usage
-│       ├── gateway.go       # Gateway struct, SendEmail/SMS/Push/Chat
+│       ├── gateway.go       # Gateway struct, SendEmail/SMS/Push/Chat/OTP
 │       ├── config.go        # Config struct + New() constructor
 │       └── errors.go
 │
@@ -413,7 +413,7 @@ In server mode, provider credentials (Mailgun API keys, etc.) are stored **encry
 Ports define **capabilities** — the "What" (Send Email), not the "How" (using Mailgun API).
 
 - **Location**: `internal/core/port/`
-- **Interfaces**: `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`
+- **Interfaces**: `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`, `OTPSneder`
 - **Benefit**: Providers are interchangeable — any implementation that satisfies the interface works
 
 ### 4. Provider Self-Registration
@@ -463,7 +463,7 @@ The React Portal UI is **always enabled** when running the server. It serves as:
 | **Single Responsibility** | Each provider handles one vendor. GatewayService handles routing. |
 | **Open/Closed** | Add new providers without modifying existing code. |
 | **Liskov Substitution** | Any `EmailSender` implementation works interchangeably. |
-| **Interface Segregation** | Separate interfaces for Email, SMS, Push, Chat. |
+| **Interface Segregation** | Separate interfaces for Email, SMS, Push, Chat, OTP. |
 | **Dependency Inversion** | Core depends on abstractions (ports), not implementations. |
 
 ### Other Principles

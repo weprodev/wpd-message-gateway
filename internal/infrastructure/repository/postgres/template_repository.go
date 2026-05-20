@@ -103,7 +103,7 @@ func (r *TemplateRepository) ListByWorkspace(ctx context.Context, workspaceID st
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.Template
+	out := make([]domain.Template, 0)
 	for rows.Next() {
 		var t domain.Template
 		var subject, category sql.NullString

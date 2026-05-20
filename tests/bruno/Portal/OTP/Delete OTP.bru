@@ -1,0 +1,24 @@
+meta {
+  name: Delete OTP
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/inbox/otp/{{otpId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{portalJwt}}
+  X-Api-Client-Id: {{apiClientId}}
+  X-Api-Client-Secret: {{apiSecret}}
+}
+
+
+tests {
+  test("should return 204", function() {
+    expect(res.status).to.equal(204);
+  });
+}
