@@ -287,12 +287,13 @@ result, err := gw.SendChat(ctx, &contracts.ChatMessage{
 
 ### Send Endpoints (API Key auth required)
 
-| Method | Endpoint | Auth |
-|--------|----------|------|
+| Method | Endpoint  |             Auth            |
+|--------|-----------|-----------------------------|
 | POST | `/v1/email` | API key + `X-Workspace-Key` |
-| POST | `/v1/sms` | API key + `X-Workspace-Key` |
-| POST | `/v1/push` | API key + `X-Workspace-Key` |
-| POST | `/v1/chat` | API key + `X-Workspace-Key` |
+| POST | `/v1/sms`   | API key + `X-Workspace-Key` |
+| POST | `/v1/push`  | API key + `X-Workspace-Key` |
+| POST | `/v1/chat`  | API key + `X-Workspace-Key` |
+| POST | `/v1/otp`   | API key + `X-Workspace-Key` |
 
 ### Portal Endpoints (JWT auth required)
 

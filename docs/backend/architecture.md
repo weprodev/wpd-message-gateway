@@ -156,7 +156,8 @@ gw.SendEmail(ctx, &contracts.Email{
 │  │  ─────────────────  │   │  ──────────────────────────── │    │
 │  │  memory/            │   │  postgres/                    │    │
 │  │  mailgun/           │   │    WorkspaceRepository        │    │
-│  │  (+ more via init())│   │    APIKeyRepository           │    │
+│  │  telegram/          │   │    APIKeyRepository           │    │
+│  │  (+ more via init())│   │    IntegrationRepository      │    │
 │  └──────────┬──────────┘   │    IntegrationRepository      │    │
 │             │              │    ... (all entities)         │    │
 │    ┌────────▼──────┐       └───────────────────────────────┘    │
@@ -364,6 +365,7 @@ wpd-message-gateway/
 │   ├── infrastructure/      # DB + provider adapters
 │   │   ├── provider/
 │   │   │   ├── mailgun/     # Mailgun email provider
+│   │   │   ├── telegram/    # Telegram OTP provider
 │   │   │   └── memory/      # In-memory capture (dev/testing)
 │   │   └── repository/
 │   │       └── postgres/    # All PostgreSQL repository implementations

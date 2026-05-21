@@ -6,4 +6,5 @@ import (
 	// Built-in providers
 	_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
 	_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+	_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/telegram"
 )

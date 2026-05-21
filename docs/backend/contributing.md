@@ -212,6 +212,10 @@ internal/infrastructure/provider/
 │   ├── mailgun.go      # Provider implementation
 │   └── register.go     # init() self-registration
 │
+├── telegram/
+│   ├── telegram.go     # OTP provider implementation
+│   └── register.go     # init() self-registration
+│
 ├── memory/             # Built-in dev/test capture provider
 │   ├── store.go        # Shared in-process message store
 │   ├── email.go        # Memory email provider

@@ -13,7 +13,7 @@
 <p align="center">
   <strong>A unified Go library and HTTP API for sending Email, SMS, Push, Chat and OTP messages.</strong>
 
-One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
+One interface, multiple providers. Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, Telegram, and more without changing a single line of application code.
 
 </p>
 
@@ -125,13 +125,13 @@ Building applications that send messages across multiple channels is complex. Yo
 
 ## Supported Message Types
 
-| Type      | Description                           | Providers                 |
-| --------- | ------------------------------------- | ------------------------- |
-| **Email** | HTML, plain text, CC/BCC, attachments | Mailgun, Memory           |
-| **SMS**   | Text to mobile numbers                | Memory (Twilio planned)   |
-| **Push**  | Mobile and web notifications          | Memory (Firebase planned) |
-| **Chat**  | Slack, WhatsApp, Telegram             | Memory (planned)          |
-| **OTP**   | Slack, WhatsApp, Telegram             | Memory (planned)          |
+| Type      | Description                               | Providers                 |
+| --------- | ----------------------------------------- | ------------------------- |
+| **Email** | HTML, plain text, CC/BCC, attachments     | Mailgun, Memory           |
+| **SMS**   | Text to mobile numbers                    | Memory (Twilio planned)   |
+| **Push**  | Mobile and web notifications              | Memory (Firebase planned) |
+| **Chat**  | Slack, WhatsApp, Telegram                 | Memory (planned)          |
+| **OTP**   | Verification codes via SMS, Telegram      | Memory, Telegram          |
 
 
 ---

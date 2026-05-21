@@ -45,15 +45,15 @@ func (r *WorkspaceMemberRepository) Remove(ctx context.Context, workspaceID, use
 }
 
 func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, userID string) (string, error) {
-	var roleID string
+	var role string
 	err := r.client.GetDB(ctx).QueryRowContext(ctx,
-		`SELECT role_id FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
+		`SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
 		workspaceID, userID,
-	).Scan(&roleID)
+	).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("workspace member workspace=%s user=%s: %w", workspaceID, userID, port.ErrNotFound)
 	}
-	return roleID, err
+	return role, err
 }
 
 func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error) {

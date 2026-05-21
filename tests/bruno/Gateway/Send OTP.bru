@@ -11,8 +11,8 @@ post {
 }
 
 auth:basic {
-  username: demo-client-id
-  password: demo-secret
+  username: {{apiClientId}}
+  password: {{apiSecret}}
 }
 
 headers {
@@ -21,9 +21,7 @@ headers {
 
 body:json {
   {
-    "phone_number": "+123456789",
-    "sender_username": "Solaris",
-    "code": "895663",
+    "phone_number": ["+1234567890"],
     "code_length": 6
   }
 }
