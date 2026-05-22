@@ -7,6 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/mailgun/mailgun-go/v4 v4.23.0
+	github.com/nyaruka/phonenumbers v1.7.4
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -21,6 +22,7 @@ require (
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 )
 
 require (

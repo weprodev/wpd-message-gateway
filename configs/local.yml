@@ -52,4 +52,4 @@ providers:
   otp:
     memory: {}
     telegram:
-      api_key: "${TELEGRAM_BOT_API_KEY}"  # Set via environment variable
+      api_key: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"

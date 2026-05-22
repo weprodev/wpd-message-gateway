@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/nyaruka/phonenumbers"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
@@ -55,6 +56,17 @@ func (p *Provider) Name() string {
 
 // Send sends an OTP via Telegram Gateway API.
 func (p *Provider) Send(ctx context.Context, otp *contracts.OTP) (*contracts.SendResult, error) {
+	for i, phone := range otp.PhoneNumber {
+		num, err := phonenumbers.Parse(phone, "")
+		if err != nil {
+			return nil, fmt.Errorf("Failed to Parse Phone Number: %s", err)
+		}
+		if !phonenumbers.IsValidNumber(num) {
+			return nil, fmt.Errorf("Invalid Phone Number")
+		}
+		otp.PhoneNumber[i] = phonenumbers.Format(num, phonenumbers.E164)
+	}
+
 	jsonData, err := json.Marshal(otp)
 	if err != nil {
 		return nil, fmt.Errorf("telegram: %w", err)
