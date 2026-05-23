@@ -142,6 +142,28 @@ func (s *GatewayService) SendOTP(ctx context.Context, workspaceID string, otp *c
 	)
 }
 
+// CheckOTPStatus queries the delivery status of a previously sent OTP message
+// identified by its request_id. It resolves the workspace's active OTP integration
+// and delegates to the provider's CheckStatus if supported.
+func (s *GatewayService) CheckOTPStatus(ctx context.Context, workspaceID, requestID string) (*contracts.VerificationStatus, error) {
+	intg, err := s.activeIntegration(ctx, workspaceID, channelOTP)
+	if err != nil {
+		return nil, err
+	}
+
+	sender, err := resolveOTPSender(s.otpCache, intg)
+	if err != nil {
+		return nil, err
+	}
+
+	checker, ok := sender.(port.OTPStatusChecker)
+	if !ok {
+		return nil, fmt.Errorf("OTP provider %q does not support status checking", intg.ProviderName)
+	}
+
+	return checker.CheckStatus(ctx, requestID)
+}
+
 // dispatch is the single entry point for all channel dispatch logic.
 // It applies the workspace dispatch mode and calls the appropriate fn(s).
 //

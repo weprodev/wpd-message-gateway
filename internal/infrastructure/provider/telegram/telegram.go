@@ -35,7 +35,8 @@ type Provider struct {
 }
 
 // Compile-time interface verification.
-var _ port.OTPSender = (*Provider)(nil)
+var _ port.OTPSender        = (*Provider)(nil)
+var _ port.OTPStatusChecker = (*Provider)(nil)
 
 // New creates a new Telegram OTP provider.
 func New(cfg Config) (*Provider, error) {
@@ -184,6 +185,93 @@ func (p *Provider) sendToOne(ctx context.Context, phone, senderUsername string, 
 		PhoneNumber: phone,
 		RequestID:   id,
 		StatusCode:  resp.StatusCode,
+	}, nil
+}
+
+// CheckStatus queries the Telegram Gateway API for the delivery status of a
+// previously sent verification message identified by its request_id.
+func (p *Provider) CheckStatus(ctx context.Context, requestID string) (*contracts.VerificationStatus, error) {
+	body := map[string]interface{}{
+		"request_id": requestID,
+	}
+
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"checkVerificationStatus", bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	var rawResp map[string]interface{}
+	if err := json.Unmarshal(respBody, &rawResp); err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	if ok, _ := rawResp["ok"].(bool); !ok {
+		errMsg, _ := rawResp["error"].(string)
+		return nil, fmt.Errorf("telegram: %s", errMsg)
+	}
+
+	result, _ := rawResp["result"].(map[string]interface{})
+	id, _ := result["request_id"].(string)
+	phone, _ := result["phone_number"].(string)
+	requestCost, _ := result["request_cost"].(float64)
+
+	var isRefunded *bool
+	if v, ok := result["is_refunded"].(bool); ok {
+		isRefunded = &v
+	}
+
+	var remainingBalance *float64
+	if v, ok := result["remaining_balance"].(float64); ok {
+		remainingBalance = &v
+	}
+
+	var deliveryStatus *contracts.DeliveryStatus
+	if ds, ok := result["delivery_status"].(map[string]interface{}); ok {
+		dsStatus, _ := ds["status"].(string)
+		dsUpdatedAt, _ := ds["last_updated_at"].(float64)
+		deliveryStatus = &contracts.DeliveryStatus{
+			Status:        dsStatus,
+			LastUpdatedAt: int64(dsUpdatedAt),
+		}
+	}
+
+	var verificationProcess *contracts.VerificationProcessStatus
+	if vs, ok := result["verification_status"].(map[string]interface{}); ok {
+		vsStatus, _ := vs["status"].(string)
+		vsVerifiedAt, _ := vs["verified_at"].(float64)
+		verificationProcess = &contracts.VerificationProcessStatus{
+			Status:     vsStatus,
+			VerifiedAt: int64(vsVerifiedAt),
+		}
+	}
+
+	return &contracts.VerificationStatus{
+		RequestID:          id,
+		PhoneNumber:        phone,
+		RequestCost:        requestCost,
+		IsRefunded:         isRefunded,
+		RemainingBalance:   remainingBalance,
+		DeliveryStatus:     deliveryStatus,
+		VerificationStatus: verificationProcess,
 	}, nil
 }
 

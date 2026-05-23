@@ -98,6 +98,7 @@ func (rt *Router) Setup() *echo.Echo {
 	v1.POST("/push", rt.gatewayHandler.HandleSendPush)
 	v1.POST("/chat", rt.gatewayHandler.HandleSendChat)
 	v1.POST("/otp", rt.gatewayHandler.HandleSendOTP)
+	v1.GET("/otp/status/:requestID", rt.gatewayHandler.HandleCheckOTPStatus)
 
 	api := e.Group("/api/v1")
 

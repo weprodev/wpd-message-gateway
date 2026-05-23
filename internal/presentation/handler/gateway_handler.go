@@ -70,6 +70,45 @@ func (h *GatewayHandler) HandleSendOTP(c echo.Context) error {
 	})
 }
 
+// HandleCheckOTPStatus handles GET /v1/otp/status/:requestID.
+func (h *GatewayHandler) HandleCheckOTPStatus(c echo.Context) error {
+	start := time.Now()
+	ctx := c.Request().Context()
+	workspaceID := middleware.GetWorkspaceID(ctx)
+	apiKeyID := middleware.GetAPIKeyID(ctx)
+	requestID := c.Param("requestID")
+
+	ctx = logger.WithWorkspace(ctx, workspaceID, apiKeyID)
+	ctx = logger.WithChannel(ctx, "otp")
+
+	if workspaceID == "" {
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusUnauthorized, c.Path(), start, "missing workspace context", "")
+		return c.JSON(http.StatusUnauthorized, errorBody("missing workspace context"))
+	}
+
+	if requestID == "" {
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusBadRequest, c.Path(), start, "missing request_id", "")
+		return c.JSON(http.StatusBadRequest, errorBody("missing request_id"))
+	}
+
+	status, err := h.service.CheckOTPStatus(ctx, workspaceID, requestID)
+	if err != nil {
+		slog.ErrorContext(ctx, "check OTP status failed",
+			append(logger.Attrs(ctx), "error", err, "request_id", requestID)...)
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusInternalServerError, c.Path(), start, err.Error(), "")
+		return c.JSON(http.StatusInternalServerError, errorBody(err.Error()))
+	}
+
+	slog.InfoContext(ctx, "check OTP status ok",
+		append(logger.Attrs(ctx), "duration_ms", time.Since(start).Milliseconds(), "request_id", requestID, "delivery_status", deliveryStatusString(status.DeliveryStatus))...)
+	h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+		http.StatusOK, c.Path(), start, "", "")
+	return c.JSON(http.StatusOK, status)
+}
+
 // handleSend is the single DRY dispatcher for all channels.
 // It decodes the JSON body into dst, calls send, records the audit log, and
 // returns the appropriate HTTP response.
@@ -147,6 +186,13 @@ func (h *GatewayHandler) recordLog(
 }
 
 func errorBody(msg string) map[string]string { return map[string]string{"error": msg} }
+
+func deliveryStatusString(ds *contracts.DeliveryStatus) string {
+	if ds == nil {
+		return "unknown"
+	}
+	return ds.Status
+}
 
 func providerFromResult(r *contracts.SendResult) string {
 	if r == nil || r.Meta == nil {
