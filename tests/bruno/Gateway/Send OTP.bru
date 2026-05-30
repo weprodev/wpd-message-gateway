@@ -5,9 +5,13 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/v1/otp
+  url: {{baseUrl}}/v1/otp/revoke
   body: json
   auth: basic
+}
+
+headers {
+  X-Workspace-Key: {{workspaceKey}}
 }
 
 auth:basic {
@@ -15,14 +19,9 @@ auth:basic {
   password: {{apiSecret}}
 }
 
-headers {
-  X-Workspace-Key: {{workspaceKey}}
-}
-
 body:json {
   {
-    "phone_number": ["+1234567890"],
-    "code_length": 6
+    "request_id": "178096435416219"
   }
 }
 
@@ -30,9 +29,8 @@ tests {
   test("should return 200", function() {
     expect(res.status).to.equal(200);
   });
-
-  test("should return non-empty message ID", function() {
-    expect(res.body.id).to.be.a("string");
-    expect(res.body.id.length).to.be.greaterThan(0);
+  
+  test("should return success boolean", function() {
+    expect(res.body.success).to.be.a("boolean");
   });
 }

@@ -142,6 +142,23 @@ func (g *Gateway) SendOTP(ctx context.Context, otp *contracts.OTP) (*contracts.S
 	return sender.Send(ctx, otp)
 }
 
+// RevokeOTP revokes a previously sent OTP message by request_id.
+// In server mode, delegates to the workspace's active OTP integration.
+func (g *Gateway) RevokeOTP(ctx context.Context, requestID string) (*contracts.SendResult, error) {
+	if g.svc != nil {
+		return g.svc.RevokeOTP(ctx, g.workspaceID, requestID)
+	}
+	sender, err := g.otpSender()
+	if err != nil {
+		return nil, err
+	}
+	revoker, ok := sender.(port.OTPRevoker)
+	if !ok {
+		return nil, fmt.Errorf("OTP provider %q does not support revocation", g.defaultOTP)
+	}
+	return revoker.Revoke(ctx, requestID)
+}
+
 func (g *Gateway) emailSender() (port.EmailSender, error) {
 	s, ok := g.emailSenders[g.defaultEmail]
 	if !ok {

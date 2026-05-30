@@ -164,6 +164,28 @@ func (s *GatewayService) CheckOTPStatus(ctx context.Context, workspaceID, reques
 	return checker.CheckStatus(ctx, requestID)
 }
 
+// RevokeOTP revokes a previously sent OTP verification message identified by
+// request_id. It resolves the workspace's active OTP integration and delegates
+// to the provider's Revoke if supported.
+func (s *GatewayService) RevokeOTP(ctx context.Context, workspaceID, requestID string) (*contracts.SendResult, error) {
+	intg, err := s.activeIntegration(ctx, workspaceID, channelOTP)
+	if err != nil {
+		return nil, err
+	}
+
+	sender, err := resolveOTPSender(s.otpCache, intg)
+	if err != nil {
+		return nil, err
+	}
+
+	revoker, ok := sender.(port.OTPRevoker)
+	if !ok {
+		return nil, fmt.Errorf("OTP provider %q does not support revocation", intg.ProviderName)
+	}
+
+	return revoker.Revoke(ctx, requestID)
+}
+
 // dispatch is the single entry point for all channel dispatch logic.
 // It applies the workspace dispatch mode and calls the appropriate fn(s).
 //

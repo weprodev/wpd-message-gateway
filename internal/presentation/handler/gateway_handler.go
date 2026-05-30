@@ -70,6 +70,53 @@ func (h *GatewayHandler) HandleSendOTP(c echo.Context) error {
 	})
 }
 
+// HandleRevokeOTP handles POST /v1/otp/revoke.
+func (h *GatewayHandler) HandleRevokeOTP(c echo.Context) error {
+	start := time.Now()
+	ctx := c.Request().Context()
+	workspaceID := middleware.GetWorkspaceID(ctx)
+	apiKeyID := middleware.GetAPIKeyID(ctx)
+
+	ctx = logger.WithWorkspace(ctx, workspaceID, apiKeyID)
+	ctx = logger.WithChannel(ctx, "otp")
+
+	if workspaceID == "" {
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusUnauthorized, c.Path(), start, "missing workspace context", "")
+		return c.JSON(http.StatusUnauthorized, errorBody("missing workspace context"))
+	}
+
+	var req struct {
+		RequestID string `json:"request_id"`
+	}
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusBadRequest, c.Path(), start, "invalid JSON body", "")
+		return c.JSON(http.StatusBadRequest, errorBody("invalid JSON body"))
+	}
+
+	if req.RequestID == "" {
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusBadRequest, c.Path(), start, "missing request_id", "")
+		return c.JSON(http.StatusBadRequest, errorBody("missing request_id"))
+	}
+
+	result, err := h.service.RevokeOTP(ctx, workspaceID, req.RequestID)
+	if err != nil {
+		slog.ErrorContext(ctx, "revoke OTP failed",
+			append(logger.Attrs(ctx), "error", err, "request_id", req.RequestID)...)
+		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+			http.StatusInternalServerError, c.Path(), start, err.Error(), "")
+		return c.JSON(http.StatusInternalServerError, errorBody(err.Error()))
+	}
+
+	slog.InfoContext(ctx, "revoke OTP ok",
+		append(logger.Attrs(ctx), "duration_ms", time.Since(start).Milliseconds(), "request_id", req.RequestID, "status_code", result.StatusCode)...)
+	h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
+		http.StatusOK, c.Path(), start, "", "")
+	return c.JSON(http.StatusOK, result)
+}
+
 // HandleCheckOTPStatus handles GET /v1/otp/status/:requestID.
 func (h *GatewayHandler) HandleCheckOTPStatus(c echo.Context) error {
 	start := time.Now()

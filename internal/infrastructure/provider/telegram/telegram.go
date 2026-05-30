@@ -37,6 +37,7 @@ type Provider struct {
 // Compile-time interface verification.
 var _ port.OTPSender        = (*Provider)(nil)
 var _ port.OTPStatusChecker = (*Provider)(nil)
+var _ port.OTPRevoker       = (*Provider)(nil)
 
 // New creates a new Telegram OTP provider.
 func New(cfg Config) (*Provider, error) {
@@ -272,6 +273,51 @@ func (p *Provider) CheckStatus(ctx context.Context, requestID string) (*contract
 		RemainingBalance:   remainingBalance,
 		DeliveryStatus:     deliveryStatus,
 		VerificationStatus: verificationProcess,
+	}, nil
+}
+
+// Revoke sends a revocation request for a previously sent verification message.
+func (p *Provider) Revoke(ctx context.Context, requestID string) (*contracts.SendResult, error) {
+	body := map[string]interface{}{
+		"request_id": requestID,
+	}
+
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"revokeVerificationMessage", bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	var rawResp map[string]interface{}
+	if err := json.Unmarshal(respBody, &rawResp); err != nil {
+		return nil, fmt.Errorf("telegram: %w", err)
+	}
+
+	if ok, _ := rawResp["ok"].(bool); !ok {
+		errMsg, _ := rawResp["error"].(string)
+		return nil, fmt.Errorf("telegram: %s", errMsg)
+	}
+	return &contracts.SendResult{
+		StatusCode: http.StatusOK,
+		Message:    "Revocation request received — message will be revoked only if not yet delivered or read",
 	}, nil
 }
 

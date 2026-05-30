@@ -17,3 +17,9 @@ type OTPSender interface {
 type OTPStatusChecker interface {
 	CheckStatus(ctx context.Context, requestID string) (*contracts.VerificationStatus, error)
 }
+
+// OTPRevoker is an optional interface that OTPSenders can implement
+// to support revoking a previously sent verification message by request_id.
+type OTPRevoker interface {
+	Revoke(ctx context.Context, requestID string) (*contracts.SendResult, error)
+}
