@@ -107,7 +107,7 @@ func (h *GatewayHandler) HandleRevokeOTP(c echo.Context) error {
 			append(logger.Attrs(ctx), "error", err, "request_id", req.RequestID)...)
 		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
 			http.StatusInternalServerError, c.Path(), start, err.Error(), "")
-		return c.JSON(http.StatusInternalServerError, errorBody(err.Error()))
+		return c.JSON(http.StatusInternalServerError, errorBody("internal server error"))
 	}
 
 	slog.InfoContext(ctx, "revoke OTP ok",
@@ -146,7 +146,7 @@ func (h *GatewayHandler) HandleCheckOTPStatus(c echo.Context) error {
 			append(logger.Attrs(ctx), "error", err, "request_id", requestID)...)
 		h.recordLog(ctx, workspaceID, apiKeyID, "otp", c.Request().Method,
 			http.StatusInternalServerError, c.Path(), start, err.Error(), "")
-		return c.JSON(http.StatusInternalServerError, errorBody(err.Error()))
+		return c.JSON(http.StatusInternalServerError, errorBody("internal server error"))
 	}
 
 	slog.InfoContext(ctx, "check OTP status ok",
@@ -193,7 +193,7 @@ func (h *GatewayHandler) handleSend(
 			append(logger.Attrs(ctx), "error", err)...)
 		h.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
 			http.StatusInternalServerError, c.Path(), start, err.Error(), providerFromResult(result))
-		return c.JSON(http.StatusInternalServerError, errorBody(err.Error()))
+		return c.JSON(http.StatusInternalServerError, errorBody("internal server error"))
 	}
 
 	slog.InfoContext(ctx, "send ok",

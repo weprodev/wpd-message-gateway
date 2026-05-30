@@ -1,6 +1,6 @@
 module github.com/weprodev/wpd-message-gateway
 
-go 1.26.1
+go 1.26.3
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -8,6 +8,7 @@ require (
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/mailgun/mailgun-go/v4 v4.23.0
 	github.com/nyaruka/phonenumbers v1.7.4
+	golang.org/x/sync v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -22,7 +23,6 @@ require (
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 

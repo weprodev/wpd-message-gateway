@@ -54,7 +54,6 @@ type ChatConfig struct {
 type OTPConfig struct {
 	CommonConfig
 	PhoneNumber    string
-	Code           string
 	CodeLength     string
 	SenderUsername string
 }

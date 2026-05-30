@@ -177,8 +177,8 @@ audit:
 	@printf "$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🎨 Formatting Go...$(RESET)\n"
-	@find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' | xargs goimports -local github.com/weprodev/wpd-message-gateway -w 2>/dev/null || \
-		find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' | xargs gofmt -w
+	@find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' -not -path '*/node_modules/*' | xargs goimports -local github.com/weprodev/wpd-message-gateway -w 2>/dev/null || \
+		find . -name '*.go' -not -path './.history/*' -not -path './vendor/*' -not -path '*/node_modules/*' | xargs gofmt -w
 	@go mod tidy
 	@printf "$(GREEN)✅ Go formatted!$(RESET)\n"
 	@printf "\n"

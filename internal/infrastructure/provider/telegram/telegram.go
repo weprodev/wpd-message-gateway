@@ -35,9 +35,9 @@ type Provider struct {
 }
 
 // Compile-time interface verification.
-var _ port.OTPSender        = (*Provider)(nil)
+var _ port.OTPSender = (*Provider)(nil)
 var _ port.OTPStatusChecker = (*Provider)(nil)
-var _ port.OTPRevoker       = (*Provider)(nil)
+var _ port.OTPRevoker = (*Provider)(nil)
 
 // New creates a new Telegram OTP provider.
 func New(cfg Config) (*Provider, error) {
@@ -63,10 +63,10 @@ func (p *Provider) Send(ctx context.Context, otp *contracts.OTP) (*contracts.Sen
 	for i, phone := range otp.PhoneNumber {
 		num, err := phonenumbers.Parse(phone, "")
 		if err != nil {
-			return nil, fmt.Errorf("Failed to Parse Phone Number: %s", err)
+			return nil, fmt.Errorf("telegram: parse phone number: %w", err)
 		}
 		if !phonenumbers.IsValidNumber(num) {
-			return nil, fmt.Errorf("Invalid Phone Number")
+			return nil, fmt.Errorf("telegram: invalid phone number")
 		}
 		otp.PhoneNumber[i] = phonenumbers.Format(num, phonenumbers.E164)
 	}
@@ -158,7 +158,7 @@ func (p *Provider) sendToOne(ctx context.Context, phone, senderUsername string, 
 	if err != nil {
 		return nil, fmt.Errorf("telegram: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -213,7 +213,7 @@ func (p *Provider) CheckStatus(ctx context.Context, requestID string) (*contract
 	if err != nil {
 		return nil, fmt.Errorf("telegram: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -299,7 +299,7 @@ func (p *Provider) Revoke(ctx context.Context, requestID string) (*contracts.Sen
 	if err != nil {
 		return nil, fmt.Errorf("telegram: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

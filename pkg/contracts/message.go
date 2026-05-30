@@ -30,13 +30,13 @@ type VerificationProcessStatus struct {
 
 // VerificationStatus represents the response from checkVerificationStatus.
 type VerificationStatus struct {
-	RequestID          string                      `json:"request_id"`
-	PhoneNumber        string                      `json:"phone_number,omitempty"`
-	RequestCost        float64                     `json:"request_cost"`
-	IsRefunded         *bool                       `json:"is_refunded,omitempty"`
-	RemainingBalance   *float64                    `json:"remaining_balance,omitempty"`
-	DeliveryStatus     *DeliveryStatus             `json:"delivery_status,omitempty"`
-	VerificationStatus *VerificationProcessStatus  `json:"verification_status,omitempty"`
+	RequestID          string                     `json:"request_id"`
+	PhoneNumber        string                     `json:"phone_number,omitempty"`
+	RequestCost        float64                    `json:"request_cost"`
+	IsRefunded         *bool                      `json:"is_refunded,omitempty"`
+	RemainingBalance   *float64                   `json:"remaining_balance,omitempty"`
+	DeliveryStatus     *DeliveryStatus            `json:"delivery_status,omitempty"`
+	VerificationStatus *VerificationProcessStatus `json:"verification_status,omitempty"`
 }
 
 // SendResult represents the result of sending a message.

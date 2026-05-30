@@ -1,0 +1,23 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  exclusions:
+    paths:
+      - frontend/node_modules
+      - node_modules
+      - .history
+      - vendor
+formatters:
+  enable:
+    - goimports
+  exclusions:
+    paths:
+      - frontend/node_modules
+      - node_modules
+      - .history
+      - vendor

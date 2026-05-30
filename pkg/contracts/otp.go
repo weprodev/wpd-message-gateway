@@ -6,7 +6,6 @@ import "context"
 type OTP struct {
 	PhoneNumber    []string `json:"phone_number,omitempty"`
 	SenderUsername []string `json:"sender_username,omitempty"`
-	Code           []string `json:"code,omitempty"`
 	CodeLength     int      `json:"code_length"`
 }
 

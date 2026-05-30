@@ -150,7 +150,7 @@ func TestSend(t *testing.T) {
 			CodeLength  int    `json:"code_length"`
 		}
 		srv := newTestServer(t, func(r *http.Request) (int, interface{}) {
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			return http.StatusOK, map[string]interface{}{
 				"ok": true,
 				"result": map[string]interface{}{
@@ -189,7 +189,7 @@ func TestSend(t *testing.T) {
 			SenderUsername string `json:"sender_username"`
 		}
 		srv := newTestServer(t, func(r *http.Request) (int, interface{}) {
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			return http.StatusOK, map[string]interface{}{
 				"ok": true,
 				"result": map[string]interface{}{
@@ -219,7 +219,7 @@ func TestSend(t *testing.T) {
 	t.Run("zero code_length omits field", func(t *testing.T) {
 		var req map[string]interface{}
 		srv := newTestServer(t, func(r *http.Request) (int, interface{}) {
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			return http.StatusOK, map[string]interface{}{
 				"ok": true,
 				"result": map[string]interface{}{
@@ -246,7 +246,7 @@ func TestSend(t *testing.T) {
 		reqCh := make(chan map[string]interface{}, 2)
 		srv := newTestServer(t, func(r *http.Request) (int, interface{}) {
 			var body map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&body)
+			_ = json.NewDecoder(r.Body).Decode(&body)
 			reqCh <- body
 			return http.StatusOK, map[string]interface{}{
 				"ok": true,
@@ -395,14 +395,14 @@ func TestCheckStatus(t *testing.T) {
 			RequestID string `json:"request_id"`
 		}
 		srv := newTestServer(t, func(r *http.Request) (int, interface{}) {
-			json.NewDecoder(r.Body).Decode(&reqBody)
+			_ = json.NewDecoder(r.Body).Decode(&reqBody)
 			return http.StatusOK, map[string]interface{}{
 				"ok": true,
 				"result": map[string]interface{}{
-					"request_id":       "req-123",
-					"phone_number":     "+12025550123",
-					"request_cost":     0.015,
-					"is_refunded":      false,
+					"request_id":        "req-123",
+					"phone_number":      "+12025550123",
+					"request_cost":      0.015,
+					"is_refunded":       false,
 					"remaining_balance": 99.985,
 					"delivery_status": map[string]interface{}{
 						"status":          "delivered",
@@ -510,7 +510,7 @@ func TestRevoke(t *testing.T) {
 			RequestID string `json:"request_id"`
 		}
 		srv := newTestServer(t, func(r *http.Request) (int, interface{}) {
-			json.NewDecoder(r.Body).Decode(&reqBody)
+			_ = json.NewDecoder(r.Body).Decode(&reqBody)
 			return http.StatusOK, map[string]interface{}{
 				"ok": true,
 			}

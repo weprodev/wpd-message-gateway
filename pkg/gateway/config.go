@@ -46,7 +46,6 @@ type ChatConfig struct {
 type OTPConfig struct {
 	CommonConfig
 	PhoneNumber    string
-	Code           string
 	CodeLength     string
 	SenderUsername string
 }
@@ -183,7 +182,6 @@ func toRegistryOTP(oc OTPConfig) registry.OTPConfig {
 	return registry.OTPConfig{
 		CommonConfig:   registry.CommonConfig{APIKey: oc.APIKey, APISecret: oc.APISecret, Region: oc.Region, BaseURL: oc.BaseURL},
 		PhoneNumber:    oc.PhoneNumber,
-		Code:           oc.Code,
 		CodeLength:     oc.CodeLength,
 		SenderUsername: oc.SenderUsername,
 	}

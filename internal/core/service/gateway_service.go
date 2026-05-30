@@ -205,7 +205,7 @@ func (s *GatewayService) dispatch(
 		if err != nil {
 			return nil, err
 		}
-		attachMeta(r, mode, channel, "")
+		attachMeta(r, mode, channel, "", "")
 		return r, nil
 
 	case domain.DispatchProviderOnly:
@@ -219,14 +219,14 @@ func (s *GatewayService) dispatch(
 			if err != nil {
 				return nil, err
 			}
-			attachMeta(r, mode, channel, intg.ID)
+			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			return r, nil
 		}
 		r, err := sendViaProvider(intg)
 		if err != nil {
 			return nil, err
 		}
-		attachMeta(r, mode, channel, intg.ID)
+		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 		return r, nil
 
 	case domain.DispatchMemoryAndProvider:
@@ -240,7 +240,7 @@ func (s *GatewayService) dispatch(
 			if err != nil {
 				return nil, err
 			}
-			attachMeta(r, mode, channel, intg.ID)
+			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			return r, nil
 		}
 		// Both paths: capture to inbox first (non-fatal), then send via provider.
@@ -255,7 +255,7 @@ func (s *GatewayService) dispatch(
 			}
 			provResult.Meta["inbox_message_id"] = inboxResult.ID
 		}
-		attachMeta(provResult, mode, channel, intg.ID)
+		attachMeta(provResult, mode, channel, intg.ID, intg.ProviderName)
 		return provResult, nil
 
 	default:
@@ -264,7 +264,7 @@ func (s *GatewayService) dispatch(
 		if err != nil {
 			return nil, err
 		}
-		attachMeta(r, domain.DispatchMemoryOnly, channel, "")
+		attachMeta(r, domain.DispatchMemoryOnly, channel, "", "")
 		return r, nil
 	}
 }
@@ -352,16 +352,19 @@ func (s *GatewayService) writeOTPToInbox(ctx context.Context, workspaceID string
 
 // attachMeta stamps standard dispatch metadata onto a result without allocating
 // if Meta is already populated.
-func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID string) {
+func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID, providerName string) {
 	if r == nil {
 		return
 	}
 	if r.Meta == nil {
-		r.Meta = make(map[string]string, 3)
+		r.Meta = make(map[string]string, 4)
 	}
 	r.Meta["dispatch_mode"] = string(mode)
 	r.Meta["channel"] = channel
 	if integrationID != "" {
 		r.Meta["integration_id"] = integrationID
+	}
+	if providerName != "" {
+		r.Meta["provider_name"] = providerName
 	}
 }

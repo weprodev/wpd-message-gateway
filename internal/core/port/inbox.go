@@ -23,7 +23,7 @@ type InboxWriter interface {
 
 	// WriteChat captures a chat message against workspaceID and returns an assigned ID.
 	WriteChat(ctx context.Context, workspaceID string, chat *contracts.ChatMessage) (id string, err error)
-	
+
 	// WriteOTP captures a otp verification message against workspaceID and returns an assigned ID.
 	WriteOTP(ctx context.Context, workspaceID string, otp *contracts.OTP) (id string, err error)
 }
