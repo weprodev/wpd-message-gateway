@@ -97,6 +97,9 @@ func (rt *Router) Setup() *echo.Echo {
 	v1.POST("/sms", rt.gatewayHandler.HandleSendSMS)
 	v1.POST("/push", rt.gatewayHandler.HandleSendPush)
 	v1.POST("/chat", rt.gatewayHandler.HandleSendChat)
+	v1.POST("/otp", rt.gatewayHandler.HandleSendOTP)
+	v1.GET("/otp/status/:requestID", rt.gatewayHandler.HandleCheckOTPStatus)
+	v1.POST("/otp/revoke", rt.gatewayHandler.HandleRevokeOTP)
 
 	api := e.Group("/api/v1")
 
@@ -152,6 +155,9 @@ func (rt *Router) Setup() *echo.Echo {
 		inboxGroup.GET("/chat", inbox.HandleGetChat)
 		inboxGroup.GET("/chat/:id", inbox.HandleGetChatByID)
 		inboxGroup.DELETE("/chat/:id", inbox.HandleDeleteChatByID)
+		inboxGroup.GET("/otp", inbox.HandleGetOTP)
+		inboxGroup.GET("/otp/:id", inbox.HandleGetOTPByID)
+		inboxGroup.DELETE("/otp/:id", inbox.HandleDeleteOTPByID)
 		inboxGroup.DELETE("/messages", inbox.HandleClearAll)
 		inboxGroup.GET("/events", inbox.HandleSSE)
 
@@ -161,6 +167,7 @@ func (rt *Router) Setup() *echo.Echo {
 		internal.POST("/sms", inbox.HandleIngestSMS)
 		internal.POST("/push", inbox.HandleIngestPush)
 		internal.POST("/chat", inbox.HandleIngestChat)
+		internal.POST("/otp", inbox.HandleIngestOTP)
 	}
 
 	return e

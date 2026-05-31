@@ -60,6 +60,7 @@ func logConfiguration(cfg *app.Config) {
 		"sms_provider", cfg.DefaultSMSProvider(),
 		"push_provider", cfg.DefaultPushProvider(),
 		"chat_provider", cfg.DefaultChatProvider(),
+		"otp_provider", cfg.DefaultOTPProvider(),
 	)
 }
 

@@ -21,6 +21,7 @@ type Config struct {
 	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
 	PushProviders  map[string]registry.PushConfig  `yaml:"-"`
 	ChatProviders  map[string]registry.ChatConfig  `yaml:"-"`
+	OTPProviders   map[string]registry.OTPConfig   `yaml:"-"`
 }
 
 // ServerConfig holds server configuration.
@@ -42,6 +43,7 @@ type ProviderConfig struct {
 	SMS      map[string]SMSConfigMap   `yaml:"sms"`
 	Push     map[string]PushConfigMap  `yaml:"push"`
 	Chat     map[string]ChatConfigMap  `yaml:"chat"`
+	OTP      map[string]OTPConfigMap   `yaml:"otp"`
 }
 
 // ProviderDefaults holds default provider names.
@@ -50,17 +52,20 @@ type ProviderDefaults struct {
 	SMS   string `yaml:"sms"`
 	Push  string `yaml:"push"`
 	Chat  string `yaml:"chat"`
+	OTP   string `yaml:"otp"`
 }
 
 type EmailConfigMap map[string]string
 type SMSConfigMap map[string]string
 type PushConfigMap map[string]string
 type ChatConfigMap map[string]string
+type OTPConfigMap map[string]string
 
 func (c *Config) DefaultEmailProvider() string { return c.Providers.Defaults.Email }
 func (c *Config) DefaultSMSProvider() string   { return c.Providers.Defaults.SMS }
 func (c *Config) DefaultPushProvider() string  { return c.Providers.Defaults.Push }
 func (c *Config) DefaultChatProvider() string  { return c.Providers.Defaults.Chat }
+func (c *Config) DefaultOTPProvider() string   { return c.Providers.Defaults.OTP }
 
 // LoadConfig loads configuration from a YAML file.
 func LoadConfig(path string) (*Config, error) {
@@ -78,6 +83,7 @@ func LoadConfig(path string) (*Config, error) {
 		SMSProviders:   make(map[string]registry.SMSConfig),
 		PushProviders:  make(map[string]registry.PushConfig),
 		ChatProviders:  make(map[string]registry.ChatConfig),
+		OTPProviders:   make(map[string]registry.OTPConfig),
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -117,6 +123,8 @@ func (c *Config) applyEnvOverrides() {
 			c.Providers.Defaults.Push = val
 		case "MESSAGE_DEFAULT_CHAT_PROVIDER":
 			c.Providers.Defaults.Chat = val
+		case "MESSAGE_DEFAULT_OTP_PROVIDER":
+			c.Providers.Defaults.OTP = val
 		case "MESSAGE_JWT_SECRET":
 			c.Portal.JWTSecret = val
 		}
@@ -164,6 +172,15 @@ func (c *Config) parseProviderConfigs() {
 			CommonConfig: buildCommon(map[string]string(m)),
 			FromPhone:    m["from_phone"],
 			WebhookURL:   m["webhook_url"],
+		}
+	}
+
+	for name, m := range c.Providers.OTP {
+		c.OTPProviders[name] = registry.OTPConfig{
+			CommonConfig:   buildCommon(map[string]string(m)),
+			PhoneNumber:    m["phone_number"],
+			CodeLength:     m["code_length"],
+			SenderUsername: m["sender_username"],
 		}
 	}
 }

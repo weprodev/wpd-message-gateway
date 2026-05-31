@@ -20,6 +20,7 @@ providers:
     sms: memory
     push: memory
     chat: memory
+    otp: memory
   
   # Provider configurations
   email:
@@ -48,3 +49,7 @@ providers:
     # slack:
     #   webhook_url: "https://hooks.slack.com/services/..."
 
+  otp:
+    memory: {}
+    # telegram:
+    #   api_key: "${TELEGRAM_BOT_API_KEY}"

@@ -52,6 +52,14 @@ type StoredChat struct {
 	Chat      *contracts.ChatMessage `json:"chat"`
 }
 
+// StoredOTP wraps an OTP with metadata for storage.
+type StoredOTP struct {
+	ID          string         `json:"id"`
+	WorkspaceID string         `json:"workspace_id,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	OTP         *contracts.OTP `json:"otp"`
+}
+
 // Store implements an in-memory message store for all message types.
 type Store struct {
 	mu     sync.RWMutex
@@ -59,6 +67,7 @@ type Store struct {
 	sms    []*StoredSMS
 	pushes []*StoredPush
 	chats  []*StoredChat
+	otps   []*StoredOTP
 }
 
 // NewStore creates a new in-memory store.
@@ -68,6 +77,7 @@ func NewStore() *Store {
 		sms:    make([]*StoredSMS, 0),
 		pushes: make([]*StoredPush, 0),
 		chats:  make([]*StoredChat, 0),
+		otps:   make([]*StoredOTP, 0),
 	}
 }
 
@@ -118,36 +128,46 @@ func (s *Store) DeleteEmailByIDForWorkspace(id, workspaceID string) bool {
 	return false
 }
 
-// StatsForWorkspace returns counts for messages belonging to workspace (email only until SMS/Push/Chat are tagged).
+// StatsForWorkspace returns counts for messages belonging to workspace.
 func (s *Store) StatsForWorkspace(workspaceID string) map[string]int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	n := 0
+	emails, otps := 0, 0
 	for _, e := range s.emails {
 		if e != nil && e.WorkspaceID == workspaceID {
-			n++
+			emails++
+		}
+	}
+	for _, o := range s.otps {
+		if o != nil && o.WorkspaceID == workspaceID {
+			otps++
 		}
 	}
 	return map[string]int{
-		"emails": n,
-		"sms":    0,
-		"push":   0,
-		"chat":   0,
-		"total":  n,
+		"emails": emails,
+		"otp":    otps,
+		"total":  emails + otps,
 	}
 }
 
-// ClearWorkspace removes in-memory messages for a single workspace (emails only for now).
+// ClearWorkspace removes in-memory messages for a single workspace.
 func (s *Store) ClearWorkspace(workspaceID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	kept := s.emails[:0]
+	emails := s.emails[:0]
 	for _, e := range s.emails {
 		if e == nil || e.WorkspaceID != workspaceID {
-			kept = append(kept, e)
+			emails = append(emails, e)
 		}
 	}
-	s.emails = kept
+	s.emails = emails
+	otps := s.otps[:0]
+	for _, o := range s.otps {
+		if o == nil || o.WorkspaceID != workspaceID {
+			otps = append(otps, o)
+		}
+	}
+	s.otps = otps
 }
 
 // EmailByID returns a stored email by its ID, or nil if not found.
@@ -305,11 +325,90 @@ func (s *Store) AddChat(stored *StoredChat) {
 	s.chats = append(s.chats, stored)
 }
 
+// OTPs returns a copy of all stored OTPs.
+func (s *Store) OTPs() []*StoredOTP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	msgs := make([]*StoredOTP, len(s.otps))
+	copy(msgs, s.otps)
+	return msgs
+}
+
+// OTPByID returns a stored OTP by its ID, or nil if not found.
+func (s *Store) OTPByID(id string) *StoredOTP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, o := range s.otps {
+		if o.ID == id {
+			return o
+		}
+	}
+	return nil
+}
+
+// DeleteOTPByID deletes an OTP by ID. Returns true if deleted.
+func (s *Store) DeleteOTPByID(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, o := range s.otps {
+		if o.ID == id {
+			s.otps = append(s.otps[:i], s.otps[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// AddOTP adds a stored OTP.
+func (s *Store) AddOTP(stored *StoredOTP) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.otps = append(s.otps, stored)
+}
+
+// OTPsForWorkspace returns stored OTPs tagged with the given workspace ID.
+func (s *Store) OTPsForWorkspace(workspaceID string) []*StoredOTP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []*StoredOTP
+	for _, o := range s.otps {
+		if o != nil && o.WorkspaceID == workspaceID {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// OTPByIDForWorkspace returns an OTP by ID only if it belongs to the workspace.
+func (s *Store) OTPByIDForWorkspace(id, workspaceID string) *StoredOTP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, o := range s.otps {
+		if o != nil && o.ID == id && o.WorkspaceID == workspaceID {
+			return o
+		}
+	}
+	return nil
+}
+
+// DeleteOTPByIDForWorkspace deletes an OTP if it belongs to the workspace.
+func (s *Store) DeleteOTPByIDForWorkspace(id, workspaceID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, o := range s.otps {
+		if o != nil && o.ID == id && o.WorkspaceID == workspaceID {
+			s.otps = append(s.otps[:i], s.otps[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 // Count returns the total number of stored messages across all types.
 func (s *Store) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats)
+	return len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats) + len(s.otps)
 }
 
 // Stats returns message counts by type.
@@ -321,7 +420,8 @@ func (s *Store) Stats() map[string]int {
 		"sms":    len(s.sms),
 		"push":   len(s.pushes),
 		"chat":   len(s.chats),
-		"total":  len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats),
+		"otp":    len(s.otps),
+		"total":  len(s.emails) + len(s.sms) + len(s.pushes) + len(s.chats) + len(s.otps),
 	}
 }
 
@@ -333,4 +433,5 @@ func (s *Store) Clear() {
 	s.sms = make([]*StoredSMS, 0)
 	s.pushes = make([]*StoredPush, 0)
 	s.chats = make([]*StoredChat, 0)
+	s.otps = make([]*StoredOTP, 0)
 }

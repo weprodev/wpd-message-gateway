@@ -16,6 +16,7 @@ const (
 	channelSMS   = "sms"
 	channelPush  = "push"
 	channelChat  = "chat"
+	channelOTP   = "otp"
 
 	// memoryProviderName is the sentinel name stored in the integrations table
 	// when a workspace uses memory dispatch. Checked here to skip DB lookup.
@@ -40,6 +41,7 @@ type GatewayService struct {
 	smsCache   *smsSenderCache
 	pushCache  *pushSenderCache
 	chatCache  *chatSenderCache
+	otpCache   *otpSenderCache
 }
 
 // NewGatewayService constructs a GatewayService.
@@ -61,6 +63,7 @@ func NewGatewayService(
 		smsCache:     newProviderCache[port.SMSSender](),
 		pushCache:    newProviderCache[port.PushSender](),
 		chatCache:    newProviderCache[port.ChatSender](),
+		otpCache:     newProviderCache[port.OTPSender](),
 	}
 }
 
@@ -124,6 +127,65 @@ func (s *GatewayService) SendChat(ctx context.Context, workspaceID string, chat 
 	)
 }
 
+// SendOTP dispatches an OTP message for workspaceID according to its dispatch mode.
+func (s *GatewayService) SendOTP(ctx context.Context, workspaceID string, otp *contracts.OTP) (*contracts.SendResult, error) {
+	mode := s.resolveDispatchMode(ctx, workspaceID)
+	return s.dispatch(ctx, workspaceID, mode, channelOTP,
+		func() (*contracts.SendResult, error) { return s.writeOTPToInbox(ctx, workspaceID, otp) },
+		func(intg *domain.Integration) (*contracts.SendResult, error) {
+			sender, err := resolveOTPSender(s.otpCache, intg)
+			if err != nil {
+				return nil, err
+			}
+			return sender.Send(ctx, otp)
+		},
+	)
+}
+
+// CheckOTPStatus queries the delivery status of a previously sent OTP message
+// identified by its request_id. It resolves the workspace's active OTP integration
+// and delegates to the provider's CheckStatus if supported.
+func (s *GatewayService) CheckOTPStatus(ctx context.Context, workspaceID, requestID string) (*contracts.VerificationStatus, error) {
+	intg, err := s.activeIntegration(ctx, workspaceID, channelOTP)
+	if err != nil {
+		return nil, err
+	}
+
+	sender, err := resolveOTPSender(s.otpCache, intg)
+	if err != nil {
+		return nil, err
+	}
+
+	checker, ok := sender.(port.OTPStatusChecker)
+	if !ok {
+		return nil, fmt.Errorf("OTP provider %q does not support status checking", intg.ProviderName)
+	}
+
+	return checker.CheckStatus(ctx, requestID)
+}
+
+// RevokeOTP revokes a previously sent OTP verification message identified by
+// request_id. It resolves the workspace's active OTP integration and delegates
+// to the provider's Revoke if supported.
+func (s *GatewayService) RevokeOTP(ctx context.Context, workspaceID, requestID string) (*contracts.SendResult, error) {
+	intg, err := s.activeIntegration(ctx, workspaceID, channelOTP)
+	if err != nil {
+		return nil, err
+	}
+
+	sender, err := resolveOTPSender(s.otpCache, intg)
+	if err != nil {
+		return nil, err
+	}
+
+	revoker, ok := sender.(port.OTPRevoker)
+	if !ok {
+		return nil, fmt.Errorf("OTP provider %q does not support revocation", intg.ProviderName)
+	}
+
+	return revoker.Revoke(ctx, requestID)
+}
+
 // dispatch is the single entry point for all channel dispatch logic.
 // It applies the workspace dispatch mode and calls the appropriate fn(s).
 //
@@ -143,7 +205,7 @@ func (s *GatewayService) dispatch(
 		if err != nil {
 			return nil, err
 		}
-		attachMeta(r, mode, channel, "")
+		attachMeta(r, mode, channel, "", "")
 		return r, nil
 
 	case domain.DispatchProviderOnly:
@@ -157,14 +219,14 @@ func (s *GatewayService) dispatch(
 			if err != nil {
 				return nil, err
 			}
-			attachMeta(r, mode, channel, intg.ID)
+			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			return r, nil
 		}
 		r, err := sendViaProvider(intg)
 		if err != nil {
 			return nil, err
 		}
-		attachMeta(r, mode, channel, intg.ID)
+		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 		return r, nil
 
 	case domain.DispatchMemoryAndProvider:
@@ -178,7 +240,7 @@ func (s *GatewayService) dispatch(
 			if err != nil {
 				return nil, err
 			}
-			attachMeta(r, mode, channel, intg.ID)
+			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			return r, nil
 		}
 		// Both paths: capture to inbox first (non-fatal), then send via provider.
@@ -193,7 +255,7 @@ func (s *GatewayService) dispatch(
 			}
 			provResult.Meta["inbox_message_id"] = inboxResult.ID
 		}
-		attachMeta(provResult, mode, channel, intg.ID)
+		attachMeta(provResult, mode, channel, intg.ID, intg.ProviderName)
 		return provResult, nil
 
 	default:
@@ -202,7 +264,7 @@ func (s *GatewayService) dispatch(
 		if err != nil {
 			return nil, err
 		}
-		attachMeta(r, domain.DispatchMemoryOnly, channel, "")
+		attachMeta(r, domain.DispatchMemoryOnly, channel, "", "")
 		return r, nil
 	}
 }
@@ -277,18 +339,32 @@ func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID strin
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
+func (s *GatewayService) writeOTPToInbox(ctx context.Context, workspaceID string, otp *contracts.OTP) (*contracts.SendResult, error) {
+	if s.inbox == nil {
+		return nil, fmt.Errorf("inbox writer not configured")
+	}
+	id, err := s.inbox.WriteOTP(ctx, workspaceID, otp)
+	if err != nil {
+		return nil, fmt.Errorf("write OTP to inbox: %w", err)
+	}
+	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
+}
+
 // attachMeta stamps standard dispatch metadata onto a result without allocating
 // if Meta is already populated.
-func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID string) {
+func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID, providerName string) {
 	if r == nil {
 		return
 	}
 	if r.Meta == nil {
-		r.Meta = make(map[string]string, 3)
+		r.Meta = make(map[string]string, 4)
 	}
 	r.Meta["dispatch_mode"] = string(mode)
 	r.Meta["channel"] = channel
 	if integrationID != "" {
 		r.Meta["integration_id"] = integrationID
+	}
+	if providerName != "" {
+		r.Meta["provider_name"] = providerName
 	}
 }
