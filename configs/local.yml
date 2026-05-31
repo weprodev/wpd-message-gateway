@@ -20,7 +20,7 @@ providers:
     sms: memory
     push: memory
     chat: memory
-    otp: telegram
+    otp: memory
   
   # Provider configurations
   email:
@@ -51,5 +51,5 @@ providers:
 
   otp:
     memory: {}
-    telegram:
-      api_key: "${TELEGRAM_BOT_API_KEY}"  # Set via environment variable
+    # telegram:
+    #   api_key: "${TELEGRAM_BOT_API_KEY}"

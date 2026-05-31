@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
@@ -168,3 +169,6 @@ func resolveOTPSender(cache *otpSenderCache, intg *domain.Integration) (port.OTP
 	cache.set(intg, sender)
 	return sender, nil
 }
+
+// ensure time is used (for cacheKey.updatedAt type alignment).
+var _ = time.Now
