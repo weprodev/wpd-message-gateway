@@ -94,6 +94,14 @@ gw, _ := gateway.New(gateway.Config{
             FromName:  os.Getenv("MAILGUN_FROM_NAME"),
         },
     },
+    DefaultPushProvider: os.Getenv("PUSH_PROVIDER"), // "telegram", "memory", etc.
+    PushProviders: map[string]gateway.PushConfig{
+        "telegram": {
+            CommonConfig: gateway.CommonConfig{
+                APIKey: os.Getenv("TELEGRAM_BOT_TOKEN"),
+            },
+        },
+    },
 })
 ```
 

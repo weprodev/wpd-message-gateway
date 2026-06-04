@@ -16,39 +16,39 @@ import (
 
 // CommonConfig contains credential fields shared across all provider channels.
 type CommonConfig struct {
-	APIKey    string
-	APISecret string
-	Region    string
-	BaseURL   string
-	Extra     map[string]string
+	APIKey    string            `json:"api_key"`
+	APISecret string            `json:"api_secret"`
+	Region    string            `json:"region"`
+	BaseURL   string            `json:"base_url"`
+	Extra     map[string]string `json:"-"`
 }
 
 // EmailConfig holds email-specific provider configuration.
 type EmailConfig struct {
 	CommonConfig
-	Domain    string
-	FromEmail string
-	FromName  string
+	Domain    string `json:"domain"`
+	FromEmail string `json:"from_email"`
+	FromName  string `json:"from_name"`
 }
 
 // SMSConfig holds SMS-specific provider configuration.
 type SMSConfig struct {
 	CommonConfig
-	FromPhone string
+	FromPhone string `json:"from_phone"`
 }
 
 // PushConfig holds push-notification-specific provider configuration.
 type PushConfig struct {
 	CommonConfig
-	AppID string
-	Topic string
+	AppID string `json:"app_id"`
+	Topic string `json:"topic"`
 }
 
 // ChatConfig holds chat-specific provider configuration.
 type ChatConfig struct {
 	CommonConfig
-	FromPhone  string
-	WebhookURL string
+	FromPhone  string `json:"from_phone"`
+	WebhookURL string `json:"webhook_url"`
 }
 
 // EmailProviderFactory constructs an EmailSender from static config.

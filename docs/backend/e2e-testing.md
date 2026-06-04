@@ -279,12 +279,17 @@ gw, _ := gateway.New(gateway.Config{
     EmailProviders: map[string]gateway.EmailConfig{
         "mailgun": { /* ... */ },
     },
+    DefaultPushProvider: os.Getenv("PUSH_PROVIDER"), // "telegram" in prod
+    PushProviders: map[string]gateway.PushConfig{
+        "telegram": { /* ... */ },
+    },
 })
 
 // xxx_test.go — override with memory provider
 func TestSignupEmail(t *testing.T) {
     gw, _ := gateway.New(gateway.Config{
         DefaultEmailProvider: "memory",
+        DefaultPushProvider:  "memory",
     })
     // Use gw — messages captured in RAM
     // Assert via the inbox HTTP API (if server running)

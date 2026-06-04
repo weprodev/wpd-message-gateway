@@ -125,12 +125,12 @@ Building applications that send messages across multiple channels is complex. Yo
 
 ## Supported Message Types
 
-| Type      | Description                           | Providers                 |
-| --------- | ------------------------------------- | ------------------------- |
-| **Email** | HTML, plain text, CC/BCC, attachments | Mailgun, Memory           |
-| **SMS**   | Text to mobile numbers                | Memory (Twilio planned)   |
-| **Push**  | Mobile and web notifications          | Memory (Firebase planned) |
-| **Chat**  | Slack, WhatsApp, Telegram             | Memory (planned)          |
+| Type      | Description                           | Providers                       |
+| --------- | ------------------------------------- | ------------------------------- |
+| **Email** | HTML, plain text, CC/BCC, attachments | Mailgun, Memory                 |
+| **SMS**   | Text to mobile numbers                | Memory (Twilio planned)         |
+| **Push**  | Mobile and web notifications          | Telegram (stub), Memory         |
+| **Chat**  | Slack, WhatsApp, Telegram             | Memory (planned)                |
 
 ---
 

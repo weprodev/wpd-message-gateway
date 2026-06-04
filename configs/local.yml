@@ -18,7 +18,7 @@ providers:
   defaults:
     email: memory
     sms: memory
-    push: memory
+    push: telegram
     chat: memory
   
   # Provider configurations
@@ -39,6 +39,8 @@ providers:
 
   push:
     memory: {}
+    # telegram:
+    #   api_key: "YOUR_TELEGRAM_BOT_API_KEY"
     # fcm:
     #   service_account_file: "path/to/service-account.json"
     #   project_id: "my-project-id"

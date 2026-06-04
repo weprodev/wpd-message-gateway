@@ -6,6 +6,7 @@
 //     declared in code. Providers must be imported to trigger self-registration:
 //
 //     import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
+//     import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/telegram"
 //
 //  2. DB-backed (server mode) — call NewWithService() with an already-wired
 //     GatewayService. This is used internally by the HTTP server.
@@ -49,6 +50,7 @@ func NewWithService(svc *service.GatewayService, workspaceID string) *Gateway {
 //
 //	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
 //	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/telegram"
 func New(cfg Config) (*Gateway, error) {
 	g := &Gateway{
 		emailSenders: make(map[string]port.EmailSender),

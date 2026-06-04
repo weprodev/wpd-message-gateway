@@ -220,6 +220,10 @@ internal/infrastructure/provider/
 │   ├── chat.go         # Memory chat provider
 │   └── register.go     # init() self-registration
 │
+├── telegram/           # Telegram push provider (stub)
+│   ├── telegram.go     # PushSender implementation
+│   └── register.go     # init() self-registration
+│
 └── sendgrid/           # Your new provider
     ├── sendgrid.go
     ├── sendgrid_test.go

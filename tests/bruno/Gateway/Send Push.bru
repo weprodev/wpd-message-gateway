@@ -11,8 +11,8 @@ post {
 }
 
 auth:basic {
-  username: demo-client-id
-  password: demo-secret
+  username: {{apiClientId}}
+  password: {{apiSecret}}
 }
 
 headers {
@@ -21,14 +21,17 @@ headers {
 
 body:json {
   {
-    "device_tokens": ["token-abc-123"],
-    "title": "New Notification",
-    "body": "You have a new message"
+    "device_tokens": ["your-device-token-or-phone-number"],
+    "title": "Inactive User Reminder",
+    "body": "⚠️ <b>You have been inactive for 3 days.</b>\nTap below to stay updated.",
+    "data": {
+      "parse_mode": "HTML"
+    }
   }
 }
 
 tests {
-  test("should return 501 (Push not implemented)", function() {
-    expect(res.status).to.equal(501);
+  test("should return 200 and send message via Telegram", function() {
+    expect(res.status).to.equal(200);
   });
 }
