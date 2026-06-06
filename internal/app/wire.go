@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/telegram"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
@@ -119,6 +122,22 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		apiKeyRepo, workspaceRepo, memberRepo,
 		portalHandler, jwtSecret, sysLogger,
 	)
+
+	// ── Telegram polling ─────────────────────────────────────────────────────
+	if tgCfg, ok := cfg.PushProviders["telegram"]; ok && tgCfg.APIKey != "" {
+		tg, err := telegram.New(telegram.Config{
+			APIToken: tgCfg.APIKey,
+			BaseURL:  tgCfg.BaseURL,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("init telegram polling: %w", err)
+		}
+		go func() {
+			if err := tg.StartPolling(context.Background()); err != nil {
+				slog.Error("telegram polling stopped", "error", err)
+			}
+		}()
+	}
 
 	return &Application{
 		Config:         cfg,

@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
@@ -18,13 +17,13 @@ import (
 const (
 	ProviderName   = "telegram"
 	defaultBaseURL = "https://api.telegram.org"
-	defaultTimeout = 30 * time.Second
 )
 
 // Config holds Telegram-specific configuration.
 type Config struct {
-	APIToken string
-	BaseURL  string
+	APIToken 	  string
+	BaseURL  	  string
+	KnownCommands []string
 }
 
 // Provider implements port.PushSender for Telegram.
@@ -32,6 +31,7 @@ type Provider struct {
 	config     Config
 	baseURL    string
 	httpClient *http.Client
+	offset     int64
 }
 
 // New creates a new Telegram push provider.
@@ -48,9 +48,7 @@ func New(cfg Config) (*Provider, error) {
 	return &Provider{
 		config:  cfg,
 		baseURL: baseURL,
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
+		httpClient: &http.Client{},
 	}, nil
 }
 
@@ -59,13 +57,6 @@ func (p *Provider) Name() string {
 	return ProviderName
 }
 
-// Telegram API errors.
-var (
-	ErrUserBlockedBot = errors.New("telegram: user blocked the bot")
-	ErrChatNotFound   = errors.New("telegram: chat not found")
-	ErrRateLimited    = errors.New("telegram: too many requests")
-	ErrForbidden      = errors.New("telegram: forbidden")
-)
 
 // sendMessageRequest is the JSON body for POST /bot<token>/sendMessage.
 type sendMessageRequest struct {
@@ -82,6 +73,85 @@ type sendMessageResponse struct {
 	} `json:"result"`
 	ErrorCode   int    `json:"error_code"`
 	Description string `json:"description"`
+}
+
+// getUpdatesResponse is the response from GET /bot<token>/getUpdates.
+type getUpdatesResponse struct {
+	OK     bool     `json:"ok"`
+	Result []Update `json:"result"`
+}
+
+// Update represents a Telegram update from getUpdates.
+type Update struct {
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message,omitempty"`
+}
+
+// Message represents a Telegram message.
+type Message struct {
+	MessageID int    `json:"message_id"`
+	Chat      Chat   `json:"chat"`
+	Text      string `json:"text,omitempty"`
+}
+
+// Chat represents a Telegram chat.
+type Chat struct {
+	ID int64 `json:"id"`
+}
+
+// sendToChat sends a plain-text message to a Telegram chat.
+func (p *Provider) sendToChat(ctx context.Context, chatID, text, parseMode string) (string, error) {
+	body := sendMessageRequest{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: parseMode,
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/bot%s/sendMessage", p.baseURL, p.config.APIToken)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+
+	var apiResp sendMessageResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	if !apiResp.OK {
+		switch {
+		case resp.StatusCode == http.StatusForbidden:
+			return "", fmt.Errorf("telegram: user blocked the bot: %s", apiResp.Description)
+		case resp.StatusCode == http.StatusNotFound:
+			return "", fmt.Errorf("telegram: chat not found: %s", apiResp.Description)
+		case resp.StatusCode == http.StatusTooManyRequests:
+			return "", fmt.Errorf("telegram: too many requests: %s", apiResp.Description)
+		case resp.StatusCode == http.StatusBadRequest:
+			return "", fmt.Errorf("telegram: bad request (code %d): %s", apiResp.ErrorCode, apiResp.Description)
+		default:
+			return "", fmt.Errorf("telegram: API error (HTTP %d, code %d): %s", resp.StatusCode, apiResp.ErrorCode, apiResp.Description)
+		}
+	}
+
+	return fmt.Sprintf("%d", apiResp.Result.MessageID), nil
 }
 
 // Send sends a push notification via the Telegram Bot API.
@@ -130,61 +200,91 @@ func (p *Provider) Send(ctx context.Context, notification *contracts.PushNotific
 	}, nil
 }
 
-func (p *Provider) sendToChat(ctx context.Context, chatID, text, parseMode string) (string, error) {
-	body := sendMessageRequest{
-		ChatID:    chatID,
-		Text:      text,
-		ParseMode: parseMode,
+// UnsupportedMessageResponse sends an unsupported-message reply if the
+// message is not a recognised command.
+func (p *Provider) UnsupportedMessageResponse(ctx context.Context, msg *Message) bool {
+	if msg == nil || msg.Text == "" {
+		return false
 	}
 
-	payload, err := json.Marshal(body)
+	if strings.HasPrefix(msg.Text, "/") {
+		return false
+	}
+
+	for _, cmd := range p.config.KnownCommands {
+		if msg.Text == cmd {
+			return false
+		}
+	}
+
+	chatID := fmt.Sprintf("%d", msg.Chat.ID)
+	if _, err := p.sendToChat(ctx, chatID, "⚠️ Unsupported message! Please use the menu or available commands", ""); err != nil {
+		log.Printf("telegram: failed to reply to chat %s: %v", chatID, err)
+		return false
+	}
+	return true
+}
+
+// StartPolling begins long-polling the Telegram Bot API for incoming updates.
+// It blocks until ctx is cancelled. Run it in a goroutine:
+//
+//	go provider.StartPolling(ctx)
+//
+// For every message that is not a recognised command, the bot replies with an
+// unsupported-message warning.
+func (p *Provider) StartPolling(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		updates, err := p.fetchUpdates(ctx)
+		if err != nil {
+			log.Printf("telegram: polling error: %v", err)
+			continue
+		}
+
+		for _, upd := range updates {
+			p.UnsupportedMessageResponse(ctx, upd.Message)
+			p.offset = upd.UpdateID + 1
+		}
+	}
+}
+
+// fetchUpdates calls getUpdates with the current offset and a long-polling timeout.
+func (p *Provider) fetchUpdates(ctx context.Context) ([]Update, error) {
+	url := fmt.Sprintf(
+		"%s/bot%s/getUpdates?offset=%d",
+		p.baseURL, p.config.APIToken, p.offset,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("create getUpdates request: %w", err)
 	}
-
-	url := fmt.Sprintf("%s/bot%s/sendMessage", p.baseURL, p.config.APIToken)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("HTTP request failed: %w", err)
+		return nil, fmt.Errorf("getUpdates HTTP error: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("read getUpdates response: %w", err)
 	}
 
-	var apiResp sendMessageResponse
+	var apiResp getUpdatesResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+		return nil, fmt.Errorf("decode getUpdates response: %w", err)
 	}
 
 	if !apiResp.OK {
-		return "", classifyTelegramError(resp.StatusCode, apiResp.ErrorCode, apiResp.Description)
+		return nil, errors.New("telegram: getUpdates returned not-ok")
 	}
 
-	return fmt.Sprintf("%d", apiResp.Result.MessageID), nil
+	return apiResp.Result, nil
 }
 
-// classifyTelegramError maps Telegram API error codes to semantic errors.
-func classifyTelegramError(httpStatus, apiErrorCode int, description string) error {
-	switch {
-	case httpStatus == http.StatusForbidden:
-		return fmt.Errorf("%w: %s", ErrUserBlockedBot, description)
-	case httpStatus == http.StatusNotFound:
-		return fmt.Errorf("%w: %s", ErrChatNotFound, description)
-	case httpStatus == http.StatusTooManyRequests:
-		return fmt.Errorf("%w: %s", ErrRateLimited, description)
-	case httpStatus == http.StatusBadRequest:
-		return fmt.Errorf("telegram: bad request (code %d): %s", apiErrorCode, description)
-	default:
-		return fmt.Errorf("telegram: API error (HTTP %d, code %d): %s", httpStatus, apiErrorCode, description)
-	}
-}
