@@ -10,8 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { sendTestRequest } from "../inbox.api"
-import type { MessageChannel } from "../inbox.types"
+import { sendTestRequest } from "../../inbox.api"
+import type { MessageChannel } from "../../inbox.types"
 
 interface SendTestModalProps {
   workspaceId: string

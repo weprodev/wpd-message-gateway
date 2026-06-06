@@ -59,5 +59,18 @@ services:
       - gateway
     restart: unless-stopped
 
+  # Storybook — Component isolation dev server (port 6006)
+  storybook:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "storybook", "--", "--host", "0.0.0.0"]
+    restart: unless-stopped
+
 volumes:
   postgres_data:

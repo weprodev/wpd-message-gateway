@@ -30,9 +30,22 @@ Inside `frontend/`:
 | `src/core/router/` | `ROUTES` + route tree (composition) |
 | `src/features/*/` | Independent feature slices (`index.ts` barrels) |
 | `src/shared/` | Generic UI — no feature imports |
-| `src/components/ui/` | shadcn primitives |
+| `src/components/ui/` | Independent shared UI components |
 
-Full layer rules: **[docs/frontend/architecture.md](../docs/frontend/architecture.md)**
+### Component Development Rules
+To keep components isolated and testable, every React component must live in its own dedicated directory with the following structure:
+```
+[ComponentName]/
+├── [ComponentName].tsx         # Implementation
+├── index.ts                     # Clean re-export (e.g., export * from "./[ComponentName]")
+├── [ComponentName].stories.tsx # Storybook stories
+└── [ComponentName].test.tsx    # Vitest + React Testing Library unit test
+```
+
+## Storybook in Docker
+Storybook is integrated into our containerized local development stack:
+- Spin up Storybook in Docker: `docker compose up -d --build storybook`
+- Access Storybook in your browser: `http://localhost:6006`
 
 ## Docs
 

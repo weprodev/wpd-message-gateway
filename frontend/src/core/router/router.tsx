@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 
 import { ROUTES } from "@/core/router/routes"
 import { LoginPage, RegisterPage } from "@/features/auth"
-import { OverviewPage } from "@/features/inbox"
+import { OverviewPage, EmailInboxPage, EmailTemplatesPage } from "@/features/inbox"
 import { WorkspaceLayout, WorkspacesPage } from "@/features/workspaces"
 import { AppShell } from "@/shared/layouts/app-shell"
 
@@ -23,7 +23,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="overview" replace /> },
       { path: "overview", element: <OverviewPage /> },
-      { path: "email", element: <OverviewPage channel="email" /> },
+      { path: "email", element: <EmailInboxPage /> },
+      { path: "email/templates", element: <EmailTemplatesPage /> },
       { path: "sms", element: <OverviewPage channel="sms" /> },
       { path: "push", element: <OverviewPage channel="push" /> },
       { path: "chat", element: <OverviewPage channel="chat" /> },

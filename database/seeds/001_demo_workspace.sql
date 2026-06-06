@@ -4,7 +4,7 @@ INSERT INTO users (id, email, password_hash, first_name, last_name, email_verifi
 VALUES (
     '00000000-0000-0000-0000-000000000010',
     'demo@weprodev.com',
-    '$2a$14$dummy.hash.for.demo.only',
+    '$2a$14$fBL/4GbbqSCMTVOYotuUa.Qx0DwnRMpkZaOHxkD3h1X4gMESUhjD.',
     'Demo',
     'User',
     true

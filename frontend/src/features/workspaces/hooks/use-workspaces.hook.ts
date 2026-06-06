@@ -16,6 +16,9 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [trigger, setTrigger] = useState(0)
+
+  const reload = () => setTrigger((t) => t + 1)
 
   useEffect(() => {
     let cancelled = false
@@ -47,10 +50,10 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     return () => {
       cancelled = true
     }
-  }, [activeWorkspaceId, navigate])
+  }, [activeWorkspaceId, navigate, trigger])
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null
 
-  return { workspaces, activeWorkspace, isLoading, error }
+  return { workspaces, activeWorkspace, isLoading, error, reload }
 }

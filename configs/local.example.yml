@@ -66,3 +66,14 @@ portal:
 #   MESSAGE_PORTAL_BASE_URL=https://inbox.weprodev.com
 #
 # ============================================================================
+
+# ----------------------------------------------------------------------------
+# Providers Configuration
+# ----------------------------------------------------------------------------
+providers:
+  defaults:
+    email: "memory"
+    sms: "memory"
+    push: "memory"
+    chat: "memory"
+
