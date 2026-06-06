@@ -1,14 +1,48 @@
 services:
-  # Gateway API (port 10101)
+  # PostgreSQL Database (port 5432)
+  db:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=gateway
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=gateway
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/20260318000000_init_gateway.up.sql:/docker-entrypoint-initdb.d/01_init_gateway.sql
+      - ./database/seeds/002_seed_permissions.sql:/docker-entrypoint-initdb.d/02_seed_permissions.sql
+      - ./database/seeds/001_demo_workspace.sql:/docker-entrypoint-initdb.d/03_demo_workspace.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Go Backend — Hot-reloading via air (port 10101)
   gateway:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     ports:
       - "10101:10101"
     environment:
-      - PORT=10101
+      - APP_ENVIRONMENT=local
+      - CONFIG_PATH=configs/local.example.yml
+      - DATABASE_URL=postgres://gateway:secret@db:5432/gateway?sslmode=disable
+      - MESSAGE_JWT_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - MESSAGE_CONFIG_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
+      - MESSAGE_PORTAL_BASE_URL=http://localhost:10104
+    volumes:
+      - .:/app
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
-  # Portal UI — React app + message inbox preview (port 10104)
+  # Portal UI — React Vite app (port 10104)
   portal-ui:
     build:
       context: ./frontend
@@ -23,3 +57,7 @@ services:
       - /app/node_modules
     depends_on:
       - gateway
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

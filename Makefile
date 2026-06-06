@@ -296,15 +296,15 @@ docker-check:
 		exit 1; \
 	)
 
-## Start Gateway and Portal UI via Docker Compose
+## Start Gateway, DB, and Portal UI via Docker Compose (with hot-reloading)
 dev: docker-check
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway and Portal UI via Docker...$(RESET)\n"
-	@docker compose up -d
-	@printf "$(GREEN)✅ Gateway started!$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway, database, and Portal UI via Docker...$(RESET)\n"
+	@docker compose up -d --build
+	@printf "$(GREEN)✅ All services started!$(RESET)\n"
 	@printf "\n"
 	@printf "   $(BOLD)Gateway API:$(RESET)  http://localhost:10101\n"
-	@printf "   $(BOLD)Portal UI:$(RESET)    Run $(YELLOW)make start$(RESET) → http://localhost:10104\n"
+	@printf "   $(BOLD)Portal UI:$(RESET)    http://localhost:10104\n"
 	@printf "\n"
 
 ## Stop Docker Compose
@@ -357,8 +357,8 @@ help:
 	@printf "   $(YELLOW)make clean$(RESET)        Clean build artifacts\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🐳 Docker$(RESET)\n"
-	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway via Docker\n"
-	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker\n"
+	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway, DB, and UI via Docker (with hot-reloading)\n"
+	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker containers\n"
 	@printf "\n"
 
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"

@@ -109,12 +109,33 @@ Use this when you want to:
 
 ### Setup
 
+#### Option A: Docker Compose (Recommended)
+This spins up the entire stack including a PostgreSQL database (pre-loaded with migrations and permission/demo seeds), a hot-reloading Go backend (via `air`), and the Portal UI dev server:
+
+```bash
+# Start all services
+make dev
+
+# Stop all services
+make dev-down
+
+# Reset Database: Since DB init scripts run only on first boot, run this to reset data/schema:
+docker compose down -v
+```
+
+Open **http://localhost:10104** — the Portal UI.
+
+#### Option B: Native Setup (No Docker)
+If you prefer to run components directly on your host machine:
+
 ```bash
 git clone https://github.com/weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
 cp configs/local.example.yml configs/local.yml
 make start
 ```
+
+For Option B, you must manually run PostgreSQL locally, apply schema migrations, and apply the SQL seeds (see below).
 
 Open **http://localhost:10104** — the Portal UI.
 

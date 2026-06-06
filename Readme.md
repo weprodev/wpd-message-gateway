@@ -141,8 +141,8 @@ make dev
 Once running:
 
 1. Open **http://localhost:10104** — the Portal UI
-2. Create an account and sign in
-3. Create a **Workspace** → add an **Integration** (e.g., Mailgun) → generate an **API Key**
+2. Create an account and sign in (or use the pre-seeded demo user: `demo@example.com` / `password`)
+3. Select the pre-seeded workspace or bootstrap a workspace and API key using the REST API (the Portal UI currently covers authentication, workspaces, message logs, and send tests; other provisioning is REST-only). See [E2E Bootstrap Guide](docs/backend/e2e-testing.md#2-bootstrap-create-workspace-and-api-key) for details.
 4. Send a message from any language:
 
 ```bash

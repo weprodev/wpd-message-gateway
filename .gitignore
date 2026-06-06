@@ -39,6 +39,10 @@ wpd-message-gateway
 go.work
 go.work.sum
 
+# Air (Go live reload watcher)
+tmp/
+build-errors.log
+
 # Frontend (Vite / React / Storybook)
 node_modules/
 frontend/node_modules/

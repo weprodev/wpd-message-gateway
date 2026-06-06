@@ -2,6 +2,18 @@
 
 ## Quick Start
 
+### Option A: Docker Compose (Recommended)
+This spins up the entire stack including a PostgreSQL database (preloaded with migrations and permission/demo seeds), a hot-reloading Go backend, and the Portal UI dev server:
+
+```bash
+git clone git@github.com:weprodev/wpd-message-gateway.git
+cd wpd-message-gateway
+make dev
+```
+
+### Option B: Native Setup (No Docker)
+If you prefer to run components directly on your host machine:
+
 ```bash
 git clone git@github.com:weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
