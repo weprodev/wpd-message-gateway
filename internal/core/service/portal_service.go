@@ -5,9 +5,12 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -34,6 +37,7 @@ type PortalDeps struct {
 	Settings     port.WorkspaceSettingsRepository
 	JWTSecret    string
 	JWTTTL       time.Duration
+	Gate         port.AuthorizationGate
 }
 
 // PortalService handles portal authentication and workspace-scoped operations.
@@ -47,9 +51,11 @@ type PortalService struct {
 	logs         port.MessageRequestLogRepository
 	invites      port.InvitationRepository
 	settings     port.WorkspaceSettingsRepository
+	gate         port.AuthorizationGate
 
-	JWTSecret string
-	JWTTTL    time.Duration
+	// jwtSecret and jwtTTL are unexported; accessed only within this package.
+	jwtSecret string
+	jwtTTL    time.Duration
 }
 
 // NewPortalService constructs a PortalService from its dependencies.
@@ -68,8 +74,9 @@ func NewPortalService(deps PortalDeps) *PortalService {
 		logs:         deps.Logs,
 		invites:      deps.Invitations,
 		settings:     deps.Settings,
-		JWTSecret:    deps.JWTSecret,
-		JWTTTL:       deps.JWTTTL,
+		gate:         deps.Gate,
+		jwtSecret:    deps.JWTSecret,
+		jwtTTL:       deps.JWTTTL,
 	}
 }
 
@@ -82,26 +89,32 @@ func (s *PortalService) UserByID(ctx context.Context, id string) (*domain.User, 
 	return u, nil
 }
 
+// RequireMember asserts that userID is a member of workspaceID and returns their role.
+// Returns port.ErrNotFound if the user is not a member.
 func (s *PortalService) RequireMember(ctx context.Context, workspaceID, userID string) (string, error) {
 	return s.members.GetRole(ctx, workspaceID, userID)
 }
 
+// RequireAdmin asserts that userID holds the admin role in workspaceID.
+// Returns port.ErrUnauthorized (wrapped) if the role is insufficient.
 func (s *PortalService) RequireAdmin(ctx context.Context, workspaceID, userID string) error {
 	role, err := s.members.GetRole(ctx, workspaceID, userID)
 	if err != nil {
 		return err
 	}
-	if role != "admin" {
-		return errors.New("admin role required")
+	if role != domain.RoleAdmin {
+		return fmt.Errorf("admin role required: %w", port.ErrUnauthorized)
 	}
 	return nil
 }
 
+// CreateWorkspace creates a new workspace owned by userID, adds userID as admin, and assigns
+// the admin role in the RBAC gate. Returns port.ErrInvalidInput if name or unique_key is empty.
 func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqueKey, iconKey string) (*domain.Workspace, error) {
 	name = strings.TrimSpace(name)
 	uniqueKey = strings.TrimSpace(strings.ToLower(uniqueKey))
 	if name == "" || uniqueKey == "" {
-		return nil, errors.New("name and unique_key required")
+		return nil, fmt.Errorf("name and unique_key required: %w", port.ErrInvalidInput)
 	}
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
@@ -118,7 +131,10 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqu
 	if err := s.workspaces.Create(ctx, w); err != nil {
 		return nil, err
 	}
-	if err := s.members.Add(ctx, w.ID, userID, "admin"); err != nil {
+	if err := s.members.Add(ctx, w.ID, userID, domain.RoleAdmin); err != nil {
+		return nil, err
+	}
+	if err := s.gate.AssignRole(ctx, "users", userID, w.ID, domain.RoleAdmin); err != nil {
 		return nil, err
 	}
 	return w, nil
@@ -136,7 +152,13 @@ func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, unique
 	if !crypto.CheckSecretHash(pin, ws.HashedPin) {
 		return errors.New("invalid PIN")
 	}
-	return s.members.Add(ctx, ws.ID, userID, "member")
+	if err := s.members.Add(ctx, ws.ID, userID, domain.RoleMember); err != nil {
+		return err
+	}
+	if err := s.gate.AssignRole(ctx, "users", userID, ws.ID, domain.RoleMember); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *PortalService) RandomAPIKeyCredentials() (clientID, secret string, secretHash string, err error) {
@@ -201,7 +223,25 @@ func (s *PortalService) ListMembers(ctx context.Context, workspaceID string) ([]
 	return s.members.ListMembers(ctx, workspaceID)
 }
 
+// RemoveMember removes a user from a workspace and revokes their RBAC role.
+// If the member has no role record in the RBAC gate (ErrNotFound), the gate removal
+// is skipped safely. Any other gate error aborts the operation before DB removal.
 func (s *PortalService) RemoveMember(ctx context.Context, workspaceID, userID string) error {
+	// Fetch current role to remove the exact RBAC assignment.
+	// ErrNotFound means the member was never assigned a role in the gate — skip silently.
+	role, err := s.members.GetRole(ctx, workspaceID, userID)
+	switch {
+	case errors.Is(err, port.ErrNotFound):
+		// No membership record; nothing to remove from RBAC gate.
+	case err != nil:
+		// Unexpected infrastructure error — abort before touching the gate.
+		return fmt.Errorf("wpd-message-gateway: get member role: %w", err)
+	default:
+		if gErr := s.gate.RemoveRole(ctx, "users", userID, workspaceID, role); gErr != nil {
+			return fmt.Errorf("wpd-message-gateway: remove role %s: %w", role, gErr)
+		}
+	}
+
 	return s.members.Remove(ctx, workspaceID, userID)
 }
 
@@ -362,10 +402,23 @@ func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, k
 	return nil
 }
 
+// ListInvitations returns all pending invitations for a workspace.
 func (s *PortalService) ListInvitations(ctx context.Context, workspaceID string) ([]domain.Invitation, error) {
 	return s.invites.ListPendingByWorkspace(ctx, workspaceID)
 }
 
-func (s *PortalService) CreateInvitation(ctx context.Context, inv *domain.Invitation) error {
-	return s.invites.Create(ctx, inv)
+// CreateInvitation generates a secure invitation token, stores its hash, and persists the
+// invitation. The returned plaintext token must be sent to the invitee and is never stored.
+func (s *PortalService) CreateInvitation(ctx context.Context, inv *domain.Invitation) (rawToken string, err error) {
+	// Generate a cryptographically random token from two UUIDs.
+	rawToken = uuid.NewString() + uuid.NewString()
+	sum := sha256.Sum256([]byte(rawToken))
+	inv.TokenHash = hex.EncodeToString(sum[:])
+	return rawToken, s.invites.Create(ctx, inv)
 }
+
+// JWTSecret exposes the portal JWT secret for auth-layer consumers within this package.
+func (s *PortalService) JWTSecret() string { return s.jwtSecret }
+
+// JWTTTL exposes the portal JWT TTL for auth-layer consumers within this package.
+func (s *PortalService) JWTTTL() time.Duration { return s.jwtTTL }

@@ -171,11 +171,15 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Check that implemented features match the original specification
    - Validate that tests pass and coverage meets requirements
    - Confirm the implementation follows the technical plan
-   - Report final status with summary of completed work
+
+10. **Mandatory verification (agents must run — do not ask the user):**
+    - Follow **`docs/agents/verification.md`**: lint touched paths → **`/smell develop`** (`.claude/commands/smell.md`) → fix all **BLOCKER** and **HIGH** findings → **`make audit`** from repo root (exit code 0)
+    - If either step fails, fix and repeat until both pass
+    - Report final status with smell summary + audit result
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit.tasks` first to regenerate the task list.
 
-10. **Check for extension hooks**: After completion validation, check if `.specify/extensions.yml` exists in the project root.
+11. **Check for extension hooks**: After verification passes, check if `.specify/extensions.yml` exists in the project root.
     - If it exists, read it and look for entries under the `hooks.after_implement` key
     - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
     - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.

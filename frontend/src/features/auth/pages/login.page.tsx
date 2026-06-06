@@ -1,10 +1,10 @@
 import { type FormEvent, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
-import { ROUTES } from "@/app/paths"
+import { ROUTES } from "@/core/router/routes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { signInWithPassword } from "@/features/auth/auth.api"
+import { signInWithPassword } from "../auth.api"
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -30,13 +30,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm space-y-6">
+    <div className="mx-auto flex max-w-sm flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
         <p className="text-sm text-muted-foreground">Use your portal account.</p>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-2">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           <label htmlFor="email" className="text-sm font-medium">
             Email
           </label>
@@ -49,7 +49,7 @@ export function LoginPage() {
             onChange={(ev) => setEmail(ev.target.value)}
           />
         </div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor="password" className="text-sm font-medium">
             Password
           </label>

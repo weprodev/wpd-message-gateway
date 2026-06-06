@@ -27,12 +27,13 @@ flowchart TD
   G --> H[/speckit.implement<br/>execute tasks; mark tasks complete]
 
   H --> I[make checklist DOMAIN=security|api|ux]
-  I --> J[make audit]
+  I --> J[/smell develop]
+  J --> K[make audit]
 
-  J --> K{Ready to open PR?}
-  K -->|no| H
+  K --> L{Ready to open PR?}
+  L -->|no| H
 
-  K -->|yes| U[make sync<br/>Auto-pushes spec.md, plan.md, tasks.md<br/>to GitHub Issue body]
+  L -->|yes| U[make sync<br/>Auto-pushes spec.md, plan.md, tasks.md<br/>to GitHub Issue body]
   U --> L[make pr]
   L --> L1{meta.json has issue_number?}
   L1 -->|yes| L2[Create PR with "Closes #<issue>"<br/>auto-links to issue]
@@ -54,14 +55,16 @@ This project uses [GitHub Spec Kit](https://github.com/github/spec-kit) for spec
 4. **`/speckit.tasks`** — Generate file-path-specific, dependency-ordered tasks
 5. **`/speckit.analyze`** *(optional)* — Consistency check (gap detection)
 6. **`/speckit.implement`** — Execute tasks phase-by-phase
-7. **`/speckit.checklist <domain>`** + `make audit` — Pre-PR quality gates
+7. **`/smell develop`** → fix BLOCKER/HIGH → **`make audit`** → **`/speckit.checklist <domain>`** — Pre-PR quality gates ([verification.md](docs/agents/verification.md))
 
 ### Agent Mapping
 
 | Spec Kit Command | Agent |
 |------------------|-------|
 | `/speckit.specify`, `/speckit.plan` | [Master Agent](docs/agents/master-agent.md) |
-| `/speckit.tasks`, `/speckit.implement` | [Delivery Agent](docs/agents/delivery-agent.md) |
-| `/speckit.checklist`, `/speckit.analyze` | [Review Agent](docs/agents/review-agent.md) |
+| `/speckit.tasks` | [Delivery Agent](docs/agents/delivery-agent.md) |
+| `/speckit.implement` | [Delivery Agent](docs/agents/delivery-agent.md) → then [verification](docs/agents/verification.md) |
+| `/speckit.checklist`, `/speckit.analyze` | [Review Agent](docs/agents/review-agent.md) — `/smell` first |
+| `/smell [branch]` | [Smell command](.claude/commands/smell.md) — mandatory after code changes |
 
 </details>

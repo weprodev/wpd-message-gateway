@@ -33,7 +33,65 @@ const (
 	keyAPIKeyID    contextKey = "api_key_id"
 	keyChannel     contextKey = "channel"
 	keyProvider    contextKey = "provider"
+	keyRequestID   contextKey = "request_id"
 )
+
+// WithRequestID returns a context enriched with request_id (correlation ID).
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, keyRequestID, requestID)
+}
+
+// GetRequestID retrieves the request_id from context.
+func GetRequestID(ctx context.Context) string {
+	v, _ := ctx.Value(keyRequestID).(string)
+	return v
+}
+
+// ContextHandler extracts request context fields and appends them to slog.Record.
+type ContextHandler struct {
+	next slog.Handler
+}
+
+// NewContextHandler wraps another slog.Handler.
+func NewContextHandler(next slog.Handler) *ContextHandler {
+	return &ContextHandler{next: next}
+}
+
+func (h *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.next.Enabled(ctx, level)
+}
+
+func (h *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
+	if ctx == nil {
+		return h.next.Handle(ctx, r)
+	}
+
+	if v, _ := ctx.Value(keyRequestID).(string); v != "" {
+		r.AddAttrs(slog.String("request_id", v))
+	}
+	if v, _ := ctx.Value(keyWorkspaceID).(string); v != "" {
+		r.AddAttrs(slog.String("workspace_id", v))
+	}
+	if v, _ := ctx.Value(keyAPIKeyID).(string); v != "" {
+		r.AddAttrs(slog.String("api_key_id", v))
+	}
+	if v, _ := ctx.Value(keyChannel).(string); v != "" {
+		r.AddAttrs(slog.String("channel", v))
+	}
+	if v, _ := ctx.Value(keyProvider).(string); v != "" {
+		r.AddAttrs(slog.String("provider", v))
+	}
+
+	return h.next.Handle(ctx, r)
+}
+
+func (h *ContextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &ContextHandler{next: h.next.WithAttrs(attrs)}
+}
+
+func (h *ContextHandler) WithGroup(name string) slog.Handler {
+	return &ContextHandler{next: h.next.WithGroup(name)}
+}
 
 // New initialises the structured logger and installs it as the global slog default.
 // Subsequent external handlers (e.g. Sentry) can be injected via extraHandlers.
@@ -57,8 +115,12 @@ func New(env string, extraHandlers ...slog.Handler) (*pkglogger.Logger, error) {
 		return nil, err
 	}
 
+	// Wrap handler with ContextHandler to automatically capture request details
+	wrappedLogger := slog.New(NewContextHandler(log.Handler()))
+
 	// All slog.X() calls throughout the process now use this logger.
-	slog.SetDefault(log.Logger)
+	slog.SetDefault(wrappedLogger)
+	log.Logger = wrappedLogger
 
 	return log, nil
 }
@@ -82,11 +144,10 @@ func WithProvider(ctx context.Context, provider string) context.Context {
 }
 
 // Attrs extracts all gateway-specific attributes from ctx into slog key-value pairs.
-// Use this when calling slog.InfoContext / slog.ErrorContext to attach request context:
-//
-//	slog.ErrorContext(ctx, "send failed", append(logger.Attrs(ctx), "error", err)...)
+// Note: Handlers wrapping standard slog logging now use ContextHandler to extract
+// these fields automatically; Attrs remains for manual or backwards-compatible usage.
 func Attrs(ctx context.Context) []any {
-	attrs := make([]any, 0, 8)
+	attrs := make([]any, 0, 10)
 	if v, _ := ctx.Value(keyWorkspaceID).(string); v != "" {
 		attrs = append(attrs, "workspace_id", v)
 	}
@@ -98,6 +159,9 @@ func Attrs(ctx context.Context) []any {
 	}
 	if v, _ := ctx.Value(keyProvider).(string); v != "" {
 		attrs = append(attrs, "provider", v)
+	}
+	if v, _ := ctx.Value(keyRequestID).(string); v != "" {
+		attrs = append(attrs, "request_id", v)
 	}
 	return attrs
 }

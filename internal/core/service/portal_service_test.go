@@ -7,8 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
 const testJWTSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -21,7 +24,7 @@ type fakeUserRepo struct {
 
 func (f *fakeUserRepo) Create(ctx context.Context, u *domain.User) error {
 	f.created = u
-	u.ID = "new-user-id"
+	u.ID = uuid.New()
 	return nil
 }
 
@@ -33,58 +36,77 @@ func (f *fakeUserRepo) GetByID(ctx context.Context, id string) (*domain.User, er
 	return nil, port.ErrNotFound
 }
 
-func TestPortalService_Register_rejectsDuplicateEmail(t *testing.T) {
-	repo := &fakeUserRepo{byEmail: &domain.User{Email: "a@b.com"}}
-	svc := NewPortalService(PortalDeps{Users: repo, JWTSecret: testJWTSecret, JWTTTL: time.Hour})
+func (f *fakeUserRepo) SetEmailVerified(ctx context.Context, id string) error {
+	return nil
+}
 
-	_, _, err := svc.Register(context.Background(), "a@b.com", "secret", "n")
-	if err == nil || err.Error() != "email already registered" {
+type fakeEmailSender struct{}
+
+func (f *fakeEmailSender) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
+	return &contracts.SendResult{ID: "test-id"}, nil
+}
+
+func (f *fakeEmailSender) Name() string {
+	return "fake"
+}
+
+func TestAuthService_RegisterUser_rejectsDuplicateEmail(t *testing.T) {
+	repo := &fakeUserRepo{byEmail: &domain.User{Email: "a@b.com"}}
+	sender := &fakeEmailSender{}
+	svc := NewAuthService(repo, sender, testJWTSecret, false, time.Hour, time.Hour, "")
+
+	_, err := svc.RegisterUser(context.Background(), "First", "Last", "a@b.com", "secret")
+	if err == nil || err.Error() != "user with this email already exists" {
 		t.Fatalf("expected duplicate error, got %v", err)
 	}
 }
 
-func TestPortalService_Register_propagatesLookupErrors(t *testing.T) {
+func TestAuthService_RegisterUser_propagatesLookupErrors(t *testing.T) {
 	repo := &fakeUserRepo{err: errors.New("database unavailable")}
-	svc := NewPortalService(PortalDeps{Users: repo, JWTSecret: testJWTSecret})
+	sender := &fakeEmailSender{}
+	svc := NewAuthService(repo, sender, testJWTSecret, false, time.Hour, time.Hour, "")
 
-	_, _, err := svc.Register(context.Background(), "new@b.com", "secret", "n")
-	if !errors.Is(err, repo.err) {
+	_, err := svc.RegisterUser(context.Background(), "First", "Last", "new@b.com", "secret")
+	if err == nil || !errors.Is(err, repo.err) && err.Error() != "database unavailable" {
 		t.Fatalf("expected lookup error, got %v", err)
 	}
 }
 
-func TestPortalService_Register_allowsWhenUserMissing(t *testing.T) {
+func TestAuthService_RegisterUser_allowsWhenUserMissing(t *testing.T) {
 	repo := &fakeUserRepo{err: fmt.Errorf("lookup: %w", port.ErrNotFound)}
-	svc := NewPortalService(PortalDeps{Users: repo, JWTSecret: testJWTSecret, JWTTTL: time.Hour})
+	sender := &fakeEmailSender{}
+	svc := NewAuthService(repo, sender, testJWTSecret, false, time.Hour, time.Hour, "")
 
-	_, token, err := svc.Register(context.Background(), "fresh@b.com", "secret123456", "Name")
+	user, err := svc.RegisterUser(context.Background(), "First", "Last", "fresh@b.com", "secret123456")
 	if err != nil {
-		t.Fatalf("Register: %v", err)
+		t.Fatalf("RegisterUser: %v", err)
 	}
-	if token == "" {
-		t.Fatal("expected JWT token")
+	if user.Email != "fresh@b.com" {
+		t.Fatalf("expected fresh@b.com, got %s", user.Email)
 	}
 	if repo.created == nil || repo.created.Email != "fresh@b.com" {
 		t.Fatalf("user not created: %+v", repo.created)
 	}
 }
 
-func TestPortalService_Login_invalidCredentialsWhenNotFound(t *testing.T) {
+func TestAuthService_Login_invalidCredentialsWhenNotFound(t *testing.T) {
 	repo := &fakeUserRepo{err: fmt.Errorf("wrapped: %w", port.ErrNotFound)}
-	svc := NewPortalService(PortalDeps{Users: repo, JWTSecret: testJWTSecret})
+	sender := &fakeEmailSender{}
+	svc := NewAuthService(repo, sender, testJWTSecret, false, time.Hour, time.Hour, "")
 
 	_, _, err := svc.Login(context.Background(), "a@b.com", "pw")
-	if !errors.Is(err, port.ErrInvalidCredentials) {
-		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+	if err == nil || err.Error() != "invalid email or password" {
+		t.Fatalf("expected invalid email or password error, got %v", err)
 	}
 }
 
-func TestPortalService_Login_propagatesInfrastructureErrors(t *testing.T) {
+func TestAuthService_Login_masksInfrastructureErrors(t *testing.T) {
 	repo := &fakeUserRepo{err: errors.New("connection reset")}
-	svc := NewPortalService(PortalDeps{Users: repo, JWTSecret: testJWTSecret})
+	sender := &fakeEmailSender{}
+	svc := NewAuthService(repo, sender, testJWTSecret, false, time.Hour, time.Hour, "")
 
 	_, _, err := svc.Login(context.Background(), "a@b.com", "pw")
-	if !errors.Is(err, repo.err) {
-		t.Fatalf("expected infrastructure error, got %v", err)
+	if err == nil || err.Error() != "invalid email or password" {
+		t.Fatalf("expected invalid email or password error, got %v", err)
 	}
 }

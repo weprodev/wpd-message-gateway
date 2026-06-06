@@ -21,11 +21,18 @@ func NewWorkspaceMemberRepository(client *pgsql.PgClient) port.WorkspaceMemberRe
 }
 
 func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID, role string) error {
-	_, err := r.client.GetDB(ctx).ExecContext(ctx, `
-		INSERT INTO workspace_members (workspace_id, user_id, role)
+	// Look up role ID from the roles table by name
+	var roleID string
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, `SELECT id FROM roles WHERE name = $1`, role).Scan(&roleID)
+	if err != nil {
+		return fmt.Errorf("wpd-message-gateway: lookup role %q: %w", role, err)
+	}
+
+	_, err = r.client.GetDB(ctx).ExecContext(ctx, `
+		INSERT INTO workspace_members (workspace_id, user_id, role_id)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role
-	`, workspaceID, userID, role)
+		ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = EXCLUDED.role_id
+	`, workspaceID, userID, roleID)
 	return err
 }
 
@@ -46,10 +53,12 @@ func (r *WorkspaceMemberRepository) Remove(ctx context.Context, workspaceID, use
 
 func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, userID string) (string, error) {
 	var role string
-	err := r.client.GetDB(ctx).QueryRowContext(ctx,
-		`SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
-		workspaceID, userID,
-	).Scan(&role)
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, `
+		SELECT r.name 
+		FROM workspace_members wm 
+		JOIN roles r ON r.id = wm.role_id 
+		WHERE wm.workspace_id = $1 AND wm.user_id = $2
+	`, workspaceID, userID).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("workspace member workspace=%s user=%s: %w", workspaceID, userID, port.ErrNotFound)
 	}
@@ -58,8 +67,9 @@ func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, us
 
 func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error) {
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
-		SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.email, COALESCE(u.display_name, '')
+		SELECT wm.workspace_id, wm.user_id, r.name, wm.joined_at, u.email, COALESCE(u.display_name, '')
 		FROM workspace_members wm
+		JOIN roles r ON r.id = wm.role_id
 		INNER JOIN users u ON u.id = wm.user_id
 		WHERE wm.workspace_id = $1
 		ORDER BY wm.joined_at ASC

@@ -71,7 +71,9 @@ jobs:
 
 ### 2. Bootstrap: Create Workspace and API Key
 
-This step provisions everything needed from scratch — no seeds required:
+Before bootstrapping, ensure that the base roles and permissions seed file `database/seeds/002_seed_permissions.sql` has been executed against the database. Workspace creation programmatically maps the creator to the `admin` role and registers permissions in the `gogate` cache; this process fails if the roles have not been seeded.
+
+After applying the base seed, execute the bootstrap sequence:
 
 ```bash
 BASE=http://localhost:10101/api/v1

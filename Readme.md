@@ -31,7 +31,7 @@ Write your messaging code once — switch between Mailgun, Twilio, Firebase, Wha
 
 - **Unified Interface:** Send Email, SMS, Push, and Chat messages through one consistent API.
 - **Provider Abstraction:** Change a configuration value to switch providers, not your code.
-- **DB-First Configuration:** Manage all provider credentials securely in PostgreSQL via the Portal UI.
+- **DB-First Configuration:** Provider credentials and workspace settings in PostgreSQL (Portal REST API; UI pages partial).
 - **Workspace Isolation:** Multi-tenant support for separate providers, API keys, and templates per workspace.
 - **Developer-Friendly:** Includes a local Memory provider to capture messages locally and assert real payloads without mocking.
 
@@ -198,17 +198,16 @@ make start
 
 ## Portal UI
 
-The Portal is available at **http://localhost:10104** when the server runs.
+Available at **http://localhost:10104** when the server runs.
 
 | Feature | Description |
-|---------|------------|
-| **Integrations** | Add provider credentials (encrypted in DB, not in config files) |
-| **API Keys** | Generate credentials for your apps to send messages |
-| **Templates** | Create reusable HTML email templates |
-| **Inbox** | View all captured messages (in `memory_only` mode) |
-| **Members** | Invite team members to your workspace |
-| **Logs** | Full audit trail of every send request |
-| **Settings** | Dispatch mode: `memory_only` · `provider_only` · `memory_and_provider` |
+|---------|-------------|
+| **Sign in / Register** | Portal account (JWT for `/api/v1/*`) |
+| **Workspaces** | List and open a workspace |
+| **Message logs** | Audit trail of gateway send requests |
+| **Send test** | Test send per channel from the dashboard |
+
+Memory **inbox** capture, integrations, API keys, templates, members, and settings are **REST/Bruno only** today — see [Usage guide](docs/backend/usage.md) and [Portal inbox](docs/backend/portal-inbox.md).
 
 ---
 
@@ -223,10 +222,8 @@ The gateway enforces a strict separation between **server infrastructure** and *
    - `JWT_SECRET` for Portal UI session authentication.
    *(Note: Never place provider credentials like Mailgun API keys in this file.)*
 
-2. **Provider Credentials (Portal UI):**
-   All third-party credentials (Mailgun, Twilio, Firebase) are managed dynamically via the **Portal UI** (http://localhost:10104). They are stored securely in PostgreSQL. This allows you to add or change messaging providers instantly without restarting the server.
-
----
+2. **Provider credentials (server mode):**
+   Stored AES-encrypted in PostgreSQL. Configure via the **Portal REST API** (Integrations endpoints) — there is no Portal UI page for this yet. See [Usage guide](docs/backend/usage.md) and [E2E bootstrap](docs/backend/e2e-testing.md).
 
 ## E2E Testing
 
@@ -324,7 +321,7 @@ wpd-message-gateway/
 4. **Add providers** — See [Contributing Guide](docs/backend/contributing.md)
 5. **Sponsor** — Support ongoing development
 
-> Run `make audit` before opening a PR — it's the quality gate.
+> Run **`/smell develop`** then **`make audit`** before opening a PR — see [docs/agents/verification.md](docs/agents/verification.md).
 
 ---
 

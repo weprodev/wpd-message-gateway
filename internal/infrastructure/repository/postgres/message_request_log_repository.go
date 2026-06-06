@@ -3,7 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"strconv"
+	"fmt"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -67,17 +67,17 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	where := "l.workspace_id = $1"
 	argPos := 2
 	if q.ChannelType != "" {
-		where += " AND l.channel_type = $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND l.channel_type = $%d", argPos)
 		args = append(args, q.ChannelType)
 		argPos++
 	}
 	if q.From != nil {
-		where += " AND l.created_at >= $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND l.created_at >= $%d", argPos)
 		args = append(args, *q.From)
 		argPos++
 	}
 	if q.To != nil {
-		where += " AND l.created_at <= $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND l.created_at <= $%d", argPos)
 		args = append(args, *q.To)
 	}
 
@@ -87,15 +87,18 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 		return nil, 0, err
 	}
 
-	listQuery := `
+	// LIMIT and OFFSET come from bounded Go int values clamped above — not from user input.
+	// database/sql does not support parameterised LIMIT/OFFSET in standard Postgres; using
+	// fmt.Sprintf with validated integers is the correct approach here.
+	listQuery := fmt.Sprintf(`
 		SELECT l.id, l.workspace_id, l.api_key_id, l.channel_type, l.http_method, l.status_code, l.endpoint,
 			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.created_at,
 			COALESCE(k.name, ''), COALESCE(k.client_id, '')
 		FROM message_request_logs l
 		LEFT JOIN api_keys k ON k.id = l.api_key_id
-		WHERE ` + where + `
+		WHERE %s
 		ORDER BY l.created_at DESC
-		LIMIT ` + strconv.Itoa(q.Limit) + ` OFFSET ` + strconv.Itoa(q.Offset)
+		LIMIT %d OFFSET %d`, where, q.Limit, q.Offset)
 
 	rows, err := db.QueryContext(ctx, listQuery, args...)
 	if err != nil {

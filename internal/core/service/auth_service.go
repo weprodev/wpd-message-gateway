@@ -20,7 +20,10 @@ type AuthService struct {
 	emailSender               port.EmailSender
 	secret                    string
 	emailVerificationEnabled  bool
+	sessionTTL                time.Duration
 	emailVerificationTokenTTL time.Duration
+	// verificationBaseURL is the URL prefix for email verification links.
+	verificationBaseURL string
 }
 
 // NewAuthService creates a new AuthService.
@@ -29,21 +32,35 @@ func NewAuthService(
 	emailSender port.EmailSender,
 	secret string,
 	emailVerificationEnabled bool,
+	sessionTTL time.Duration,
 	emailVerificationTokenTTL time.Duration,
+	verificationBaseURL string,
 ) *AuthService {
+	if sessionTTL <= 0 {
+		sessionTTL = 24 * time.Hour
+	}
+	if emailVerificationTokenTTL <= 0 {
+		emailVerificationTokenTTL = 24 * time.Hour
+	}
 	return &AuthService{
 		userRepo:                  userRepo,
 		emailSender:               emailSender,
 		secret:                    secret,
 		emailVerificationEnabled:  emailVerificationEnabled,
+		sessionTTL:                sessionTTL,
 		emailVerificationTokenTTL: emailVerificationTokenTTL,
+		verificationBaseURL:       verificationBaseURL,
 	}
 }
 
 // RegisterUser registers a new user.
 func (s *AuthService) RegisterUser(ctx context.Context, firstName, lastName, email, password string) (*domain.User, error) {
-	if _, err := s.userRepo.GetByEmail(ctx, email); !errors.Is(err, port.ErrNotFound) {
+	_, err := s.userRepo.GetByEmail(ctx, email)
+	if err == nil {
 		return nil, errors.New("user with this email already exists")
+	}
+	if !errors.Is(err, port.ErrNotFound) {
+		return nil, err
 	}
 
 	passwordHash, err := crypto.HashSecret(password)
@@ -78,8 +95,7 @@ func (s *AuthService) sendVerificationEmail(ctx context.Context, user *domain.Us
 		return err
 	}
 
-	// TODO: Make the verification URL configurable
-	verificationURL := fmt.Sprintf("https://portal.weprodev.com/verify-email?token=%s", token)
+	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", s.verificationBaseURL, token)
 
 	_, err = s.emailSender.Send(ctx, &contracts.Email{
 		To:      []string{user.Email},
@@ -123,7 +139,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*domai
 		return nil, "", errors.New("invalid email or password")
 	}
 
-	token, err := authjwt.Sign(user.ID.String(), user.Email, s.secret, s.emailVerificationTokenTTL)
+	token, err := authjwt.Sign(user.ID.String(), user.Email, s.secret, s.sessionTTL)
 	if err != nil {
 		return nil, "", fmt.Errorf("could not sign token: %w", err)
 	}

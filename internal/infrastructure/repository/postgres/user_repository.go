@@ -31,13 +31,6 @@ func (r *UserRepository) Create(ctx context.Context, u *domain.User) error {
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 }
 
-func nullStr(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, password_hash, email_verified, created_at, updated_at

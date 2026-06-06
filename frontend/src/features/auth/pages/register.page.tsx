@@ -1,10 +1,10 @@
 import { type FormEvent, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
-import { ROUTES } from "@/app/paths"
+import { ROUTES } from "@/core/router/routes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { registerAccount } from "@/features/auth/auth.api"
+import { registerAccount } from "../auth.api"
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -31,13 +31,13 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm space-y-6">
+    <div className="mx-auto flex max-w-sm flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
         <p className="text-sm text-muted-foreground">Register for the message gateway portal.</p>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-2">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           <label htmlFor="email" className="text-sm font-medium">
             Email
           </label>
@@ -50,7 +50,7 @@ export function RegisterPage() {
             onChange={(ev) => setEmail(ev.target.value)}
           />
         </div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor="display" className="text-sm font-medium">
             Display name
           </label>
@@ -62,7 +62,7 @@ export function RegisterPage() {
             onChange={(ev) => setDisplayName(ev.target.value)}
           />
         </div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor="password" className="text-sm font-medium">
             Password
           </label>

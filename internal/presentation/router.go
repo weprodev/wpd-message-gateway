@@ -6,13 +6,16 @@ import (
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 
 	pkgapi "github.com/weprodev/go-pkg/api"
 	pkglogger "github.com/weprodev/go-pkg/logger"
 	pkgvalidator "github.com/weprodev/go-pkg/validator"
+	gogate "github.com/weprodev/wpd-gogate"
 )
 
 // Router holds HTTP handlers and Echo configuration.
@@ -25,6 +28,7 @@ type Router struct {
 	workspaceRepo      port.WorkspaceRepository
 	memberRepo         port.WorkspaceMemberRepository
 	logger             *pkglogger.Logger
+	gate               *gogate.Gate
 }
 
 // NewRouter creates a new router bundle.
@@ -37,6 +41,7 @@ func NewRouter(
 	portal *handler.PortalHandler,
 	jwtSecret string,
 	logger *pkglogger.Logger,
+	gate *gogate.Gate,
 ) *Router {
 	return &Router{
 		gatewayHandler:     gateway,
@@ -47,6 +52,7 @@ func NewRouter(
 		workspaceRepo:      workspaceRepo,
 		memberRepo:         memberRepo,
 		logger:             logger,
+		gate:               gate,
 	}
 }
 
@@ -58,6 +64,21 @@ func (rt *Router) Setup() *echo.Echo {
 	e.Validator = pkgvalidator.NewValidator()
 
 	e.Use(echomiddleware.Recover())
+	e.Use(echomiddleware.RequestID())
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			reqID := c.Response().Header().Get(echo.HeaderXRequestID)
+			if reqID == "" {
+				reqID = c.Request().Header.Get(echo.HeaderXRequestID)
+			}
+			if reqID != "" {
+				ctx := c.Request().Context()
+				ctx = applogger.WithRequestID(ctx, reqID)
+				c.SetRequest(c.Request().WithContext(ctx))
+			}
+			return next(c)
+		}
+	})
 	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{
 		LogStatus:   true,
 		LogURI:      true,
@@ -65,7 +86,7 @@ func (rt *Router) Setup() *echo.Echo {
 		LogLatency:  true,
 		LogRemoteIP: true,
 		LogValuesFunc: func(c echo.Context, v echomiddleware.RequestLoggerValues) error {
-			slog.Info("request",
+			slog.InfoContext(c.Request().Context(), "request summary",
 				slog.String("method", v.Method),
 				slog.String("uri", v.URI),
 				slog.Int("status", v.Status),
@@ -112,26 +133,27 @@ func (rt *Router) Setup() *echo.Echo {
 	protected.POST("/workspaces/join", ph.JoinWorkspace)
 	protected.GET("/workspaces", ph.ListWorkspaces)
 	protected.POST("/workspaces", ph.CreateWorkspace)
-	protected.GET("/workspaces/:wid", ph.GetWorkspace)
-	protected.PATCH("/workspaces/:wid", ph.PatchWorkspace)
-	protected.GET("/workspaces/:wid/members", ph.ListMembers)
-	protected.DELETE("/workspaces/:wid/members/:userId", ph.RemoveMember)
-	protected.GET("/workspaces/:wid/api-keys", ph.ListAPIKeys)
-	protected.POST("/workspaces/:wid/api-keys", ph.CreateAPIKey)
-	protected.DELETE("/workspaces/:wid/api-keys/:keyId", ph.DeleteAPIKey)
-	protected.POST("/workspaces/:wid/api-keys/:keyId/regenerate", ph.RegenerateAPIKey)
-	protected.GET("/workspaces/:wid/logs", ph.ListLogs)
-	protected.GET("/workspaces/:wid/integrations", ph.ListIntegrations)
-	protected.POST("/workspaces/:wid/integrations", ph.UpsertIntegration)
-	protected.DELETE("/workspaces/:wid/integrations/:iid", ph.DeleteIntegration)
-	protected.GET("/workspaces/:wid/templates", ph.ListTemplates)
-	protected.POST("/workspaces/:wid/templates", ph.CreateTemplate)
-	protected.PATCH("/workspaces/:wid/templates/:tid", ph.PatchTemplate)
-	protected.DELETE("/workspaces/:wid/templates/:tid", ph.DeleteTemplate)
-	protected.GET("/workspaces/:wid/settings", ph.GetSettings)
-	protected.PATCH("/workspaces/:wid/settings", ph.PatchSettings)
-	protected.GET("/workspaces/:wid/invitations", ph.ListInvitations)
-	protected.POST("/workspaces/:wid/invitations", ph.CreateInvitation)
+	protected.GET("/workspaces/:wid", ph.GetWorkspace, customMiddleware.RequirePermission(rt.gate, domain.PermissionWorkspacesRead))
+	protected.PATCH("/workspaces/:wid", ph.PatchWorkspace, customMiddleware.RequirePermission(rt.gate, domain.PermissionWorkspacesWrite))
+	protected.GET("/workspaces/:wid/members", ph.ListMembers, customMiddleware.RequirePermission(rt.gate, domain.PermissionMembersRead))
+	protected.DELETE("/workspaces/:wid/members/:userId", ph.RemoveMember, customMiddleware.RequirePermission(rt.gate, domain.PermissionMembersWrite))
+	protected.GET("/workspaces/:wid/api-keys", ph.ListAPIKeys, customMiddleware.RequirePermission(rt.gate, domain.PermissionAPIKeysRead))
+	protected.POST("/workspaces/:wid/api-keys", ph.CreateAPIKey, customMiddleware.RequirePermission(rt.gate, domain.PermissionAPIKeysWrite))
+	protected.DELETE("/workspaces/:wid/api-keys/:keyId", ph.DeleteAPIKey, customMiddleware.RequirePermission(rt.gate, domain.PermissionAPIKeysWrite))
+	protected.POST("/workspaces/:wid/api-keys/:keyId/regenerate", ph.RegenerateAPIKey, customMiddleware.RequirePermission(rt.gate, domain.PermissionAPIKeysWrite))
+	protected.GET("/workspaces/:wid/logs", ph.ListLogs, customMiddleware.RequirePermission(rt.gate, domain.PermissionLogsRead))
+	protected.GET("/workspaces/:wid/integrations", ph.ListIntegrations, customMiddleware.RequirePermission(rt.gate, domain.PermissionIntegrationsRead))
+	protected.POST("/workspaces/:wid/integrations", ph.UpsertIntegration, customMiddleware.RequirePermission(rt.gate, domain.PermissionIntegrationsWrite))
+	protected.DELETE("/workspaces/:wid/integrations/:iid", ph.DeleteIntegration, customMiddleware.RequirePermission(rt.gate, domain.PermissionIntegrationsWrite))
+	protected.GET("/workspaces/:wid/templates", ph.ListTemplates, customMiddleware.RequirePermission(rt.gate, domain.PermissionTemplatesRead))
+	protected.POST("/workspaces/:wid/templates", ph.CreateTemplate, customMiddleware.RequirePermission(rt.gate, domain.PermissionTemplatesWrite))
+	protected.PATCH("/workspaces/:wid/templates/:tid", ph.PatchTemplate, customMiddleware.RequirePermission(rt.gate, domain.PermissionTemplatesWrite))
+	protected.DELETE("/workspaces/:wid/templates/:tid", ph.DeleteTemplate, customMiddleware.RequirePermission(rt.gate, domain.PermissionTemplatesWrite))
+	protected.GET("/workspaces/:wid/settings", ph.GetSettings, customMiddleware.RequirePermission(rt.gate, domain.PermissionSettingsRead))
+	protected.PATCH("/workspaces/:wid/settings", ph.PatchSettings, customMiddleware.RequirePermission(rt.gate, domain.PermissionSettingsWrite))
+	protected.GET("/workspaces/:wid/invitations", ph.ListInvitations, customMiddleware.RequirePermission(rt.gate, domain.PermissionInvitationsRead))
+	protected.POST("/workspaces/:wid/invitations", ph.CreateInvitation, customMiddleware.RequirePermission(rt.gate, domain.PermissionInvitationsWrite))
+	protected.POST("/workspaces/:wid/send-test/:channel", ph.SendTest, customMiddleware.RequirePermission(rt.gate, domain.PermissionSendTest))
 
 	// Inbox API — always enabled (portal is always on).
 	if rt.memberRepo != nil {

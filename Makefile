@@ -11,6 +11,9 @@ MAGENTA := \033[35m
 BOLD    := \033[1m
 RESET   := \033[0m
 
+# Go packages only (excludes frontend/node_modules vendored Go stubs)
+GO_PKGS := ./cmd/... ./internal/... ./pkg/...
+
 .DEFAULT_GOAL := help
 
 # ============================================================================
@@ -51,7 +54,7 @@ install:
 	@printf "$(BOLD)$(CYAN)🔧 Installing development tools...$(RESET)\n"
 	@go install golang.org/x/tools/cmd/goimports@latest
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
 	@printf "$(GREEN)✅ Development tools installed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🌐 Installing frontend dependencies...$(RESET)\n"
@@ -163,7 +166,7 @@ stop:
 test:
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🧪 Running tests...$(RESET)\n"
-	@go test ./...
+	@go test $(GO_PKGS)
 	@printf "$(GREEN)✅ All tests passed!$(RESET)\n"
 
 ## Full quality check: format + lint + test (Go + frontend), govulncheck, then compile checks (Go + Vite + Storybook)
@@ -183,7 +186,7 @@ audit:
 	@printf "$(GREEN)✅ Frontend formatted!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔍 Linting Go...$(RESET)\n"
-	@golangci-lint run ./...
+	@golangci-lint run $(GO_PKGS)
 	@printf "$(GREEN)✅ Go lint passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔍 Linting frontend...$(RESET)\n"
@@ -191,7 +194,7 @@ audit:
 	@printf "$(GREEN)✅ Frontend lint passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🧪 Testing Go...$(RESET)\n"
-	@go test ./...
+	@go test $(GO_PKGS)
 	@printf "$(GREEN)✅ Go tests passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🧪 Testing frontend...$(RESET)\n"
@@ -199,11 +202,11 @@ audit:
 	@printf "$(GREEN)✅ Frontend tests passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔒 govulncheck (Go)...$(RESET)\n"
-	@govulncheck ./...
+	@govulncheck $(GO_PKGS)
 	@printf "$(GREEN)✅ No Go vulnerabilities reported!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔨 Verifying builds (Go + Vite app + Storybook)...$(RESET)\n"
-	@go build ./...
+	@go build $(GO_PKGS)
 	@cd frontend && npm run build:all
 	@printf "$(GREEN)✅ All builds succeeded!$(RESET)\n"
 	@printf "\n"
@@ -215,7 +218,7 @@ audit:
 build:
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🔨 Building Go + frontend (app + Storybook)...$(RESET)\n"
-	@go build ./...
+	@go build $(GO_PKGS)
 	@cd frontend && npm run build:all
 	@printf "$(GREEN)✅ Build successful!$(RESET)\n"
 

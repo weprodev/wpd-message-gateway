@@ -10,7 +10,7 @@ Use a structured, TDD-focused workflow for all backend modifications:
 2. **Plan**: Formulate a complete design before writing code.
 3. **Test First (RED-GREEN-REFACTOR)**: Write a failing table-driven test representing the requirement, then write the minimal code to pass it, and lastly refactor for cleanliness and performance.
 4. **Implement**: Execute using standard patterns (small interfaces, concrete return types, and context-aware functions).
-5. **Verify**: Apply the quality gate (`make audit`, ensuring `-race` and test coverage remain high).
+5. **Verify**: Run [verification chain](../agents/verification.md) — lint → **`/smell develop`** → fix BLOCKER/HIGH → **`make audit`**.
 6. **Communicate**: Provide clear, conventionally-formatted commit messages detailing *why* a change was made.
 
 ## 2. DDD Layers & Import Rules
@@ -124,13 +124,14 @@ When unsure how to implement a business feature:
 
 ## 10. Quality Gate
 
-Before pushing any PR, ensure:
+Before pushing any PR, run [verification.md](../agents/verification.md):
 
 ```bash
-make audit
+/smell develop   # fix BLOCKER/HIGH — .claude/commands/smell.md
+make audit       # format, lint, test, govulncheck, builds
 ```
 
-This enforces formatting, linters (`golangci-lint`), tests `-race`, `govulncheck`, and build checks for **Go and the frontend** (including Storybook). Ensure exit 0 for the scope of your change.
+Agents must execute both themselves. Ensure exit 0 for the scope of your change.
 
 ## 11. References
 

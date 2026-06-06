@@ -1,20 +1,9 @@
-import { useState } from "react"
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom"
+import { Link, NavLink, Outlet } from "react-router-dom"
 
-import { getToken, setToken } from "@/core/api/client"
-import { ROUTES } from "@/app/paths"
+import { ROUTES } from "@/core/router/routes"
 import { cn } from "@/lib/utils"
 
 export function AppShell() {
-  const navigate = useNavigate()
-  const [authed, setAuthed] = useState(() => !!getToken())
-
-  function logout() {
-    setToken(null)
-    setAuthed(false)
-    navigate(ROUTES.login, { replace: true })
-  }
-
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-card">
@@ -31,27 +20,6 @@ export function AppShell() {
             >
               Workspaces
             </NavLink>
-            <NavLink
-              to={ROUTES.email}
-              className={({ isActive }) =>
-                cn("hover:text-foreground", isActive && "font-medium text-foreground")
-              }
-            >
-              Email
-            </NavLink>
-            {authed ? (
-              <button
-                type="button"
-                onClick={logout}
-                className="text-foreground hover:underline"
-              >
-                Sign out
-              </button>
-            ) : (
-              <Link to={ROUTES.login} className="hover:text-foreground">
-                Sign in
-              </Link>
-            )}
           </nav>
         </div>
       </header>

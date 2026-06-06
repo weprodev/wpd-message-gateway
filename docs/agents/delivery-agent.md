@@ -2,8 +2,7 @@
 name: delivery-agent
 description: >-
   Invoke for new features, feature improvements, and bugfixes across the WPD Message Gateway.
-  Loads backend (Go/hexagonal) and frontend (Portal/React) contracts from docs/backend and docs/frontend.
-  Prefer routing via docs/agents/master-agent.md unless the user already specified implementation work.
+  After implementation, run docs/agents/verification.md (/smell + make audit).
 ---
 
 # Delivery agent — implement & fix
@@ -15,7 +14,7 @@ Orchestration note: the **[master-agent](./master-agent.md)** classifies request
 ## 0. Control & traceability (Agent Hygiene & Safety)
 
 - **Traceability:** Before multi-file edits, state a **short plan** (files/areas + verification). After edits, summarize **what changed** and **how it was verified**.
-- **Bounded retries:** If `make audit` or tests fail twice for the **same** mistake class, **stop**, re-read the failing output, and **narrow scope** (fix one layer or one package) instead of looping.
+- **Bounded retries:** If [verification](./verification.md) fails twice for the **same** mistake class, **stop**, re-read output, and **narrow scope** instead of looping.
 - **No secret material (Data Exposure limits):** Do not echo or commit API keys, JWTs, or pasted credentials. **Hard requirement:** Any code generating secrets must use crypto-safe `crypto/rand`, and secrets must exclusively live in ENV or hashed in Postgres.
 
 ## 1. Safety & Robustness Pre-Check
@@ -66,17 +65,26 @@ Determine **surface area** before coding:
 - **Frontend**: semantic tokens, shadcn patterns; auth tokens never logged; accessibility (`aria-*`) natively supported everywhere.
 
 ### 4.4 Verify & Document (Reliability & Sync)
-From repo root:
-```bash
-make audit
-```
-Exit code **0** is required before merge.
+
+Run the mandatory [verification chain](./verification.md) after implementation:
+
+1. Fast lint on touched paths
+2. **`/smell develop`** — fix all BLOCKER and HIGH findings
+3. **`make audit`** — exit code 0 from repo root
+
+Agents execute this chain themselves; do not ask the user to run it.
 
 **Continuous Documentation Sync is Mandatory**:
 - **UI Component Changed?** → Update or create the equivalent `.stories.tsx` Storybook file.
 - **Database Schema Changed?** → Update database schemas and architecture markdown diagrams.
 - **Directory/Layer Added?** → Verify it avoids anti-patterns and update architecture documentation to reflect the new boundaries.
 
+## 5. Before PR
+
+Complete [verification.md](./verification.md) in full. Optional: [review-agent](./review-agent.md) self-review (starts with `/smell`).
+
+See [prompts.md](./prompts.md).
+
 ---
 
-**Summary:** Classify work → evaluate safety/security vectors → TDD / plan minimal diffs → implement per layer rules → `make audit` → ship with explicit assurance that PII/Secrets are contained.
+**Summary:** Classify work → safety pre-check → TDD / minimal diffs → implement per layer rules → **verification chain** (`/smell` + `make audit`) → ship.

@@ -15,7 +15,6 @@ type WorkspaceMemberRepository interface {
 	ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error)
 }
 
-
 // InvitationRepository stores pending invites.
 type InvitationRepository interface {
 	Create(ctx context.Context, inv *domain.Invitation) error
@@ -37,4 +36,10 @@ type WorkspaceSettingsRepository interface {
 	Get(ctx context.Context, workspaceID, key string) (string, error)
 	Set(ctx context.Context, workspaceID, key, value string) error
 	GetAll(ctx context.Context, workspaceID string) (map[string]string, error)
+}
+
+// AuthorizationGate abstracts role and permission assignments.
+type AuthorizationGate interface {
+	AssignRole(ctx context.Context, modelType, modelID, teamID, roleName string) error
+	RemoveRole(ctx context.Context, modelType, modelID, teamID, roleName string) error
 }

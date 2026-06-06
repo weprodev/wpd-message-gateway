@@ -1,7 +1,7 @@
 package app
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -14,7 +14,10 @@ import (
 
 	"github.com/weprodev/go-pkg/crypto"
 
+	gogate "github.com/weprodev/wpd-gogate"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/authgate"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
@@ -34,6 +37,10 @@ type Application struct {
 // Wire builds and connects all application dependencies.
 // It returns an error if any required secret is missing or the DB is unreachable.
 func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
+	// Startup context: cap initialization time to avoid hanging indefinitely.
+	startCtx, startCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer startCancel()
+
 	// ── Database ────────────────────────────────────────────────────────────
 	dbConfig := pkgconfig.ApplyDatabaseOverrides(pkgconfig.DatabaseConfig{})
 	pgClient, err := pgsql.NewPgClient(pgsql.PgConfig{
@@ -51,6 +58,13 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect to database: %w", err)
 	}
+
+	// ── RBAC Gate ───────────────────────────────────────────────────────────
+	gateEngine := gogate.NewGate(pgClient.GetDB(startCtx), nil)
+	if err := gateEngine.LoadPolicy(startCtx); err != nil {
+		return nil, fmt.Errorf("load RBAC policies: %w", err)
+	}
+	authGate := authgate.NewGoGateAdapter(gateEngine)
 
 	// ── Encryption service ──────────────────────────────────────────────────
 	encKey, err := resolveSecret("MESSAGE_CONFIG_ENCRYPTION_KEY", cfg.Environment, 32)
@@ -99,6 +113,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		Settings:     settingsRepo,
 		JWTSecret:    jwtSecret,
 		JWTTTL:       jwtTTL,
+		Gate:         authGate,
 	})
 
 	// ── Auth service ──────────────────────────────────────────────────────
@@ -107,7 +122,9 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		memory.NewEmailProvider(memory.GetStore()),
 		jwtSecret,
 		true,
+		jwtTTL,
 		24*time.Hour,
+		cfg.Portal.BaseURL,
 	)
 
 	// ── Memory store & inbox writer ─────────────────────────────────────────
@@ -119,7 +136,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
-	portalHandler := handler.NewPortalHandler(portalSvc, authService)
+	portalHandler := handler.NewPortalHandler(portalSvc, authService, gatewaySvc, logRepo)
 	portalInboxHandler := handler.NewPortalInboxHandler(memoryStore)
 	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, logRepo)
 
@@ -128,6 +145,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		gatewayHandler, portalInboxHandler,
 		apiKeyRepo, workspaceRepo, memberRepo,
 		portalHandler, jwtSecret, sysLogger,
+		gateEngine,
 	)
 
 	return &Application{
@@ -140,36 +158,23 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	}, nil
 }
 
-// resolveSecret returns the secret from env or cfg, failing if it is too short
-// in non-local environments. In local/test it falls back to a dev-only default
-// and warns — never used silently in production.
+// resolveSecret returns the secret from the environment, failing if it is missing or too short.
 func resolveSecret(envKey string, environment string, minLen int) (string, error) {
 	val := os.Getenv(envKey)
 	if len(val) >= minLen {
 		return val, nil
 	}
-	if isLocalEnv(environment) {
-		// Safe to use a well-known dev default — not a production secret.
-		return "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", nil
-	}
 	return "", fmt.Errorf(
-		"%s must be set to a %d+ character secret in %q environment; "+
-			"see docs/backend/usage.md for configuration instructions",
-		envKey, minLen, environment,
+		"%s must be set to a %d+ character secret; "+
+			"see docs/backend/usage.md or the .env file for configuration instructions",
+		envKey, minLen,
 	)
 }
 
-// validateSecret fails if the secret is too short in non-local environments.
+// validateSecret fails if the secret is missing or too short.
 func validateSecret(label, val string, minLen int, environment string) error {
 	if len(val) >= minLen {
 		return nil
 	}
-	if isLocalEnv(environment) {
-		return nil // dev-only: accept short/empty secrets
-	}
-	return errors.New(label + " must be at least " + fmt.Sprintf("%d", minLen) + " characters")
-}
-
-func isLocalEnv(env string) bool {
-	return env == "" || env == "local" || env == "test" || env == "development"
+	return fmt.Errorf("%s must be at least %d characters", label, minLen)
 }

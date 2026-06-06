@@ -28,11 +28,12 @@ type ServerConfig struct {
 	Port int `yaml:"port"`
 }
 
-// PortalConfig holds JWT settings for the web portal.
+// PortalConfig holds JWT settings and portal URL for the web portal.
 type PortalConfig struct {
 	JWTSecret   string `yaml:"jwt_secret"`
 	JWTTTLHours int    `yaml:"jwt_ttl_hours"`
 	UIPort      int    `yaml:"ui_port"`
+	BaseURL     string `yaml:"base_url"`
 }
 
 // ProviderConfig holds provider configuration.
@@ -119,6 +120,8 @@ func (c *Config) applyEnvOverrides() {
 			c.Providers.Defaults.Chat = val
 		case "MESSAGE_JWT_SECRET":
 			c.Portal.JWTSecret = val
+		case "MESSAGE_PORTAL_BASE_URL":
+			c.Portal.BaseURL = val
 		}
 	}
 }

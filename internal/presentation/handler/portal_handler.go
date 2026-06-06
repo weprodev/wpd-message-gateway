@@ -1,15 +1,12 @@
 package handler
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/go-pkg/sanitizer"
@@ -22,12 +19,45 @@ import (
 
 // PortalHandler exposes REST endpoints for the web portal (JWT, not API keys).
 type PortalHandler struct {
-	svc    *service.PortalService
+	svc     *service.PortalService
 	authSvc *service.AuthService
+	gateway *service.GatewayService
+	logs    port.MessageRequestLogRepository
+	helper  *SendHelper
 }
 
-func NewPortalHandler(svc *service.PortalService, authSvc *service.AuthService) *PortalHandler {
-	return &PortalHandler{svc: svc, authSvc: authSvc}
+func NewPortalHandler(
+	svc *service.PortalService,
+	authSvc *service.AuthService,
+	gateway *service.GatewayService,
+	logs port.MessageRequestLogRepository,
+) *PortalHandler {
+	return &PortalHandler{
+		svc:     svc,
+		authSvc: authSvc,
+		gateway: gateway,
+		logs:    logs,
+		helper:  NewSendHelper(logs),
+	}
+}
+
+// safeHTTPError returns an HTTPError with a sanitised message.
+// For known domain sentinels it uses a curated message; for all other errors
+// it returns a generic message to avoid leaking infrastructure details.
+func safeHTTPError(err error, fallbackStatus int, fallbackMessage string) *echo.HTTPError {
+	switch {
+	case errors.Is(err, port.ErrNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, "resource not found")
+	case errors.Is(err, port.ErrConflict):
+		return echo.NewHTTPError(http.StatusConflict, "resource already exists")
+	case errors.Is(err, port.ErrUnauthorized):
+		return echo.NewHTTPError(http.StatusForbidden, "insufficient permissions")
+	case errors.Is(err, port.ErrInvalidCredentials):
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
+	case errors.Is(err, port.ErrInvalidInput):
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return echo.NewHTTPError(fallbackStatus, fallbackMessage)
 }
 
 type registerBody struct {
@@ -54,7 +84,8 @@ func (h *PortalHandler) Register(c echo.Context) error {
 	}
 	u, err := h.authSvc.RegisterUser(c.Request().Context(), body.FirstName, body.LastName, body.Email, body.Password)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		// Map known sentinels; guard against leaking DB/infra error strings.
+		return safeHTTPError(err, http.StatusBadRequest, "registration failed")
 	}
 	return c.JSON(http.StatusCreated, u)
 }
@@ -80,7 +111,8 @@ func (h *PortalHandler) Login(c echo.Context) error {
 
 	u, token, err := h.authSvc.Login(c.Request().Context(), body.Email, body.Password)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+		// Never leak infra error details; always return a generic auth failure.
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
 	}
 
 	return c.JSON(http.StatusOK, tokenResponse{Token: token, User: u})
@@ -144,11 +176,7 @@ func (h *PortalHandler) JoinWorkspace(c echo.Context) error {
 }
 
 func (h *PortalHandler) GetWorkspace(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	w, err := h.svc.WorkspaceByID(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
@@ -163,11 +191,7 @@ type patchWorkspaceBody struct {
 }
 
 func (h *PortalHandler) PatchWorkspace(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body patchWorkspaceBody
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -185,11 +209,7 @@ func (h *PortalHandler) PatchWorkspace(c echo.Context) error {
 }
 
 func (h *PortalHandler) ListMembers(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	members, err := h.svc.ListMembers(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -198,14 +218,10 @@ func (h *PortalHandler) ListMembers(c echo.Context) error {
 }
 
 func (h *PortalHandler) RemoveMember(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
 	target := c.Param("userId")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	if err := h.svc.RemoveMember(c.Request().Context(), wid, target); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return safeHTTPError(err, http.StatusBadRequest, "failed to remove member")
 	}
 	return c.NoContent(http.StatusNoContent)
 }
@@ -233,11 +249,7 @@ func toAPIKeyPublic(k domain.APIKey) apiKeyPublic {
 }
 
 func (h *PortalHandler) ListAPIKeys(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	keys, err := h.svc.ListAPIKeys(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -250,11 +262,7 @@ func (h *PortalHandler) ListAPIKeys(c echo.Context) error {
 }
 
 func (h *PortalHandler) CreateAPIKey(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body createAPIKeyBody
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -276,12 +284,8 @@ func (h *PortalHandler) CreateAPIKey(c echo.Context) error {
 }
 
 func (h *PortalHandler) DeleteAPIKey(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
 	keyID := c.Param("keyId")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	if err := h.svc.DeleteAPIKey(c.Request().Context(), wid, keyID); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -289,12 +293,8 @@ func (h *PortalHandler) DeleteAPIKey(c echo.Context) error {
 }
 
 func (h *PortalHandler) RegenerateAPIKey(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
 	keyID := c.Param("keyId")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	secret, err := h.svc.RegenerateAPIKey(c.Request().Context(), wid, keyID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -303,11 +303,7 @@ func (h *PortalHandler) RegenerateAPIKey(c echo.Context) error {
 }
 
 func (h *PortalHandler) ListLogs(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	q := port.MessageLogQuery{WorkspaceID: wid}
 	if ch := c.QueryParam("channel"); ch != "" {
 		q.ChannelType = ch
@@ -352,11 +348,7 @@ func integrationToJSON(intg domain.Integration) map[string]any {
 }
 
 func (h *PortalHandler) ListIntegrations(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	list, err := h.svc.ListIntegrations(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -369,11 +361,7 @@ func (h *PortalHandler) ListIntegrations(c echo.Context) error {
 }
 
 func (h *PortalHandler) UpsertIntegration(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body integrationBody
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -401,12 +389,8 @@ func (h *PortalHandler) UpsertIntegration(c echo.Context) error {
 }
 
 func (h *PortalHandler) DeleteIntegration(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
 	iid := c.Param("iid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	if err := h.svc.DeleteIntegration(c.Request().Context(), wid, iid); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -436,11 +420,7 @@ type patchTemplateBody struct {
 }
 
 func (h *PortalHandler) ListTemplates(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	list, err := h.svc.ListTemplates(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -449,11 +429,7 @@ func (h *PortalHandler) ListTemplates(c echo.Context) error {
 }
 
 func (h *PortalHandler) CreateTemplate(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body templateBody
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -485,12 +461,8 @@ func (h *PortalHandler) CreateTemplate(c echo.Context) error {
 }
 
 func (h *PortalHandler) PatchTemplate(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
 	tid := c.Param("tid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body patchTemplateBody
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -515,12 +487,8 @@ func (h *PortalHandler) PatchTemplate(c echo.Context) error {
 }
 
 func (h *PortalHandler) DeleteTemplate(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
 	tid := c.Param("tid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	if err := h.svc.DeleteTemplate(c.Request().Context(), wid, tid); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -528,11 +496,7 @@ func (h *PortalHandler) DeleteTemplate(c echo.Context) error {
 }
 
 func (h *PortalHandler) GetSettings(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if _, err := h.svc.RequireMember(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "not a member")
-	}
 	m, err := h.svc.GetSettings(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -541,11 +505,7 @@ func (h *PortalHandler) GetSettings(c echo.Context) error {
 }
 
 func (h *PortalHandler) PatchSettings(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body map[string]string
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -562,11 +522,7 @@ type invitationBody struct {
 }
 
 func (h *PortalHandler) ListInvitations(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	list, err := h.svc.ListInvitations(c.Request().Context(), wid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -575,11 +531,7 @@ func (h *PortalHandler) ListInvitations(c echo.Context) error {
 }
 
 func (h *PortalHandler) CreateInvitation(c echo.Context) error {
-	uid := customMiddleware.GetPortalUserID(c.Request().Context())
 	wid := c.Param("wid")
-	if err := h.svc.RequireAdmin(c.Request().Context(), wid, uid); err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	}
 	var body invitationBody
 	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -587,19 +539,17 @@ func (h *PortalHandler) CreateInvitation(c echo.Context) error {
 	if body.Email == "" || body.Role == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "email and role required")
 	}
-	rawToken := uuid.NewString() + uuid.NewString()
-	sum := sha256.Sum256([]byte(rawToken))
-	tokenHash := hex.EncodeToString(sum[:])
 	inv := &domain.Invitation{
 		WorkspaceID: wid,
 		Email:       body.Email,
 		Role:        body.Role,
-		TokenHash:   tokenHash,
 		ExpiresAt:   time.Now().Add(7 * 24 * time.Hour),
 		Status:      "pending",
 	}
-	if err := h.svc.CreateInvitation(c.Request().Context(), inv); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	// Token generation (UUID concat + SHA-256) and hash storage happen inside the service.
+	rawToken, err := h.svc.CreateInvitation(c.Request().Context(), inv)
+	if err != nil {
+		return safeHTTPError(err, http.StatusBadRequest, "failed to create invitation")
 	}
 	return c.JSON(http.StatusCreated, map[string]any{
 		"id":         inv.ID,

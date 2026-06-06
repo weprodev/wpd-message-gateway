@@ -15,8 +15,8 @@ This design aligns with agent-system best practices: **Plan-and-Execute**, **cur
 
 | Agent doc | Invoke when | Full playbook |
 | --------- | ----------- | ------------- |
-| **[delivery-agent](./delivery-agent.md)** | Implementing or fixing: new feature, improvement, bugfix, refactor that changes behavior or adds code | Features, layers, TDD, `make audit`, safety guardrails |
-| **[review-agent](./review-agent.md)** | Evaluating existing work: PR review, diff review, design critique before merge | Checklists, bias checks, performance constraints |
+| **[delivery-agent](./delivery-agent.md)** | Implementing or fixing: new feature, improvement, bugfix, refactor that changes behavior or adds code | Features, layers, TDD, [verification chain](./verification.md) |
+| **[review-agent](./review-agent.md)** | Evaluating existing work: PR review, diff review, design critique before merge | `/smell` first, then checklists |
 
 **Rule:** After routing, **load and follow** the matching specialist doc for procedures and checklists. The master agent’s job is **routing + plan + coherence**, not rewriting those contracts.
 
@@ -28,21 +28,21 @@ This design aligns with agent-system best practices: **Plan-and-Execute**, **cur
 | ------------------ | ----- | ----- |
 | “implement”, “add”, “fix bug”, “patch”, “refactor” *with code change intent* | **delivery-agent** | Default for “do the work” |
 | “review”, “PR”, “diff”, “LGTM?”, “what’s wrong” | **review-agent** | Read-only critique unless user asks for fixes |
-| Both (“review then fix”) | **review-agent** first → **delivery-agent** | State two-phase plan upfront |
+| Both (“review then fix”) | **review-agent** (`/smell` + checklist) → **delivery-agent** → **verification chain** again | State two-phase plan upfront |
 
 ## 3. Orchestration pattern (Plan-and-Execute)
 
 Do **not** spin unbounded reason-act loops. Use a **short plan**, execute, then verify to prevent "Memory Hoarding" and infinite looping context breaks.
 
 1. **Safety Pre-Check**: Does the prompt ask for or expose Personal Identifiable Info (PII), DB secrets, or test hardcoded passwords? Refuse unsafe injections instantly.
-2. **Plan (brief)** — 3–7 bullets: goal, scope, constraints, and verification strategy (`make audit`).
+2. **Plan (brief)** — 3–7 bullets: goal, scope, constraints, verification via [verification.md](./verification.md).
 3. **Delegate** — Apply **[delivery-agent](./delivery-agent.md)** or **[review-agent](./review-agent.md)** in full for that phase.
 4. **Execute** — Smallest coherent change set. Do not rewrite files completely if replacing 5 lines works (Token Efficiency).
-5. **Verify & Document** — Ask to run commands per specialist doc. You must explicitly verify:
-   - If UI changed -> Update Storybook.
-   - If DB changed -> Update DB diagrams.
-   - If new layer added -> Validate against architecture and update docs.
-6. **Report** — What changed, how verified, open risks.
+5. **Verify & Document** — After **any** code change, run the full [verification chain](./verification.md): lint → **`/smell develop`** → fix BLOCKER/HIGH → **`make audit`**. Also:
+   - If UI changed → Update Storybook.
+   - If DB changed → Update DB diagrams.
+   - If new layer added → Validate against architecture and update docs.
+6. **Report** — What changed, smell summary, audit result, open risks.
 
 **Re-planning:** At most **one** full replan after major new information (e.g. failing test reveals wrong layer). If still blocked → **stop** and list **specific** questions. Do not infinitely guess.
 
@@ -75,6 +75,7 @@ Do **not** spin unbounded reason-act loops. Use a **short plan**, execute, then 
 
 ## 6. References
 
+- Agents: [AGENTS.md](../../AGENTS.md), [verification.md](./verification.md), [prompts.md](./prompts.md), **`/smell`** (`.claude/commands/smell.md`)
 - Backend: [backend-engineer.md](../backend/backend-engineer.md), [architecture.md](../backend/architecture.md)
 - Frontend: [frontend-engineer.md](../frontend/frontend-engineer.md), [conventions.md](../frontend/conventions.md)
 - Workflow: [workflow.md](../workflow.md)

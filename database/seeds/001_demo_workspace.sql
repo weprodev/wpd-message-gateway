@@ -1,13 +1,13 @@
 -- Demo workspace, API key, email integration, template (aligned with latest schema)
 
-INSERT INTO users (id, email, password, first_name, last_name, status)
+INSERT INTO users (id, email, password_hash, first_name, last_name, email_verified)
 VALUES (
     '00000000-0000-0000-0000-000000000010',
     'demo@weprodev.com',
     '$2a$14$dummy.hash.for.demo.only',
     'Demo',
     'User',
-    'active'
+    true
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -37,6 +37,16 @@ VALUES (
     '00000000-0000-0000-0000-000000000020'
 )
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
+
+INSERT INTO model_has_roles (role_id, model_type, model_id, team_id)
+VALUES (
+    '00000000-0000-0000-0000-000000000020', -- 'admin' role
+    'users',
+    '00000000-0000-0000-0000-000000000010', -- demo user
+    '00000000-0000-0000-0000-000000000001'  -- demo workspace
+)
+ON CONFLICT (role_id, model_id, model_type, team_id) DO NOTHING;
+
 
 INSERT INTO workspace_channels (workspace_id, channel_type, enabled)
 VALUES ('00000000-0000-0000-0000-000000000001', 'email', true)

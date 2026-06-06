@@ -135,15 +135,13 @@ gw, _ := gateway.New(gateway.Config{
 gw.SendEmail(ctx, email)
 ```
 
-### Step 5: Use in Server Mode (via Portal UI)
+### Step 5: Use in server mode (REST API)
 
-1. Start the server and open the Portal
-2. Go to **Integrations** for your workspace
-3. Add integration → select channel **Email**, provider **sendgrid**
-4. Enter `api_key`, `from_email`, `from_name` in the JSON config
-5. The `GatewayService` reads this from DB and instantiates your provider via the registry factory
+1. Start the server and obtain a portal JWT (`POST /api/v1/auth/login`)
+2. `POST /api/v1/workspaces/:wid/integrations` with channel **email**, provider **sendgrid**, and JSON config (`api_key`, `from_email`, `from_name`)
+3. The `GatewayService` reads this from DB and instantiates your provider via the registry factory
 
-> Provider config in server mode is stored **AES-encrypted** in the `integrations` table. Users configure credentials in the UI — not in YAML files.
+> Provider config in server mode is stored **AES-encrypted** in the `integrations` table. Configure via REST — not in YAML files. (No Portal UI page for integrations yet.)
 
 ### Step 6: Add Tests
 
@@ -263,12 +261,13 @@ Same pattern — use the corresponding registry function and port interface:
 
 ## Pull Request Checklist
 
-- [ ] `make audit` passes (format, lint, test, security)
+- [ ] **`/smell develop`** — no BLOCKER/HIGH ([verification.md](../agents/verification.md))
+- [ ] **`make audit`** passes (format, lint, test, security)
 - [ ] Tests added with meaningful coverage
 - [ ] Interface check: `var _ port.EmailSender = (*Provider)(nil)`
 - [ ] `register.go` with `init()` for self-registration
 - [ ] Blank import added to `internal/app/imports.go`
-- [ ] No provider credentials in YAML — use environment variables or the Portal UI
+- [ ] No provider credentials in YAML — use environment variables (embedded SDK) or Portal REST API (server mode)
 - [ ] Commit messages follow [Conventional Commits](../workflow.md#commit-conventions)
 
 ---

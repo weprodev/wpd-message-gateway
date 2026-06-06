@@ -1,21 +1,31 @@
 # Portal — Message Inbox
 
-The Portal is the **primary interface** for the WPD Message Gateway. It is always enabled when running the server. You use it to configure workspaces, manage providers, view captured messages, manage API keys, and more.
+The Portal is the web UI and REST surface for the WPD Message Gateway when running in server mode.
 
 ---
 
-## What the Portal Does
+## What exists today
+
+### Portal UI (http://localhost:10104)
 
 | Feature | Description |
 |---------|-------------|
-| **Authentication** | Email + password (Portal JWT) |
-| **Workspaces** | Multi-tenant isolation — each workspace has its own config |
-| **Integrations** | Configure email/SMS/push/chat providers (stored encrypted in DB) |
-| **API Keys** | Create and manage machine-to-machine credentials |
-| **Templates** | HTML email templates per workspace |
-| **Message Inbox** | View messages captured in memory (`memory_only` mode) |
-| **Message Logs** | Audit trail of all outbound send API requests |
-| **Settings** | Per-workspace dispatch mode and other configuration |
+| **Authentication** | Register and sign in (email + password → JWT) |
+| **Workspaces** | List workspaces you belong to; open a workspace dashboard |
+| **Message logs** | Outbound send **request audit trail** (not memory inbox capture) |
+| **Send test** | Send a test message per channel from the dashboard |
+
+No Portal pages yet for: workspace create, integrations, API keys, templates, members, settings, or memory inbox browsing.
+
+### REST API (server)
+
+| Feature | Portal UI | Description |
+|---------|:---------:|-------------|
+| **Inbox capture** | | Messages stored in RAM (`memory_only` / `memory_and_provider`) — [Inbox API](#inbox-api-reference) |
+| **Internal ingest** | | Automation writes to inbox without portal JWT |
+| **Workspace provisioning** | | Create workspace, API keys, settings, integrations — curl/Bruno/CI only; see [E2E bootstrap](./e2e-testing.md) |
+
+Provider credentials and dispatch mode are stored in PostgreSQL and configured via **REST** (encrypted at rest). There is no Integrations or Settings screen in the Portal UI yet.
 
 ---
 
@@ -69,7 +79,7 @@ Each workspace controls how its outbound messages are handled:
 | `provider_only` | Sent through the connected integration, **no** memory copy. |
 | `memory_and_provider` | Stored in memory **and** sent through the integration. |
 
-Set via Portal → **Settings → General**, or via API:
+Set via REST (no Portal UI page yet):
 
 ```bash
 PATCH /api/v1/workspaces/:wid/settings
@@ -160,8 +170,8 @@ POST /api/v1/workspaces/{workspaceId}/internal/push
 POST /api/v1/workspaces/{workspaceId}/internal/chat
 ```
 
-Protected by `X-Internal-Secret` header when `MESSAGE_INTERNAL_INGEST_SECRET` env var is set.  
-In local dev (no env var), the endpoint is open.
+Protected by `X-Internal-Secret` when `MESSAGE_INTERNAL_INGEST_SECRET` is set.  
+Local dev: set `MESSAGE_INTERNAL_INGEST_ALLOW_OPEN=true` only when no secret is configured (never in production).
 
 ---
 
@@ -211,7 +221,7 @@ portal:
 ```
 
 > **Provider credentials** (Mailgun API keys, etc.) are **not** in this file.  
-> They are configured in the Portal UI and stored AES-encrypted in PostgreSQL.
+> They are stored AES-encrypted in PostgreSQL and configured via the **Portal REST API** (no Portal UI page yet).
 
 ---
 
