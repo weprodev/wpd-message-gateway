@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [develop, master]
   pull_request:
-    branches: [master]
+    branches: [develop, master]
 
 env:
   GO_VERSION: "1.26"
@@ -66,7 +68,7 @@ jobs:
       - name: Run tests
         run: |
           go test -race -coverprofile=coverage.out -covermode=atomic ./cmd/... ./internal/... ./pkg/... 2>&1 | tee test-output.txt
-          echo "TEST_EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
+          exit ${PIPESTATUS[0]}
 
       - name: Upload coverage
         if: success()
@@ -183,14 +185,19 @@ jobs:
       - name: Initialize Database (Migrations & Seeds)
         # Read database config from configs/local.example.yml and run initialization script
         run: |
-          DB_HOST=$(yq '.database.host' configs/local.example.yml)
-          DB_PORT=$(yq '.database.port' configs/local.example.yml)
-          DB_USER=$(yq '.database.user' configs/local.example.yml)
-          DB_PASS=$(yq '.database.password' configs/local.example.yml)
-          DB_NAME=$(yq '.database.dbname' configs/local.example.yml)
+          export DB_HOST=$(yq '.database.host' configs/local.example.yml)
+          export DB_PORT=$(yq '.database.port' configs/local.example.yml)
+          export DB_USER=$(yq '.database.user' configs/local.example.yml)
+          export DB_PASS=$(yq '.database.password' configs/local.example.yml)
+          export DB_NAME=$(yq '.database.dbname' configs/local.example.yml)
           
-          PGPASSWORD="$DB_PASS" PGHOST="$DB_HOST" PGPORT="$DB_PORT" POSTGRES_USER="$DB_USER" POSTGRES_DB="$DB_NAME" \
-            sed 's|/docker-entrypoint-initdb.d|database|g' database/init-db.sh | bash
+          export PGPASSWORD="$DB_PASS"
+          export PGHOST="$DB_HOST"
+          export PGPORT="$DB_PORT"
+          export POSTGRES_USER="$DB_USER"
+          export POSTGRES_DB="$DB_NAME"
+          
+          sed 's|/docker-entrypoint-initdb.d|database|g' database/init-db.sh | bash
 
       - name: Build and start server
         run: |
@@ -216,7 +223,7 @@ jobs:
         run: |
           cd tests/bruno
           bru run --env memory 2>&1 | tee bruno-output.txt
-          echo "BRUNO_EXIT=$?" >> $GITHUB_ENV
+          exit ${PIPESTATUS[0]}
 
       - name: Stop server
         if: always()
