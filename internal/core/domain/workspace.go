@@ -6,7 +6,7 @@ import "time"
 type Workspace struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
-	UniqueKey  string    `json:"unique_key"`
+	Slug       string    `json:"slug"`
 	AdminEmail string    `json:"admin_email"`
 	Status     string    `json:"status"`
 	Visibility string    `json:"visibility"`

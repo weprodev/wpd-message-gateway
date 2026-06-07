@@ -26,7 +26,7 @@ func scanWorkspace(scanner interface {
 }) (domain.Workspace, error) {
 	var w domain.Workspace
 	var hashedPin, iconKey sql.NullString
-	err := scanner.Scan(&w.ID, &w.Name, &w.UniqueKey, &w.AdminEmail, &w.Status, &w.Visibility,
+	err := scanner.Scan(&w.ID, &w.Name, &w.Slug, &w.AdminEmail, &w.Status, &w.Visibility,
 		&hashedPin, &iconKey, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return w, err
@@ -54,10 +54,10 @@ func (r *WorkspaceRepository) Create(ctx context.Context, workspace *domain.Work
 		icon = workspace.IconKey
 	}
 	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
-		workspace.Name, workspace.UniqueKey, workspace.AdminEmail, workspace.Status, workspace.Visibility, hashedPin, icon,
+		workspace.Name, workspace.Slug, workspace.AdminEmail, workspace.Status, workspace.Visibility, hashedPin, icon,
 	).Scan(&workspace.ID, &workspace.CreatedAt, &workspace.UpdatedAt)
 	if err != nil {
-		slog.ErrorContext(ctx, "database error: failed to create workspace", "error", err, "name", workspace.Name, "unique_key", workspace.UniqueKey)
+		slog.ErrorContext(ctx, "database error: failed to create workspace", "error", err, "name", workspace.Name, "slug", workspace.Slug)
 	}
 	return err
 }
@@ -82,7 +82,7 @@ func (r *WorkspaceRepository) GetByID(ctx context.Context, id string) (*domain.W
 	return &w, nil
 }
 
-func (r *WorkspaceRepository) GetByUniqueKey(ctx context.Context, uniqueKey string) (*domain.Workspace, error) {
+func (r *WorkspaceRepository) GetBySlug(ctx context.Context, slug string) (*domain.Workspace, error) {
 	query := `
 		SELECT w.id, w.name, w.slug, u.email, w.status,
 		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
@@ -91,12 +91,12 @@ func (r *WorkspaceRepository) GetByUniqueKey(ctx context.Context, uniqueKey stri
 		INNER JOIN users u ON u.id = w.owner_id
 		WHERE w.slug = $1
 	`
-	w, err := scanWorkspace(r.client.GetDB(ctx).QueryRowContext(ctx, query, uniqueKey))
+	w, err := scanWorkspace(r.client.GetDB(ctx).QueryRowContext(ctx, query, slug))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("workspace key=%s: %w", uniqueKey, port.ErrNotFound)
+		return nil, fmt.Errorf("workspace slug=%s: %w", slug, port.ErrNotFound)
 	}
 	if err != nil {
-		slog.ErrorContext(ctx, "database error: failed to get workspace by unique key", "error", err, "unique_key", uniqueKey)
+		slog.ErrorContext(ctx, "database error: failed to get workspace by slug", "error", err, "slug", slug)
 		return nil, err
 	}
 	return &w, nil

@@ -6,7 +6,7 @@ import { JoinWorkspaceModal } from "./join-workspace-modal"
 describe("JoinWorkspaceModal Component", () => {
   it("renders form fields correctly when open", () => {
     render(<JoinWorkspaceModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
-    expect(screen.getByLabelText("Workspace Unique Key")).toBeInTheDocument()
+    expect(screen.getByLabelText("Workspace Slug")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Join Workspace" })).toBeInTheDocument()
   })
 })

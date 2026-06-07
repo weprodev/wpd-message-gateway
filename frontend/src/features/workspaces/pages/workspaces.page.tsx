@@ -27,7 +27,7 @@ export function WorkspacesPage() {
   const filteredWorkspaces = workspaces.filter(
     (workspace) =>
       workspace.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      workspace.unique_key.toLowerCase().includes(searchQuery.toLowerCase()),
+      workspace.slug.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   const handleSelectWorkspace = (workspace: Workspace) => {

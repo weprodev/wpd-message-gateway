@@ -24,7 +24,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 export interface UserWorkspace {
   id: string
   name: string
-  unique_key: string
+  slug: string
   status: string
   admin_email?: string
   visibility?: "public" | "private"

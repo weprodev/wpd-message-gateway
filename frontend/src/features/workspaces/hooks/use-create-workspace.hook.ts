@@ -15,7 +15,7 @@ export function useCreateWorkspace() {
         method: "POST",
         body: JSON.stringify({
           name: data.name,
-          unique_key: data.unique_key,
+          slug: data.slug,
           icon_key: data.icon_key,
         }),
       })

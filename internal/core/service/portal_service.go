@@ -110,14 +110,14 @@ func (s *PortalService) RequireAdmin(ctx context.Context, workspaceID, userID st
 }
 
 // CreateWorkspace creates a new workspace owned by userID, adds userID as admin, and assigns
-// the admin role in the RBAC gate. Returns port.ErrInvalidInput if name or unique_key is empty.
-func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqueKey, iconKey string) (*domain.Workspace, error) {
-	slog.InfoContext(ctx, "creating workspace", "user_id", userID, "name", name, "unique_key", uniqueKey)
+// the admin role in the RBAC gate. Returns port.ErrInvalidInput if name or slug is empty.
+func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug, iconKey string) (*domain.Workspace, error) {
+	slog.InfoContext(ctx, "creating workspace", "user_id", userID, "name", name, "slug", slug)
 	name = strings.TrimSpace(name)
-	uniqueKey = strings.TrimSpace(strings.ToLower(uniqueKey))
-	if name == "" || uniqueKey == "" {
+	slug = strings.TrimSpace(strings.ToLower(slug))
+	if name == "" || slug == "" {
 		slog.WarnContext(ctx, "workspace creation failed: invalid input", "user_id", userID)
-		return nil, fmt.Errorf("name and unique_key required: %w", port.ErrInvalidInput)
+		return nil, fmt.Errorf("name and slug required: %w", port.ErrInvalidInput)
 	}
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqu
 	}
 	w := &domain.Workspace{
 		Name:       name,
-		UniqueKey:  uniqueKey,
+		Slug:       slug,
 		AdminEmail: u.Email,
 		Status:     "active",
 		Visibility: "private",
@@ -148,12 +148,12 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqu
 	return w, nil
 }
 
-func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, uniqueKey, pin string) error {
-	slog.InfoContext(ctx, "joining workspace with PIN", "user_id", userID, "unique_key", uniqueKey)
-	uniqueKey = strings.TrimSpace(strings.ToLower(uniqueKey))
-	ws, err := s.workspaces.GetByUniqueKey(ctx, uniqueKey)
+func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, slug, pin string) error {
+	slog.InfoContext(ctx, "joining workspace with PIN", "user_id", userID, "slug", slug)
+	slug = strings.TrimSpace(strings.ToLower(slug))
+	ws, err := s.workspaces.GetBySlug(ctx, slug)
 	if err != nil || ws == nil {
-		slog.WarnContext(ctx, "join workspace with PIN failed: workspace not found", "unique_key", uniqueKey)
+		slog.WarnContext(ctx, "join workspace with PIN failed: workspace not found", "slug", slug)
 		return errors.New("workspace not found")
 	}
 	if ws.HashedPin == "" {

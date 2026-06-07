@@ -6,6 +6,9 @@ on:
         - cron: "0 0 1 * *"
     workflow_dispatch:
 
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
     cleanup-ghcr:
         name: 🧹 Clean Old Container Images

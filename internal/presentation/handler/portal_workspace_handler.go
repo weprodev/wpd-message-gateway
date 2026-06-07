@@ -21,14 +21,14 @@ func NewPortalWorkspaceHandler(svc *service.PortalService) *PortalWorkspaceHandl
 }
 
 type createWorkspaceBody struct {
-	Name      string `json:"name"`
-	UniqueKey string `json:"unique_key"`
-	IconKey   string `json:"icon_key"`
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	IconKey string `json:"icon_key"`
 }
 
 type joinBody struct {
-	UniqueKey string `json:"unique_key"`
-	PIN       string `json:"pin"`
+	Slug string `json:"slug"`
+	PIN  string `json:"pin"`
 }
 
 type patchWorkspaceBody struct {
@@ -59,7 +59,7 @@ func (h *PortalWorkspaceHandler) CreateWorkspace(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to bind workspace create body", "error", err, "user_id", uid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	w, err := h.svc.CreateWorkspace(c.Request().Context(), uid, body.Name, body.UniqueKey, body.IconKey)
+	w, err := h.svc.CreateWorkspace(c.Request().Context(), uid, body.Name, body.Slug, body.IconKey)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create workspace", "error", err, "user_id", uid, "name", body.Name)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create workspace")
@@ -74,8 +74,8 @@ func (h *PortalWorkspaceHandler) JoinWorkspace(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to bind workspace join body", "error", err, "user_id", uid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	if err := h.svc.JoinWorkspaceWithPIN(c.Request().Context(), uid, body.UniqueKey, body.PIN); err != nil {
-		slog.ErrorContext(c.Request().Context(), "failed to join workspace", "error", err, "user_id", uid, "unique_key", body.UniqueKey)
+	if err := h.svc.JoinWorkspaceWithPIN(c.Request().Context(), uid, body.Slug, body.PIN); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to join workspace", "error", err, "user_id", uid, "slug", body.Slug)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to join workspace")
 	}
 	return c.NoContent(http.StatusNoContent)

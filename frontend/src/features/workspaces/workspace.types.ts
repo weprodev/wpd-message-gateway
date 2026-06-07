@@ -1,7 +1,7 @@
 export interface Workspace {
   id: string
   name: string
-  unique_key: string
+  slug: string
   status: string
   admin_email?: string
   visibility?: "public" | "private"
@@ -14,14 +14,14 @@ export interface Workspace {
 
 export interface CreateWorkspaceData {
   name: string
-  unique_key: string
+  slug: string
   icon_key: string
 }
 
 export interface WorkspaceCreatedResponse {
   id: string
   name: string
-  unique_key: string
+  slug: string
   icon_key?: string
   created_at: string
 }

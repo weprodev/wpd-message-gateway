@@ -6,7 +6,7 @@ import { WorkspaceCard } from "./workspace-card"
 const mockWorkspace = {
   id: "w1",
   name: "Production Workspace",
-  unique_key: "production_workspace",
+  slug: "production_workspace",
   icon_key: "shield",
   visibility: "private" as const,
   status: "active",

@@ -9,7 +9,7 @@ import (
 type WorkspaceRepository interface {
 	Create(ctx context.Context, workspace *domain.Workspace) error
 	GetByID(ctx context.Context, id string) (*domain.Workspace, error)
-	GetByUniqueKey(ctx context.Context, uniqueKey string) (*domain.Workspace, error)
+	GetBySlug(ctx context.Context, slug string) (*domain.Workspace, error)
 	Update(ctx context.Context, workspace *domain.Workspace) error
 	SetStatus(ctx context.Context, id, status string) error
 	ListForUser(ctx context.Context, userID string) ([]domain.Workspace, error)

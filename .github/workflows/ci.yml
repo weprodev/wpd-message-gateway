@@ -9,6 +9,7 @@ on:
 env:
   GO_VERSION: "1.26"
   NODE_VERSION: "20"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: read
@@ -183,19 +184,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Initialize Database (Migrations & Seeds)
-        # Read database config from configs/local.example.yml and run initialization script
         run: |
-          export DB_HOST=$(yq '.database.host' configs/local.example.yml)
-          export DB_PORT=$(yq '.database.port' configs/local.example.yml)
-          export DB_USER=$(yq '.database.user' configs/local.example.yml)
-          export DB_PASS=$(yq '.database.password' configs/local.example.yml)
-          export DB_NAME=$(yq '.database.dbname' configs/local.example.yml)
-          
-          export PGPASSWORD="$DB_PASS"
-          export PGHOST="$DB_HOST"
-          export PGPORT="$DB_PORT"
-          export POSTGRES_USER="$DB_USER"
-          export POSTGRES_DB="$DB_NAME"
+          export PGPASSWORD="secret"
+          export PGHOST="127.0.0.1"
+          export PGPORT="5432"
+          export POSTGRES_USER="gateway"
+          export POSTGRES_DB="gateway"
           
           sed 's|/docker-entrypoint-initdb.d|database|g' database/init-db.sh | bash
 

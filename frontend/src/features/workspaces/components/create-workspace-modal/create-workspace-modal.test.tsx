@@ -15,6 +15,6 @@ describe("CreateWorkspaceModal Component", () => {
   it("renders form fields correctly when open", () => {
     render(<CreateWorkspaceModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
     expect(screen.getByLabelText("Workspace Name")).toBeInTheDocument()
-    expect(screen.getByLabelText("Unique Key / URL Slug")).toBeInTheDocument()
+    expect(screen.getByLabelText("Workspace Slug")).toBeInTheDocument()
   })
 })

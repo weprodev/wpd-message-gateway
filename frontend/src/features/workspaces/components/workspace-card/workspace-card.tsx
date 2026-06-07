@@ -36,7 +36,7 @@ export function WorkspaceCard({ workspace, isSelected, onSelect }: WorkspaceCard
           {workspace.name}
         </p>
         <span className="text-xs text-text-secondary font-mono truncate">
-          {workspace.unique_key}
+          {workspace.slug}
         </span>
       </div>
 

@@ -13,7 +13,7 @@ interface CreateWorkspaceModalProps {
 }
 export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorkspaceModalProps) {
   const [name, setName] = useState("")
-  const [uniqueKey, setUniqueKey] = useState("")
+  const [slug, setSlug] = useState("")
   const [iconKey, setIconKey] = useState("package")
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
@@ -22,11 +22,11 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
   const handleNameChange = (val: string) => {
     setName(val)
     setValidationErrors((prev) => ({ ...prev, name: "" }))
-    const slug = val
+    const generatedSlug = val
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "")
-    setUniqueKey(slug)
+    setSlug(generatedSlug)
   }
 
   const validate = () => {
@@ -34,10 +34,10 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
     if (!name.trim()) {
       errors.name = "Workspace name is required"
     }
-    if (!uniqueKey.trim()) {
-      errors.uniqueKey = "Unique key is required"
-    } else if (!/^[a-z0-9-]+$/.test(uniqueKey)) {
-      errors.uniqueKey = "Unique key must only contain lowercase letters, numbers, and dashes"
+    if (!slug.trim()) {
+      errors.slug = "Workspace slug is required"
+    } else if (!/^[a-z0-9-]+$/.test(slug)) {
+      errors.slug = "Workspace slug must only contain lowercase letters, numbers, and dashes"
     }
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
@@ -50,7 +50,7 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
     try {
       const workspace = await createWorkspace({
         name: name.trim(),
-        unique_key: uniqueKey.trim(),
+        slug: slug.trim(),
         icon_key: iconKey,
       })
       onSuccess(workspace.id, workspace.name)
@@ -62,7 +62,7 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
 
   const handleClose = () => {
     setName("")
-    setUniqueKey("")
+    setSlug("")
     setIconKey("package")
     setValidationErrors({})
     onClose()
@@ -93,19 +93,19 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="ws-key" className="text-xs font-semibold text-text-secondary uppercase">
-            Unique Key / URL Slug
+          <label htmlFor="ws-slug" className="text-xs font-semibold text-text-secondary uppercase">
+            Workspace Slug
           </label>
           <Input
-            id="ws-key"
+            id="ws-slug"
             type="text"
-            value={uniqueKey}
-            onChange={(e) => setUniqueKey(e.target.value)}
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
             placeholder="e.g. engineering-team"
             className="w-full bg-secondary border-border h-11 px-4 font-mono"
           />
-          {validationErrors.uniqueKey && (
-            <p className="text-xs text-destructive font-medium mt-0.5">{validationErrors.uniqueKey}</p>
+          {validationErrors.slug && (
+            <p className="text-xs text-destructive font-medium mt-0.5">{validationErrors.slug}</p>
           )}
         </div>
 

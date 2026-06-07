@@ -22,7 +22,7 @@ const (
 	APIKeyIDKey contextKey = "api_key_id"
 	// APIKeyNameKey is the context key for the API key display name (product/service label).
 	APIKeyNameKey contextKey = "api_key_name"
-	// HeaderWorkspaceKey is the HTTP header carrying the workspace unique_key (stable slug).
+	// HeaderWorkspaceKey is the HTTP header carrying the workspace slug.
 	HeaderWorkspaceKey = "X-Workspace-Key"
 )
 
@@ -63,9 +63,9 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			wsKey := strings.TrimSpace(c.Request().Header.Get(HeaderWorkspaceKey))
 			if wsKey == "" {
 				slog.WarnContext(c.Request().Context(), "API key auth failed: missing workspace key header", "client_id", clientID)
-				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace unique_key)")
+				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace slug)")
 			}
-			ws, werr := workspaceRepo.GetByUniqueKey(c.Request().Context(), wsKey)
+			ws, werr := workspaceRepo.GetBySlug(c.Request().Context(), wsKey)
 			if werr != nil || ws == nil {
 				slog.WarnContext(c.Request().Context(), "API key auth failed: unknown workspace key", "client_id", clientID, "workspace_key", wsKey)
 				return echo.NewHTTPError(http.StatusForbidden, "Unknown workspace key")

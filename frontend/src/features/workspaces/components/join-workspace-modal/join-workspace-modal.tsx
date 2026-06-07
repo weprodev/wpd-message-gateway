@@ -12,7 +12,7 @@ interface JoinWorkspaceModalProps {
 }
 
 export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspaceModalProps) {
-  const [uniqueKey, setUniqueKey] = useState("")
+  const [slug, setSlug] = useState("")
   const [pin, setPin] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,8 +20,8 @@ export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspace
 
   const validate = () => {
     const errors: Record<string, string> = {}
-    if (!uniqueKey.trim()) {
-      errors.uniqueKey = "Workspace unique key is required"
+    if (!slug.trim()) {
+      errors.slug = "Workspace slug is required"
     }
     if (!pin.trim()) {
       errors.pin = "Security PIN is required"
@@ -43,17 +43,17 @@ export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspace
       const res = await apiFetch("/api/v1/workspaces/join", {
         method: "POST",
         body: JSON.stringify({
-          unique_key: uniqueKey.trim().toLowerCase(),
+          slug: slug.trim().toLowerCase(),
           pin: pin.trim(),
         }),
       })
 
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { message?: string }
-        throw new Error(err.message ?? "Failed to join workspace. Please check the key and PIN.")
+        throw new Error(err.message ?? "Failed to join workspace. Please check the slug and PIN.")
       }
 
-      onSuccess(uniqueKey.trim())
+      onSuccess(slug.trim())
       handleClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join workspace")
@@ -63,7 +63,7 @@ export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspace
   }
 
   const handleClose = () => {
-    setUniqueKey("")
+    setSlug("")
     setPin("")
     setError(null)
     setValidationErrors({})
@@ -74,26 +74,26 @@ export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspace
     <Modal isOpen={isOpen} onClose={handleClose} title="Join Workspace">
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <p className="text-sm text-text-secondary">
-          Enter the unique key and security PIN of the workspace you want to join.
+          Enter the slug and security PIN of the workspace you want to join.
         </p>
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="join-key" className="text-xs font-semibold text-text-secondary uppercase">
-            Workspace Unique Key
+            Workspace Slug
           </label>
           <Input
             id="join-key"
             type="text"
-            value={uniqueKey}
+            value={slug}
             onChange={(e) => {
-              setUniqueKey(e.target.value)
-              setValidationErrors((prev) => ({ ...prev, uniqueKey: "" }))
+              setSlug(e.target.value)
+              setValidationErrors((prev) => ({ ...prev, slug: "" }))
             }}
             placeholder="e.g. marketing-team"
             className="w-full bg-secondary border-border h-11 px-4 font-mono"
           />
-          {validationErrors.uniqueKey && (
-            <p className="text-xs text-destructive font-medium mt-0.5">{validationErrors.uniqueKey}</p>
+          {validationErrors.slug && (
+            <p className="text-xs text-destructive font-medium mt-0.5">{validationErrors.slug}</p>
           )}
         </div>
 
