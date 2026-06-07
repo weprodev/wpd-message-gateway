@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom"
 import { useState } from "react"
 
 import { PageHeader } from "@/shared/components/page-header"
+import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
 
 import { IntegrationRow } from "../components/integration-row"
@@ -27,9 +29,6 @@ export function IntegrationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [connectProvider, setConnectProvider] = useState<(typeof items)[number] | null>(null)
   const { items, isLoading, error, connect, disconnect } = useIntegrations(wid)
-
-  const filtered = filterIntegrationsByTab(items, activeTab)
-  const grouped = groupByCategory(filtered)
 
   async function handleConnect(provider: (typeof items)[number], config: Record<string, unknown>) {
     await connect(provider, config)
@@ -81,33 +80,70 @@ export function IntegrationsPage() {
           ))}
         </Tabs.List>
 
-        {(["all", "connected", "available"] as const).map((tab) => (
-          <Tabs.Content key={tab} value={tab} className="flex flex-col gap-8">
-            {(Object.keys(grouped) as IntegrationChannel[]).map((category) => {
-              const categoryItems = grouped[category]
-              if (categoryItems.length === 0) return null
+        {(["all", "connected", "available"] as const).map((tab) => {
+          const tabItems = filterIntegrationsByTab(items, tab)
+          const tabGrouped = groupByCategory(tabItems)
 
-              return (
-                <section key={category}>
-                  <h2 className="mb-3 text-base font-semibold text-foreground">
-                    {CATEGORY_LABELS[category]}
-                  </h2>
-                  <div className="overflow-hidden rounded-lg border border-border bg-card">
-                    {categoryItems.map((provider) => (
-                      <IntegrationRow
-                        key={provider.id}
-                        provider={provider}
-                        isBusy={busyId === provider.id}
-                        onConnect={setConnectProvider}
-                        onDisconnect={handleDisconnect}
-                      />
-                    ))}
+          return (
+            <Tabs.Content key={tab} value={tab} className="flex flex-col gap-8">
+              {tabItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-6 rounded-xl border border-dashed border-border bg-card/50 py-16 px-4 text-center">
+                  <div className="rounded-full bg-secondary/50 p-4 text-text-tertiary">
+                    <Icon name="link_off" className="size-8" />
                   </div>
-                </section>
-              )
-            })}
-          </Tabs.Content>
-        ))}
+                  <div className="flex flex-col gap-2 max-w-sm">
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {tab === "connected"
+                        ? "No Connected Integrations"
+                        : tab === "available"
+                        ? "No Available Integrations"
+                        : "No Integrations Found"}
+                    </h3>
+                    <p className="text-sm text-text-secondary">
+                      {tab === "connected"
+                        ? "You haven't connected any integrations to this workspace yet."
+                        : tab === "available"
+                        ? "All available integrations are already connected to your workspace."
+                        : "There are no integration providers matching your filter."}
+                    </p>
+                  </div>
+                  {tab === "connected" && (
+                    <Button
+                      onClick={() => setActiveTab("available")}
+                      className="bg-primary-brand hover:bg-primary-brand-hover"
+                    >
+                      Connect a Provider
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                (Object.keys(tabGrouped) as IntegrationChannel[]).map((category) => {
+                  const categoryItems = tabGrouped[category]
+                  if (categoryItems.length === 0) return null
+
+                  return (
+                    <section key={category}>
+                      <h2 className="mb-3 text-base font-semibold text-foreground">
+                        {CATEGORY_LABELS[category]}
+                      </h2>
+                      <div className="overflow-hidden rounded-lg border border-border bg-card">
+                        {categoryItems.map((provider) => (
+                          <IntegrationRow
+                            key={provider.id}
+                            provider={provider}
+                            isBusy={busyId === provider.id}
+                            onConnect={setConnectProvider}
+                            onDisconnect={handleDisconnect}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )
+                })
+              )}
+            </Tabs.Content>
+          )
+        })}
       </Tabs.Root>
 
       <ConnectModal
