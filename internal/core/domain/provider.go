@@ -11,6 +11,8 @@ type Provider struct {
 	Name        string                `json:"name"`
 	ChannelType string                `json:"channel_type"`
 	Status      string                `json:"status"`
+	IconPath    string                `json:"icon_path"`
+	Description string                `json:"description"`
 	CreatedAt   time.Time             `json:"created_at"`
 	UpdatedAt   time.Time             `json:"updated_at"`
 	Fields      []ProviderConfigField `json:"fields,omitempty"`

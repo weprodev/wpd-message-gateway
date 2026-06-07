@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <circle cx="12" cy="12" r="10" fill="url(#twGrad)"/>
+  <circle cx="9" cy="9" r="2" fill="#ffffff"/>
+  <circle cx="15" cy="9" r="2" fill="#ffffff"/>
+  <circle cx="9" cy="15" r="2" fill="#ffffff"/>
+  <circle cx="15" cy="15" r="2" fill="#ffffff"/>
+  <defs>
+    <linearGradient id="twGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+  </defs>
+</svg>

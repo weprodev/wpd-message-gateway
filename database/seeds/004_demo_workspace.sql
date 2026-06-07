@@ -63,14 +63,18 @@ VALUES (
 )
 ON CONFLICT (client_id) DO NOTHING;
 
-INSERT INTO providers (id, name, channel_type, status)
+INSERT INTO providers (id, name, channel_type, status, icon_path, description)
 VALUES (
     '00000000-0000-0000-0000-000000000030',
     'memory',
     'email',
-    'active'
+    'active',
+    '/assets/providers/memory.svg',
+    'In-memory simulator for development and simulation'
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+    icon_path = EXCLUDED.icon_path,
+    description = EXCLUDED.description;
 
 -- Encrypted JSON "{}" for memory provider (AES-GCM, dev only)
 INSERT INTO integrations (id, workspace_id, channel_type, provider_id, encrypted_config, status, is_default)

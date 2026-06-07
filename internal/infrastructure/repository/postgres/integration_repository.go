@@ -278,3 +278,31 @@ func (r *IntegrationRepository) GetProviderFields(ctx context.Context, providerN
 	}
 	return fields, nil
 }
+
+func (r *IntegrationRepository) ListProviders(ctx context.Context) ([]domain.Provider, error) {
+	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
+		SELECT id, name, channel_type, status, COALESCE(icon_path, ''), COALESCE(description, ''), created_at, updated_at
+		FROM providers
+		ORDER BY channel_type ASC, name ASC
+	`)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to query providers list", "error", err)
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	var list []domain.Provider
+	for rows.Next() {
+		var p domain.Provider
+		if err := rows.Scan(&p.ID, &p.Name, &p.ChannelType, &p.Status, &p.IconPath, &p.Description, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan provider row", "error", err)
+			return nil, err
+		}
+		list = append(list, p)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for providers list", "error", err)
+		return nil, err
+	}
+	return list, nil
+}

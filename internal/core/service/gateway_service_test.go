@@ -65,6 +65,10 @@ func (s *stubIntegrationRepo) GetProviderFields(ctx context.Context, providerNam
 	return nil, nil
 }
 
+func (s *stubIntegrationRepo) ListProviders(ctx context.Context) ([]domain.Provider, error) {
+	return nil, nil
+}
+
 type stubInbox struct {
 	emailID string
 }

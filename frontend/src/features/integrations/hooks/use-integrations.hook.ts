@@ -1,23 +1,35 @@
 import { useEffect, useState } from "react"
 
-import { deleteIntegration, listIntegrations, upsertIntegration } from "../integrations.api"
-import type { Integration, IntegrationChannel, ProviderCatalogItem } from "../integrations.types"
-import { PROVIDER_CATALOG } from "../integrations.types"
+import { deleteIntegration, listIntegrations, upsertIntegration, fetchProviders } from "../integrations.api"
+import type { BackendProvider } from "../integrations.api"
+import type { Integration, IntegrationChannel } from "../integrations.types"
 
-export interface IntegrationViewModel extends ProviderCatalogItem {
+export interface IntegrationViewModel {
+  id: string
+  name: string
+  description: string
+  icon: string
+  category: IntegrationChannel
+  isAvailable: boolean
+  isComingSoon?: boolean
   integration?: Integration
   isConnected: boolean
 }
 
-function mergeCatalogWithIntegrations(integrations: Integration[]): IntegrationViewModel[] {
-  return PROVIDER_CATALOG.map((provider) => {
+function mergeCatalogWithIntegrations(providers: BackendProvider[], integrations: Integration[]): IntegrationViewModel[] {
+  return providers.map((provider) => {
     const integration = integrations.find(
       (item) =>
-        item.provider_name.toLowerCase() === provider.id ||
         item.provider_name.toLowerCase() === provider.name.toLowerCase(),
     )
     return {
-      ...provider,
+      id: provider.name.toLowerCase(),
+      name: provider.name,
+      description: provider.description,
+      icon: provider.icon_path,
+      category: provider.channel_type as IntegrationChannel,
+      isAvailable: provider.status === "active",
+      isComingSoon: provider.status === "not_supported",
       integration,
       isConnected: integration?.status === "connected",
     }
@@ -39,9 +51,12 @@ export function useIntegrations(workspaceId: string) {
       setIsLoading(true)
       setError(null)
       try {
-        const integrations = await listIntegrations(workspaceId)
+        const [providers, integrations] = await Promise.all([
+          fetchProviders(workspaceId),
+          listIntegrations(workspaceId),
+        ])
         if (cancelled) return
-        setItems(mergeCatalogWithIntegrations(integrations))
+        setItems(mergeCatalogWithIntegrations(providers, integrations))
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : "Failed to load integrations")

@@ -64,3 +64,20 @@ export async function fetchProviderConfigFields(
   return (await res.json()) as ProviderConfigField[]
 }
 
+export interface BackendProvider {
+  id: string
+  name: string
+  channel_type: string
+  status: string
+  description: string
+  icon_path: string
+}
+
+export async function fetchProviders(workspaceId: string): Promise<BackendProvider[]> {
+  const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/providers`)
+  if (!res.ok) {
+    throw new Error("Failed to load providers catalog")
+  }
+  return (await res.json()) as BackendProvider[]
+}
+

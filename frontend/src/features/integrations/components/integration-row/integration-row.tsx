@@ -22,8 +22,12 @@ export function IntegrationRow({ provider, onConnect, onDisconnect, isBusy }: In
       )}
     >
       <div className="flex flex-1 items-center gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-input text-2xl">
-          {provider.icon}
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-input text-2xl overflow-hidden p-2.5">
+          {provider.icon.startsWith("/") || provider.icon.startsWith("http") ? (
+            <img src={provider.icon} alt={`${provider.name} logo`} className="size-full object-contain" />
+          ) : (
+            <span>{provider.icon}</span>
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">{provider.name}</p>

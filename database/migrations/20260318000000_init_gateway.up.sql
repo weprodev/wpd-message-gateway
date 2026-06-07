@@ -147,6 +147,8 @@ CREATE TABLE providers (
     channel_type TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
     status       TEXT        NOT NULL DEFAULT 'active'
                              CHECK (status IN ('active', 'not_supported', 'blocked')),
+    icon_path    TEXT,
+    description  TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -420,12 +422,4 @@ CREATE TABLE model_has_permissions (
 
 CREATE INDEX idx_model_has_permissions_lookup ON model_has_permissions (model_id, model_type, team_id);
 
--- ==============================================================================
--- 20. SEED DEFAULT PROVIDERS
--- ==============================================================================
 
-INSERT INTO providers (id, name, channel_type, status)
-VALUES
-    ('00000000-0000-0000-0000-000000000030', 'memory', 'email', 'active'),
-    ('00000000-0000-0000-0000-000000000031', 'mailgun', 'email', 'active')
-ON CONFLICT (id) DO NOTHING;

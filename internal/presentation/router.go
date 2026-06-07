@@ -163,6 +163,7 @@ func (rt *Router) Setup() *echo.Echo {
 	protected.GET("/workspaces/:wid/integrations", pi.ListIntegrations, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsRead))
 	protected.POST("/workspaces/:wid/integrations", pi.UpsertIntegration, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsWrite))
 	protected.DELETE("/workspaces/:wid/integrations/:iid", pi.DeleteIntegration, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsWrite))
+	protected.GET("/workspaces/:wid/providers", pi.ListProviders, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsRead))
 	protected.GET("/workspaces/:wid/providers/:name/config", pi.GetProviderConfigFields, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsRead))
 
 	protected.GET("/workspaces/:wid/templates", pt.ListTemplates, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionTemplatesRead))

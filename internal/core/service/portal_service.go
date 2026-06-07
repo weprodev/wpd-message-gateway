@@ -552,3 +552,20 @@ func (s *PortalService) GetProviderFields(ctx context.Context, providerName stri
 	}
 	return fields, nil
 }
+
+// ListProviders returns all available integration providers in the catalog (excluding memory).
+func (s *PortalService) ListProviders(ctx context.Context) ([]domain.Provider, error) {
+	slog.InfoContext(ctx, "listing integration providers")
+	list, err := s.integrations.ListProviders(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to list integration providers", "error", err)
+		return nil, err
+	}
+	out := make([]domain.Provider, 0, len(list))
+	for _, p := range list {
+		if p.Name != "memory" {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}

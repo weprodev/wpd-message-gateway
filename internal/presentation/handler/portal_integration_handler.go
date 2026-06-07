@@ -109,3 +109,13 @@ func (h *PortalIntegrationHandler) GetProviderConfigFields(c echo.Context) error
 	}
 	return c.JSON(http.StatusOK, fields)
 }
+
+func (h *PortalIntegrationHandler) ListProviders(c echo.Context) error {
+	wid := c.Param("wid")
+	providers, err := h.svc.ListProviders(c.Request().Context())
+	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to list providers", "error", err, "workspace_id", wid)
+		return safeHTTPError(err, http.StatusInternalServerError, "failed to list providers")
+	}
+	return c.JSON(http.StatusOK, providers)
+}

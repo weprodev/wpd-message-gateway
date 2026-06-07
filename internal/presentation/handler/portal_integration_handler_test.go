@@ -58,6 +58,10 @@ func (f *fakeIntegrationRepository) GetProviderFields(ctx context.Context, provi
 	return f.fields, f.fieldsErr
 }
 
+func (f *fakeIntegrationRepository) ListProviders(ctx context.Context) ([]domain.Provider, error) {
+	return nil, nil
+}
+
 func TestPortalIntegrationHandler_ListIntegrations(t *testing.T) {
 	e := echo.New()
 
