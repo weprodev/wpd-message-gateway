@@ -65,12 +65,6 @@ database:
 # AES encryption key for provider credentials (32 bytes):
 #   MESSAGE_CONFIG_ENCRYPTION_KEY=your-32-byte-key-here0123456789ab
 #
-# Internal ingest secret (required in production; for automation workers only):
-#   MESSAGE_INTERNAL_INGEST_SECRET=your-ingest-secret
-#
-# Local dev only — allow internal ingest without a secret (never use in production):
-#   MESSAGE_INTERNAL_INGEST_ALLOW_OPEN=true
-#
 # Portal UI Base URL for email verification links:
 #   MESSAGE_PORTAL_BASE_URL=https://inbox.weprodev.com
 #

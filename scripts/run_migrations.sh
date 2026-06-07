@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs golang-migrate then (on "up" only) idempotent seeds from database/seeds/*.sql in order.
-# Shared by user and flashcard services. Set DATABASE_DIR, DATABASE_URL (or DB_*), and for seeds
+# Shared by migration jobs. Set DATABASE_DIR, DATABASE_URL (or DB_*), and for seeds
 # either DATABASE_URL + psql, or SQL_RUNNER with {} placeholder for the seed file path.
 #
 # Staging-only seeds: any seed file whose name contains "staging" is run only when

@@ -150,7 +150,7 @@ The Portal UI currently supports:
 
 You need at least one workspace before the list is useful. Provision workspaces, API keys, and dispatch mode via the **REST API** (no Portal pages for these yet). See [E2E bootstrap](./e2e-testing.md#2-bootstrap-create-workspace-and-api-key) for a full curl flow used in CI.
 
-For local dev with PostgreSQL, you must first apply the required permissions seed: `database/seeds/002_seed_permissions.sql` (after migrations), and then optionally apply optional demo data: `database/seeds/001_demo_workspace.sql`.
+For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_mailgun_config.sql`, and optionally `003_demo_workspace.sql`.
 
 ### Sending via HTTP
 
@@ -353,8 +353,9 @@ Roles and permissions are defined in [permission.go](../../internal/core/domain/
 - **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus the ability to send test messages (`send.test`).
 
 To bootstrap roles and permissions, make sure you run the database seeds:
-1. Run `database/seeds/002_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.
-2. Run `database/seeds/001_demo_workspace.sql` (optional) to create a demo workspace, user, and assign the `admin` role to the demo user.
+1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.
+2. Run `database/seeds/002_seed_mailgun_config.sql` to seed Mailgun provider config fields.
+3. Run `database/seeds/003_demo_workspace.sql` (optional) to create a demo workspace, user, and assign the `admin` role to the demo user.
 
 ### Dual Authorization Models
 
@@ -405,9 +406,6 @@ MESSAGE_JWT_SECRET=your-jwt-secret
 
 # AES encryption key for provider credentials (32 bytes)
 MESSAGE_CONFIG_ENCRYPTION_KEY=your-32-byte-key-here
-
-# Internal ingest secret (optional)
-MESSAGE_INTERNAL_INGEST_SECRET=your-ingest-secret
 ```
 
 ---

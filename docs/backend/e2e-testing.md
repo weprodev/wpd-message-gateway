@@ -71,7 +71,7 @@ jobs:
 
 ### 2. Bootstrap: Create Workspace and API Key
 
-Before bootstrapping, ensure that the base roles and permissions seed file `database/seeds/002_seed_permissions.sql` has been executed against the database. Workspace creation programmatically maps the creator to the `admin` role and registers permissions in the `gogate` cache; this process fails if the roles have not been seeded.
+Before bootstrapping, ensure that the base roles and permissions seed file `database/seeds/001_seed_permissions.sql` has been executed against the database. Workspace creation programmatically maps the creator to the `admin` role and registers permissions in the `gogate` cache; this process fails if the roles have not been seeded.
 
 After applying the base seed, execute the bootstrap sequence:
 
@@ -82,7 +82,7 @@ UK="ci-${{ github.run_id }}"   # unique workspace key per run
 # 1) Register (idempotent in CI) then login
 curl -fsS -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"ci-$UK@e2e.test\",\"password\":\"ci-secret-123\",\"display_name\":\"CI\"}" >/dev/null 2>&1 || true
+  -d "{\"email\":\"ci-$UK@e2e.test\",\"password\":\"ci-secret-123\",\"first_name\":\"CI\",\"last_name\":\"Runner\"}" >/dev/null 2>&1 || true
 
 PORTAL_JWT=$(curl -sS -X POST "$BASE/auth/login" \
   -H "Content-Type: application/json" \
@@ -203,7 +203,7 @@ jobs:
           # Register then login to get JWT
           curl -fsS -X POST "$BASE/auth/register" \
             -H "Content-Type: application/json" \
-            -d "{\"email\":\"ci-$UK@e2e.test\",\"password\":\"ci-secret-123\",\"display_name\":\"CI\"}" >/dev/null 2>&1 || true
+            -d "{\"email\":\"ci-$UK@e2e.test\",\"password\":\"ci-secret-123\",\"first_name\":\"CI\",\"last_name\":\"Runner\"}" >/dev/null 2>&1 || true
             
           TOKEN=$(curl -sS -X POST "$BASE/auth/login" \
             -H "Content-Type: application/json" \
@@ -260,9 +260,9 @@ jobs:
             -H "X-Api-Client-Secret: $API_CLIENT_SECRET" \
             "$BASE/workspaces/$WORKSPACE_ID/inbox/emails" \
           | jq -e '
-            .emails | length >= 1 and
-            .emails[0].email.to[0] == "user@example.com" and
-            .emails[0].email.subject == "Welcome!"
+            length >= 1 and
+            .[0].email.to[0] == "user@example.com" and
+            .[0].email.subject == "Welcome!"
           ' || exit 1
 
           echo "✅ Welcome email verified"
@@ -327,22 +327,22 @@ Required headers: `Authorization: Bearer <portal-jwt>`, `X-Api-Client-Id`, `X-Ap
 
 ### Response Format
 
+List endpoints return a JSON **array** of stored messages (not wrapped in an object):
+
 ```json
-{
-  "emails": [
-    {
-      "id": "abc123",
-      "created_at": "2024-01-15T10:30:00Z",
-      "workspace_id": "uuid-of-workspace",
-      "email": {
-        "to": ["user@example.com"],
-        "subject": "Welcome!",
-        "html": "<h1>Hello John</h1>",
-        "plain_text": "Hello John"
-      }
+[
+  {
+    "id": "abc123",
+    "created_at": "2024-01-15T10:30:00Z",
+    "workspace_id": "uuid-of-workspace",
+    "email": {
+      "to": ["user@example.com"],
+      "subject": "Welcome!",
+      "html": "<h1>Hello John</h1>",
+      "plain_text": "Hello John"
     }
-  ]
-}
+  }
+]
 ```
 
 ---
@@ -356,7 +356,7 @@ COUNT=$(curl -sS \
   -H "Authorization: Bearer $PORTAL_JWT" \
   -H "X-Api-Client-Id: $API_CLIENT_ID" \
   -H "X-Api-Client-Secret: $API_CLIENT_SECRET" \
-  "$BASE/workspaces/$WORKSPACE_ID/inbox/emails" | jq '.emails | length')
+  "$BASE/workspaces/$WORKSPACE_ID/inbox/emails" | jq 'length')
 [ "$COUNT" -eq 1 ] || { echo "Expected 1 email, got $COUNT"; exit 1; }
 ```
 
@@ -368,8 +368,8 @@ curl -sS \
   -H "X-Api-Client-Id: $API_CLIENT_ID" \
   -H "X-Api-Client-Secret: $API_CLIENT_SECRET" \
   "$BASE/workspaces/$WORKSPACE_ID/inbox/emails" | jq -e '
-  .emails[0].email.subject == "Welcome!" and
-  .emails[0].email.to[0] == "user@example.com"
+  .[0].email.subject == "Welcome!" and
+  .[0].email.to[0] == "user@example.com"
 '
 ```
 
@@ -379,7 +379,7 @@ curl -sS \
 for i in $(seq 1 10); do
   COUNT=$(curl -sS -H "Authorization: Bearer $PORTAL_JWT" \
     -H "X-Api-Client-Id: $API_CLIENT_ID" -H "X-Api-Client-Secret: $API_CLIENT_SECRET" \
-    "$BASE/workspaces/$WORKSPACE_ID/inbox/emails" | jq '.emails | length')
+    "$BASE/workspaces/$WORKSPACE_ID/inbox/emails" | jq 'length')
   [ "$COUNT" -ge 1 ] && break
   sleep 1
 done

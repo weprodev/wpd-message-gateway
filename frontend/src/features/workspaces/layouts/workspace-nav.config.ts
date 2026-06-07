@@ -36,6 +36,3 @@ export const WORKSPACE_NAV_SECTIONS: readonly WorkspaceNavSection[] = [
     ],
   },
 ] as const
-
-/** @deprecated Use WORKSPACE_NAV_SECTIONS */
-export const WORKSPACE_NAV_ITEMS = WORKSPACE_NAV_SECTIONS[0].items

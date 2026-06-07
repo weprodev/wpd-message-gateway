@@ -167,7 +167,7 @@ POST /api/v1/workspaces/{workspaceId}/internal/push
 POST /api/v1/workspaces/{workspaceId}/internal/chat
 ```
 
-These endpoints are protected by the standard Portal authentication mechanisms. They require a valid **Portal JWT** (or API Key) and the authenticated user must be a member of the workspace.
+These endpoints are protected by Portal JWT auth and workspace membership. They do not require the workspace API key headers used by inbox read routes.
 
 ---
 

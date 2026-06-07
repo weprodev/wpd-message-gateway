@@ -134,7 +134,7 @@ steps:
     env:
       EMAIL_API: http://localhost:10101
 
-  - run: curl -H "Authorization: Bearer $JWT" -H "X-Api-Client-Id: $ID" -H "X-Api-Client-Secret: $SECRET" "http://localhost:10101/api/v1/workspaces/$WID/inbox/emails" | jq '.emails[0].email.subject'
+  - run: curl -H "Authorization: Bearer $JWT" -H "X-Api-Client-Id: $ID" -H "X-Api-Client-Secret: $SECRET" "http://localhost:10101/api/v1/workspaces/$WID/inbox/emails" | jq '.[0].email.subject'
 ```
 
 ## Branch Strategy
