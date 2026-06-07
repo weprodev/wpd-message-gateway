@@ -1,11 +1,8 @@
 // Package gateway provides the public embedded SDK for wpd-message-gateway.
 //
-// There are two ways to use this package:
+// Call New() with provider credentials. Providers must be imported to trigger self-registration:
 //
-//  1. Static config (no server, no DB) — call New() with provider credentials
-//     declared in code. Providers must be imported to trigger self-registration:
-//
-//     import _ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
+//	import _ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
 package gateway
 
 import (
