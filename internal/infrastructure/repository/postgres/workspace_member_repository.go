@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -25,6 +26,7 @@ func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID
 	var roleID string
 	err := r.client.GetDB(ctx).QueryRowContext(ctx, `SELECT id FROM roles WHERE name = $1`, role).Scan(&roleID)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: lookup role failed", "error", err, "role", role)
 		return fmt.Errorf("wpd-message-gateway: lookup role %q: %w", role, err)
 	}
 
@@ -33,6 +35,9 @@ func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID
 		VALUES ($1, $2, $3)
 		ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = EXCLUDED.role_id
 	`, workspaceID, userID, roleID)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to add workspace member", "error", err, "workspace_id", workspaceID, "user_id", userID, "role", role)
+	}
 	return err
 }
 
@@ -42,6 +47,7 @@ func (r *WorkspaceMemberRepository) Remove(ctx context.Context, workspaceID, use
 		workspaceID, userID,
 	)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to remove workspace member", "error", err, "workspace_id", workspaceID, "user_id", userID)
 		return err
 	}
 	n, _ := res.RowsAffected()
@@ -62,6 +68,9 @@ func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, us
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("workspace member workspace=%s user=%s: %w", workspaceID, userID, port.ErrNotFound)
 	}
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get member role", "error", err, "workspace_id", workspaceID, "user_id", userID)
+	}
 	return role, err
 }
 
@@ -75,6 +84,7 @@ func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID
 		ORDER BY wm.joined_at ASC
 	`, workspaceID)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to list workspace members", "error", err, "workspace_id", workspaceID)
 		return nil, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -83,9 +93,14 @@ func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID
 	for rows.Next() {
 		var m domain.WorkspaceMember
 		if err := rows.Scan(&m.WorkspaceID, &m.UserID, &m.Role, &m.JoinedAt, &m.UserEmail, &m.DisplayName); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan workspace member", "error", err, "workspace_id", workspaceID)
 			return nil, err
 		}
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for workspace members", "error", err, "workspace_id", workspaceID)
+		return nil, err
+	}
+	return out, nil
 }

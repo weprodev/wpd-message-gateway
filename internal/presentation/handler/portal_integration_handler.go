@@ -59,10 +59,12 @@ func (h *PortalIntegrationHandler) UpsertIntegration(c echo.Context) error {
 	wid := c.Param("wid")
 	var body integrationBody
 	if err := c.Bind(&body); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to bind integration body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
 	cfg, err := service.IntegrationConfigJSON(body.Config)
 	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to parse integration config JSON", "error", err, "workspace_id", wid, "provider_name", body.ProviderName)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid config JSON")
 	}
 	status := body.Status
@@ -78,6 +80,7 @@ func (h *PortalIntegrationHandler) UpsertIntegration(c echo.Context) error {
 		IsDefault:    body.IsDefault,
 	}
 	if err := h.svc.UpsertIntegration(c.Request().Context(), intg); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to upsert integration", "error", err, "workspace_id", wid, "provider_name", body.ProviderName)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to upsert integration")
 	}
 	return c.JSON(http.StatusOK, integrationToJSON(*intg))
@@ -87,7 +90,22 @@ func (h *PortalIntegrationHandler) DeleteIntegration(c echo.Context) error {
 	wid := c.Param("wid")
 	iid := c.Param("iid")
 	if err := h.svc.DeleteIntegration(c.Request().Context(), wid, iid); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to delete integration", "error", err, "workspace_id", wid, "integration_id", iid)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to delete integration")
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *PortalIntegrationHandler) GetProviderConfigFields(c echo.Context) error {
+	wid := c.Param("wid")
+	name := c.Param("name")
+	if name == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "provider name required")
+	}
+	fields, err := h.svc.GetProviderFields(c.Request().Context(), name)
+	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to get provider config fields", "error", err, "workspace_id", wid, "provider_name", name)
+		return safeHTTPError(err, http.StatusInternalServerError, "failed to get provider config fields")
+	}
+	return c.JSON(http.StatusOK, fields)
 }

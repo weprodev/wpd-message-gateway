@@ -66,20 +66,12 @@ func (h *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 		return h.next.Handle(ctx, r)
 	}
 
-	if v, _ := ctx.Value(keyRequestID).(string); v != "" {
-		r.AddAttrs(slog.String("request_id", v))
-	}
-	if v, _ := ctx.Value(keyWorkspaceID).(string); v != "" {
-		r.AddAttrs(slog.String("workspace_id", v))
-	}
-	if v, _ := ctx.Value(keyAPIKeyID).(string); v != "" {
-		r.AddAttrs(slog.String("api_key_id", v))
-	}
-	if v, _ := ctx.Value(keyChannel).(string); v != "" {
-		r.AddAttrs(slog.String("channel", v))
-	}
-	if v, _ := ctx.Value(keyProvider).(string); v != "" {
-		r.AddAttrs(slog.String("provider", v))
+	attrs := Attrs(ctx)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		if ok {
+			r.AddAttrs(slog.Any(key, attrs[i+1]))
+		}
 	}
 
 	return h.next.Handle(ctx, r)
@@ -105,11 +97,18 @@ func New(env string, extraHandlers ...slog.Handler) (*pkglogger.Logger, error) {
 		level = pkglogger.LevelInfo
 	}
 
+	extractors := []pkglogger.ContextExtractor{
+		func(ctx context.Context) []any {
+			return Attrs(ctx)
+		},
+	}
+
 	log, err := pkglogger.New(pkglogger.Config{
-		Level:         level,
-		Format:        format,
-		OutputPath:    "stdout",
-		ExtraHandlers: extraHandlers,
+		Level:             level,
+		Format:            format,
+		OutputPath:        "stdout",
+		ExtraHandlers:     extraHandlers,
+		ContextExtractors: extractors,
 	})
 	if err != nil {
 		return nil, err

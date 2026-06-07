@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -45,10 +46,14 @@ func (r *MessageRequestLogRepository) Create(ctx context.Context, log *domain.Me
 	if log.ProviderName != "" {
 		provider = log.ProviderName
 	}
-	return r.client.GetDB(ctx).QueryRowContext(ctx, query,
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
 		log.WorkspaceID, apiKeyID, log.ChannelType, log.HTTPMethod, log.StatusCode, log.Endpoint,
 		provider, reqID, dur, errMsg,
 	).Scan(&log.ID, &log.CreatedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "workspace_id", log.WorkspaceID, "endpoint", log.Endpoint)
+	}
+	return err
 }
 
 func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port.MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error) {
@@ -84,6 +89,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	countQuery := "SELECT COUNT(*) FROM message_request_logs l WHERE " + where
 	var total int
 	if err := db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "database error: failed to count message request logs", "error", err, "workspace_id", q.WorkspaceID)
 		return nil, 0, err
 	}
 
@@ -102,6 +108,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 
 	rows, err := db.QueryContext(ctx, listQuery, args...)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to query message request logs", "error", err, "workspace_id", q.WorkspaceID)
 		return nil, 0, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -119,6 +126,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 			&prov, &reqID, &dur, &errMsg, &row.CreatedAt,
 			&row.SourceName, &row.ClientID,
 		); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan message request log", "error", err, "workspace_id", q.WorkspaceID)
 			return nil, 0, err
 		}
 		if apiKeyID.Valid {
@@ -138,5 +146,9 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 		}
 		out = append(out, row)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for message request logs", "error", err, "workspace_id", q.WorkspaceID)
+		return nil, 0, err
+	}
+	return out, total, nil
 }

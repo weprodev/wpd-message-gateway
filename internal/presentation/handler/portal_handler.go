@@ -94,6 +94,7 @@ func (h *PortalHandler) CreateAPIKey(c echo.Context) error {
 	wid := c.Param("wid")
 	var body createAPIKeyBody
 	if err := c.Bind(&body); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to bind api key body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
 	if body.Name == "" {
@@ -101,6 +102,7 @@ func (h *PortalHandler) CreateAPIKey(c echo.Context) error {
 	}
 	k, secret, err := h.svc.CreateAPIKey(c.Request().Context(), wid, body.Name)
 	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to create api key", "error", err, "workspace_id", wid, "name", body.Name)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create api key")
 	}
 	pub := toAPIKeyPublic(*k)
@@ -116,6 +118,7 @@ func (h *PortalHandler) DeleteAPIKey(c echo.Context) error {
 	wid := c.Param("wid")
 	keyID := c.Param("keyId")
 	if err := h.svc.DeleteAPIKey(c.Request().Context(), wid, keyID); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to delete api key", "error", err, "workspace_id", wid, "api_key_id", keyID)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to delete api key")
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -126,6 +129,7 @@ func (h *PortalHandler) RegenerateAPIKey(c echo.Context) error {
 	keyID := c.Param("keyId")
 	secret, err := h.svc.RegenerateAPIKey(c.Request().Context(), wid, keyID)
 	if err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to regenerate api key", "error", err, "workspace_id", wid, "api_key_id", keyID)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to regenerate api key")
 	}
 	return c.JSON(http.StatusOK, map[string]string{"client_secret": secret})
@@ -169,9 +173,11 @@ func (h *PortalHandler) PatchSettings(c echo.Context) error {
 	wid := c.Param("wid")
 	var body map[string]string
 	if err := c.Bind(&body); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to bind settings body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
 	if err := h.svc.PatchSettings(c.Request().Context(), wid, body); err != nil {
+		slog.ErrorContext(c.Request().Context(), "failed to patch settings", "error", err, "workspace_id", wid)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to patch settings")
 	}
 	return c.NoContent(http.StatusNoContent)

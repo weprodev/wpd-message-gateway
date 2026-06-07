@@ -10,9 +10,8 @@ services:
       - POSTGRES_DB=gateway
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations/20260318000000_init_gateway.up.sql:/docker-entrypoint-initdb.d/01_init_gateway.sql
-      - ./database/seeds/002_seed_permissions.sql:/docker-entrypoint-initdb.d/02_seed_permissions.sql
-      - ./database/seeds/001_demo_workspace.sql:/docker-entrypoint-initdb.d/03_demo_workspace.sql
+      - ./database:/docker-entrypoint-initdb.d
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
       interval: 5s

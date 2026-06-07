@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -26,9 +27,13 @@ func (r *UserRepository) Create(ctx context.Context, u *domain.User) error {
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at
 	`
-	return r.client.GetDB(ctx).QueryRowContext(ctx, query,
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
 		u.FirstName, u.LastName, u.Email, u.PasswordHash,
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create user", "error", err, "email", u.Email)
+	}
+	return err
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -43,6 +48,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		return nil, fmt.Errorf("user %s: %w", email, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get user by email", "error", err, "email", email)
 		return nil, err
 	}
 	return &u, nil
@@ -60,6 +66,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, 
 		return nil, fmt.Errorf("user %s: %w", id, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get user by id", "error", err, "user_id", id)
 		return nil, err
 	}
 	return &u, nil
@@ -72,5 +79,8 @@ func (r *UserRepository) SetEmailVerified(ctx context.Context, id string) error 
 		WHERE id = $1
 	`
 	_, err := r.client.GetDB(ctx).ExecContext(ctx, query, id)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to set email verified", "error", err, "user_id", id)
+	}
 	return err
 }

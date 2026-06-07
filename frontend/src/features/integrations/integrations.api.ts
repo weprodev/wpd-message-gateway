@@ -39,3 +39,28 @@ export async function deleteIntegration(workspaceId: string, integrationId: stri
     throw new Error("Failed to delete integration")
   }
 }
+
+export interface ProviderConfigField {
+  id: string
+  provider_id: string
+  key: string
+  label: string
+  description: string
+  field_type: string
+  required: boolean
+  default_value: string
+  options?: unknown
+  sort_order: number
+}
+
+export async function fetchProviderConfigFields(
+  workspaceId: string,
+  providerName: string,
+): Promise<ProviderConfigField[]> {
+  const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/providers/${providerName}/config`)
+  if (!res.ok) {
+    throw new Error("Failed to load provider configuration fields")
+  }
+  return (await res.json()) as ProviderConfigField[]
+}
+

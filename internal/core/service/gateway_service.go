@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
@@ -141,56 +142,71 @@ func (s *GatewayService) dispatch(
 	writeToInbox func() (*contracts.SendResult, error),
 	sendViaProvider func(context.Context, *domain.Integration) (*contracts.SendResult, error),
 ) (*contracts.SendResult, error) {
+	slog.InfoContext(ctx, "dispatching message", "workspace_id", workspaceID, "dispatch_mode", mode, "channel", channel)
 	switch mode {
 	case domain.DispatchMemoryOnly:
 		r, err := writeToInbox()
 		if err != nil {
+			slog.ErrorContext(ctx, "inbox write failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
 		attachMeta(r, mode, channel, "", memoryProviderName)
+		slog.InfoContext(ctx, "message dispatched via memory only", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 		return r, nil
 
 	case domain.DispatchProviderOnly:
 		intg, err := s.activeIntegration(ctx, workspaceID, channel)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
 		// If the stored integration IS the memory provider, fall through to inbox.
 		if intg.ProviderName == memoryProviderName {
 			r, err := writeToInbox()
 			if err != nil {
+				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
 				return nil, err
 			}
 			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
+			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 			return r, nil
 		}
 		providerCtx := applogger.WithProvider(ctx, intg.ProviderName)
 		r, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
 			return nil, err
 		}
 		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
+		slog.InfoContext(ctx, "message dispatched via provider only", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID)
 		return r, nil
 
 	case domain.DispatchMemoryAndProvider:
 		intg, err := s.activeIntegration(ctx, workspaceID, channel)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
 		// If the integration is already memory, a single write is enough.
 		if intg.ProviderName == memoryProviderName {
 			r, err := writeToInbox()
 			if err != nil {
+				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
 				return nil, err
 			}
 			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
+			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 			return r, nil
 		}
 		// Both paths: capture to inbox first (non-fatal), then send via provider.
-		inboxResult, _ := writeToInbox() // inbox failure does not abort the send
+		inboxResult, err := writeToInbox()
+		if err != nil {
+			slog.WarnContext(ctx, "inbox write failed (non-fatal)", "error", err, "workspace_id", workspaceID, "channel", channel)
+		}
 		providerCtx := applogger.WithProvider(ctx, intg.ProviderName)
 		provResult, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
 			return nil, err
 		}
 		if inboxResult != nil {
@@ -200,12 +216,15 @@ func (s *GatewayService) dispatch(
 			provResult.Meta["inbox_message_id"] = inboxResult.ID
 		}
 		attachMeta(provResult, mode, channel, intg.ID, intg.ProviderName)
+		slog.InfoContext(ctx, "message dispatched via memory and provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", provResult.ID)
 		return provResult, nil
 
 	default:
 		// Undefined modes fall back to memory_only (safe default).
+		slog.WarnContext(ctx, "unknown dispatch mode, falling back to memory only", "workspace_id", workspaceID, "mode", mode)
 		r, err := writeToInbox()
 		if err != nil {
+			slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
 		attachMeta(r, domain.DispatchMemoryOnly, channel, "", memoryProviderName)

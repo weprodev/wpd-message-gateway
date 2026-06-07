@@ -24,6 +24,8 @@ type fakeIntegrationRepository struct {
 	upsertErr  error
 	deleteErr  error
 	getByIDErr error
+	fields     []domain.ProviderConfigField
+	fieldsErr  error
 }
 
 func (f *fakeIntegrationRepository) Create(ctx context.Context, integration *domain.Integration) error {
@@ -50,6 +52,10 @@ func (f *fakeIntegrationRepository) Delete(ctx context.Context, id string) error
 func (f *fakeIntegrationRepository) Upsert(ctx context.Context, integration *domain.Integration) error {
 	f.upserted = integration
 	return f.upsertErr
+}
+
+func (f *fakeIntegrationRepository) GetProviderFields(ctx context.Context, providerName string) ([]domain.ProviderConfigField, error) {
+	return f.fields, f.fieldsErr
 }
 
 func TestPortalIntegrationHandler_ListIntegrations(t *testing.T) {
@@ -242,6 +248,54 @@ func TestPortalIntegrationHandler_DeleteIntegration(t *testing.T) {
 		err := h.DeleteIntegration(c)
 		if err == nil {
 			t.Fatal("expected error")
+		}
+	})
+}
+
+func TestPortalIntegrationHandler_GetProviderConfigFields(t *testing.T) {
+	e := echo.New()
+
+	t.Run("gets provider config fields successfully", func(t *testing.T) {
+		repo := &fakeIntegrationRepository{
+			fields: []domain.ProviderConfigField{
+				{
+					Key:       "api_key",
+					Label:     "API Key",
+					FieldType: "password",
+					Required:  true,
+				},
+			},
+		}
+		svc := service.NewPortalService(service.PortalDeps{
+			Integrations: repo,
+		})
+		h := NewPortalIntegrationHandler(svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/ws-123/providers/mailgun/config", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("wid", "name")
+		c.SetParamValues("ws-123", "mailgun")
+
+		if err := h.GetProviderConfigFields(c); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK, got %d", rec.Code)
+		}
+
+		var res []domain.ProviderConfigField
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatalf("failed to decode JSON response: %v", err)
+		}
+
+		if len(res) != 1 {
+			t.Fatalf("expected 1 field, got %d", len(res))
+		}
+
+		if res[0].Key != "api_key" {
+			t.Errorf("expected key api_key, got %s", res[0].Key)
 		}
 	})
 }

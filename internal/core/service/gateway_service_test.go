@@ -61,6 +61,10 @@ func (s *stubIntegrationRepo) Upsert(ctx context.Context, integration *domain.In
 	return nil
 }
 
+func (s *stubIntegrationRepo) GetProviderFields(ctx context.Context, providerName string) ([]domain.ProviderConfigField, error) {
+	return nil, nil
+}
+
 type stubInbox struct {
 	emailID string
 }

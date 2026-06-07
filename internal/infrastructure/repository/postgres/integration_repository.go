@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -227,4 +228,53 @@ func (r *IntegrationRepository) Upsert(ctx context.Context, integration *domain.
 		slog.ErrorContext(ctx, "database error: failed to upsert integration", "error", err, "workspace_id", integration.WorkspaceID, "provider_name", integration.ProviderName, "channel_type", integration.ChannelType)
 	}
 	return err
+}
+
+func (r *IntegrationRepository) GetProviderFields(ctx context.Context, providerName string) ([]domain.ProviderConfigField, error) {
+	// Look up the provider first
+	var providerID string
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, `SELECT id FROM providers WHERE name = $1`, providerName).Scan(&providerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.WarnContext(ctx, "provider not found", "provider_name", providerName)
+			return nil, fmt.Errorf("provider %s: %w", providerName, port.ErrNotFound)
+		}
+		slog.ErrorContext(ctx, "database error: failed to lookup provider", "error", err, "provider_name", providerName)
+		return nil, err
+	}
+
+	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
+		SELECT id, provider_id, key, label, COALESCE(description, ''), field_type, required, COALESCE(default_value, ''), options, sort_order, created_at, updated_at
+		FROM provider_config_fields
+		WHERE provider_id = $1
+		ORDER BY sort_order ASC, key ASC
+	`, providerID)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to query provider config fields", "error", err, "provider_name", providerName)
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	var fields []domain.ProviderConfigField
+	for rows.Next() {
+		var f domain.ProviderConfigField
+		var options []byte
+		var desc string
+		var defVal string
+		if err := rows.Scan(&f.ID, &f.ProviderID, &f.Key, &f.Label, &desc, &f.FieldType, &f.Required, &defVal, &options, &f.SortOrder, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan provider config field", "error", err, "provider_name", providerName)
+			return nil, err
+		}
+		f.Description = desc
+		f.DefaultValue = defVal
+		if len(options) > 0 {
+			f.Options = json.RawMessage(options)
+		}
+		fields = append(fields, f)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for provider config fields", "error", err, "provider_name", providerName)
+		return nil, err
+	}
+	return fields, nil
 }

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -111,13 +112,16 @@ func (s *PortalService) RequireAdmin(ctx context.Context, workspaceID, userID st
 // CreateWorkspace creates a new workspace owned by userID, adds userID as admin, and assigns
 // the admin role in the RBAC gate. Returns port.ErrInvalidInput if name or unique_key is empty.
 func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqueKey, iconKey string) (*domain.Workspace, error) {
+	slog.InfoContext(ctx, "creating workspace", "user_id", userID, "name", name, "unique_key", uniqueKey)
 	name = strings.TrimSpace(name)
 	uniqueKey = strings.TrimSpace(strings.ToLower(uniqueKey))
 	if name == "" || uniqueKey == "" {
+		slog.WarnContext(ctx, "workspace creation failed: invalid input", "user_id", userID)
 		return nil, fmt.Errorf("name and unique_key required: %w", port.ErrInvalidInput)
 	}
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
+		slog.ErrorContext(ctx, "workspace creation failed: user not found", "error", err, "user_id", userID)
 		return nil, err
 	}
 	w := &domain.Workspace{
@@ -129,35 +133,46 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, uniqu
 		IconKey:    strings.TrimSpace(iconKey),
 	}
 	if err := s.workspaces.Create(ctx, w); err != nil {
+		slog.ErrorContext(ctx, "workspace creation failed: database error", "error", err, "user_id", userID)
 		return nil, err
 	}
 	if err := s.members.Add(ctx, w.ID, userID, domain.RoleAdmin); err != nil {
+		slog.ErrorContext(ctx, "workspace creation failed: failed to add member", "error", err, "workspace_id", w.ID, "user_id", userID)
 		return nil, err
 	}
 	if err := s.gate.AssignRole(ctx, "users", userID, w.ID, domain.RoleAdmin); err != nil {
+		slog.ErrorContext(ctx, "workspace creation failed: failed to assign role", "error", err, "workspace_id", w.ID, "user_id", userID)
 		return nil, err
 	}
+	slog.InfoContext(ctx, "workspace created successfully", "workspace_id", w.ID, "user_id", userID)
 	return w, nil
 }
 
 func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, uniqueKey, pin string) error {
+	slog.InfoContext(ctx, "joining workspace with PIN", "user_id", userID, "unique_key", uniqueKey)
 	uniqueKey = strings.TrimSpace(strings.ToLower(uniqueKey))
 	ws, err := s.workspaces.GetByUniqueKey(ctx, uniqueKey)
 	if err != nil || ws == nil {
+		slog.WarnContext(ctx, "join workspace with PIN failed: workspace not found", "unique_key", uniqueKey)
 		return errors.New("workspace not found")
 	}
 	if ws.HashedPin == "" {
+		slog.WarnContext(ctx, "join workspace with PIN failed: PIN join not configured", "workspace_id", ws.ID)
 		return errors.New("workspace does not use PIN join")
 	}
 	if !crypto.CheckSecretHash(pin, ws.HashedPin) {
+		slog.WarnContext(ctx, "join workspace with PIN failed: invalid PIN", "workspace_id", ws.ID, "user_id", userID)
 		return errors.New("invalid PIN")
 	}
 	if err := s.members.Add(ctx, ws.ID, userID, domain.RoleMember); err != nil {
+		slog.ErrorContext(ctx, "join workspace with PIN failed: failed to add member", "error", err, "workspace_id", ws.ID, "user_id", userID)
 		return err
 	}
 	if err := s.gate.AssignRole(ctx, "users", userID, ws.ID, domain.RoleMember); err != nil {
+		slog.ErrorContext(ctx, "join workspace with PIN failed: failed to assign role", "error", err, "workspace_id", ws.ID, "user_id", userID)
 		return err
 	}
+	slog.InfoContext(ctx, "joined workspace successfully with PIN", "workspace_id", ws.ID, "user_id", userID)
 	return nil
 }
 
@@ -285,8 +300,10 @@ func (s *PortalService) ListAPIKeys(ctx context.Context, workspaceID string) ([]
 }
 
 func (s *PortalService) CreateAPIKey(ctx context.Context, workspaceID, name string) (*domain.APIKey, string, error) {
+	slog.InfoContext(ctx, "creating api key", "workspace_id", workspaceID, "name", name)
 	clientID, secret, hash, err := s.RandomAPIKeyCredentials()
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to generate api key credentials", "error", err, "workspace_id", workspaceID)
 		return nil, "", err
 	}
 	k := &domain.APIKey{
@@ -297,37 +314,53 @@ func (s *PortalService) CreateAPIKey(ctx context.Context, workspaceID, name stri
 		IsActive:         true,
 	}
 	if err := s.apiKeys.Create(ctx, k); err != nil {
+		slog.ErrorContext(ctx, "failed to persist api key in database", "error", err, "workspace_id", workspaceID)
 		return nil, "", err
 	}
+	slog.InfoContext(ctx, "api key created successfully", "workspace_id", workspaceID, "api_key_id", k.ID)
 	return k, secret, nil
 }
 
 func (s *PortalService) DeleteAPIKey(ctx context.Context, workspaceID, keyID string) error {
+	slog.InfoContext(ctx, "deleting api key", "workspace_id", workspaceID, "api_key_id", keyID)
 	k, err := s.apiKeys.GetByID(ctx, keyID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch api key for deletion", "error", err, "workspace_id", workspaceID, "api_key_id", keyID)
 		return err
 	}
 	if k.WorkspaceID != workspaceID {
+		slog.WarnContext(ctx, "api key delete rejected: workspace mismatch", "workspace_id", workspaceID, "api_key_id", keyID, "actual_workspace_id", k.WorkspaceID)
 		return errors.New("api key not in workspace")
 	}
-	return s.apiKeys.Delete(ctx, keyID)
+	if err := s.apiKeys.Delete(ctx, keyID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete api key from database", "error", err, "workspace_id", workspaceID, "api_key_id", keyID)
+		return err
+	}
+	slog.InfoContext(ctx, "api key deleted successfully", "workspace_id", workspaceID, "api_key_id", keyID)
+	return nil
 }
 
 func (s *PortalService) RegenerateAPIKey(ctx context.Context, workspaceID, keyID string) (string, error) {
+	slog.InfoContext(ctx, "regenerating api key", "workspace_id", workspaceID, "api_key_id", keyID)
 	k, err := s.apiKeys.GetByID(ctx, keyID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch api key for regeneration", "error", err, "workspace_id", workspaceID, "api_key_id", keyID)
 		return "", err
 	}
 	if k.WorkspaceID != workspaceID {
+		slog.WarnContext(ctx, "api key regenerate rejected: workspace mismatch", "workspace_id", workspaceID, "api_key_id", keyID, "actual_workspace_id", k.WorkspaceID)
 		return "", errors.New("api key not in workspace")
 	}
 	_, secret, hash, err := s.RandomAPIKeyCredentials()
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to generate credentials for api key regeneration", "error", err, "workspace_id", workspaceID, "api_key_id", keyID)
 		return "", err
 	}
 	if err := s.apiKeys.UpdateSecret(ctx, keyID, k.ClientID, hash); err != nil {
+		slog.ErrorContext(ctx, "failed to update api key secret in database", "error", err, "workspace_id", workspaceID, "api_key_id", keyID)
 		return "", err
 	}
+	slog.InfoContext(ctx, "api key regenerated successfully", "workspace_id", workspaceID, "api_key_id", keyID)
 	return secret, nil
 }
 
@@ -350,18 +383,33 @@ func (s *PortalService) ListIntegrations(ctx context.Context, workspaceID string
 }
 
 func (s *PortalService) UpsertIntegration(ctx context.Context, intg *domain.Integration) error {
-	return s.integrations.Upsert(ctx, intg)
+	slog.InfoContext(ctx, "upserting integration", "workspace_id", intg.WorkspaceID, "provider_name", intg.ProviderName, "channel_type", intg.ChannelType)
+	err := s.integrations.Upsert(ctx, intg)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to upsert integration", "error", err, "workspace_id", intg.WorkspaceID, "provider_name", intg.ProviderName, "channel_type", intg.ChannelType)
+	} else {
+		slog.InfoContext(ctx, "integration upserted successfully", "workspace_id", intg.WorkspaceID, "provider_name", intg.ProviderName, "channel_type", intg.ChannelType, "integration_id", intg.ID)
+	}
+	return err
 }
 
 func (s *PortalService) DeleteIntegration(ctx context.Context, workspaceID, integrationID string) error {
+	slog.InfoContext(ctx, "deleting integration", "workspace_id", workspaceID, "integration_id", integrationID)
 	intg, err := s.integrations.GetByID(ctx, integrationID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch integration for deletion", "error", err, "workspace_id", workspaceID, "integration_id", integrationID)
 		return err
 	}
 	if intg.WorkspaceID != workspaceID {
+		slog.WarnContext(ctx, "integration delete rejected: workspace mismatch", "workspace_id", workspaceID, "integration_id", integrationID, "actual_workspace_id", intg.WorkspaceID)
 		return errors.New("integration not in workspace")
 	}
-	return s.integrations.Delete(ctx, integrationID)
+	if err := s.integrations.Delete(ctx, integrationID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete integration from database", "error", err, "workspace_id", workspaceID, "integration_id", integrationID)
+		return err
+	}
+	slog.InfoContext(ctx, "integration deleted successfully", "workspace_id", workspaceID, "integration_id", integrationID)
+	return nil
 }
 
 func (s *PortalService) ListTemplates(ctx context.Context, workspaceID string) ([]domain.Template, error) {
@@ -369,7 +417,14 @@ func (s *PortalService) ListTemplates(ctx context.Context, workspaceID string) (
 }
 
 func (s *PortalService) CreateTemplate(ctx context.Context, t *domain.Template) error {
-	return s.templates.Create(ctx, t)
+	slog.InfoContext(ctx, "creating template", "workspace_id", t.WorkspaceID, "unique_key", t.UniqueKey, "channel_type", t.ChannelType)
+	err := s.templates.Create(ctx, t)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to create template", "error", err, "workspace_id", t.WorkspaceID, "unique_key", t.UniqueKey)
+	} else {
+		slog.InfoContext(ctx, "template created successfully", "workspace_id", t.WorkspaceID, "template_id", t.ID, "unique_key", t.UniqueKey)
+	}
+	return err
 }
 
 // TemplatePatch carries optional fields for PATCH template.
@@ -385,11 +440,14 @@ type TemplatePatch struct {
 }
 
 func (s *PortalService) PatchTemplate(ctx context.Context, workspaceID, templateID string, p TemplatePatch) error {
+	slog.InfoContext(ctx, "patching template", "workspace_id", workspaceID, "template_id", templateID)
 	t, err := s.templates.GetByID(ctx, templateID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch template for patching", "error", err, "workspace_id", workspaceID, "template_id", templateID)
 		return err
 	}
 	if t.WorkspaceID != workspaceID {
+		slog.WarnContext(ctx, "template patch rejected: workspace mismatch", "workspace_id", workspaceID, "template_id", templateID, "actual_workspace_id", t.WorkspaceID)
 		return errors.New("template not in workspace")
 	}
 	if p.Name != nil {
@@ -416,7 +474,12 @@ func (s *PortalService) PatchTemplate(ctx context.Context, workspaceID, template
 	if p.IsDefault != nil {
 		t.IsDefault = *p.IsDefault
 	}
-	return s.templates.Update(ctx, t)
+	if err := s.templates.Update(ctx, t); err != nil {
+		slog.ErrorContext(ctx, "failed to update patched template in database", "error", err, "workspace_id", workspaceID, "template_id", templateID)
+		return err
+	}
+	slog.InfoContext(ctx, "template patched successfully", "workspace_id", workspaceID, "template_id", templateID)
+	return nil
 }
 
 func (s *PortalService) GetTemplate(ctx context.Context, templateID string) (*domain.Template, error) {
@@ -424,14 +487,22 @@ func (s *PortalService) GetTemplate(ctx context.Context, templateID string) (*do
 }
 
 func (s *PortalService) DeleteTemplate(ctx context.Context, workspaceID, templateID string) error {
+	slog.InfoContext(ctx, "deleting template", "workspace_id", workspaceID, "template_id", templateID)
 	t, err := s.templates.GetByID(ctx, templateID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch template for deletion", "error", err, "workspace_id", workspaceID, "template_id", templateID)
 		return err
 	}
 	if t.WorkspaceID != workspaceID {
+		slog.WarnContext(ctx, "template delete rejected: workspace mismatch", "workspace_id", workspaceID, "template_id", templateID, "actual_workspace_id", t.WorkspaceID)
 		return errors.New("template not in workspace")
 	}
-	return s.templates.Delete(ctx, templateID)
+	if err := s.templates.Delete(ctx, templateID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete template from database", "error", err, "workspace_id", workspaceID, "template_id", templateID)
+		return err
+	}
+	slog.InfoContext(ctx, "template deleted successfully", "workspace_id", workspaceID, "template_id", templateID)
+	return nil
 }
 
 func (s *PortalService) GetSettings(ctx context.Context, workspaceID string) (map[string]string, error) {
@@ -467,3 +538,17 @@ func (s *PortalService) JWTSecret() string { return s.jwtSecret }
 
 // JWTTTL exposes the portal JWT TTL for auth-layer consumers within this package.
 func (s *PortalService) JWTTTL() time.Duration { return s.jwtTTL }
+
+// GetProviderFields returns the configuration fields schema for the named provider.
+func (s *PortalService) GetProviderFields(ctx context.Context, providerName string) ([]domain.ProviderConfigField, error) {
+	slog.InfoContext(ctx, "fetching provider fields schema", "provider_name", providerName)
+	if providerName == "memory" {
+		return []domain.ProviderConfigField{}, nil
+	}
+	fields, err := s.integrations.GetProviderFields(ctx, providerName)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch provider fields schema", "error", err, "provider_name", providerName)
+		return nil, err
+	}
+	return fields, nil
+}

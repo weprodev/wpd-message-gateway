@@ -2,11 +2,11 @@ import * as Tabs from "@radix-ui/react-tabs"
 import { useParams } from "react-router-dom"
 import { useState } from "react"
 
-import { Spinner } from "@/components/ui/spinner"
 import { PageHeader } from "@/shared/components/page-header"
 import { cn } from "@/lib/utils"
 
 import { IntegrationRow } from "../components/integration-row"
+import { ConnectModal } from "../components/connect-modal"
 import {
   filterIntegrationsByTab,
   groupByCategory,
@@ -25,18 +25,14 @@ export function IntegrationsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
   const [activeTab, setActiveTab] = useState<"all" | "connected" | "available">("all")
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [connectProvider, setConnectProvider] = useState<(typeof items)[number] | null>(null)
   const { items, isLoading, error, connect, disconnect } = useIntegrations(wid)
 
   const filtered = filterIntegrationsByTab(items, activeTab)
   const grouped = groupByCategory(filtered)
 
-  async function handleConnect(provider: (typeof items)[number]) {
-    setBusyId(provider.id)
-    try {
-      await connect(provider)
-    } finally {
-      setBusyId(null)
-    }
+  async function handleConnect(provider: (typeof items)[number], config: Record<string, unknown>) {
+    await connect(provider, config)
   }
 
   async function handleDisconnect(provider: (typeof items)[number]) {
@@ -51,7 +47,6 @@ export function IntegrationsPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center gap-3">
-        <Spinner size="lg" />
         <span className="text-sm text-text-secondary">Loading integrations...</span>
       </div>
     )
@@ -103,7 +98,7 @@ export function IntegrationsPage() {
                         key={provider.id}
                         provider={provider}
                         isBusy={busyId === provider.id}
-                        onConnect={handleConnect}
+                        onConnect={setConnectProvider}
                         onDisconnect={handleDisconnect}
                       />
                     ))}
@@ -114,6 +109,14 @@ export function IntegrationsPage() {
           </Tabs.Content>
         ))}
       </Tabs.Root>
+
+      <ConnectModal
+        isOpen={connectProvider !== null}
+        onClose={() => setConnectProvider(null)}
+        workspaceId={wid}
+        provider={connectProvider}
+        onConnect={handleConnect}
+      />
     </div>
   )
 }

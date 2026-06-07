@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -23,9 +24,13 @@ func (r *InvitationRepository) Create(ctx context.Context, inv *domain.Invitatio
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at
 	`
-	return r.client.GetDB(ctx).QueryRowContext(ctx, query,
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
 		inv.WorkspaceID, inv.Email, inv.Role, inv.TokenHash, inv.ExpiresAt, inv.Status,
 	).Scan(&inv.ID, &inv.CreatedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create invitation", "error", err, "workspace_id", inv.WorkspaceID, "email", inv.Email, "role", inv.Role)
+	}
+	return err
 }
 
 func (r *InvitationRepository) ListPendingByWorkspace(ctx context.Context, workspaceID string) ([]domain.Invitation, error) {
@@ -36,6 +41,7 @@ func (r *InvitationRepository) ListPendingByWorkspace(ctx context.Context, works
 		ORDER BY created_at DESC
 	`, workspaceID)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to list pending invitations", "error", err, "workspace_id", workspaceID)
 		return nil, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -44,9 +50,14 @@ func (r *InvitationRepository) ListPendingByWorkspace(ctx context.Context, works
 	for rows.Next() {
 		var inv domain.Invitation
 		if err := rows.Scan(&inv.ID, &inv.WorkspaceID, &inv.Email, &inv.Role, &inv.TokenHash, &inv.ExpiresAt, &inv.Status, &inv.CreatedAt); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan pending invitation", "error", err, "workspace_id", workspaceID)
 			return nil, err
 		}
 		out = append(out, inv)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for pending invitations", "error", err, "workspace_id", workspaceID)
+		return nil, err
+	}
+	return out, nil
 }

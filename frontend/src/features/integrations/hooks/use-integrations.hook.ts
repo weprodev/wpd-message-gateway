@@ -55,12 +55,12 @@ export function useIntegrations(workspaceId: string) {
     }
   }, [workspaceId, trigger])
 
-  async function connect(provider: IntegrationViewModel) {
+  async function connect(provider: IntegrationViewModel, config: Record<string, unknown> = {}) {
     await upsertIntegration(workspaceId, {
       channel_type: provider.category,
       provider_name: provider.id,
       status: "connected",
-      config: {},
+      config: config,
     })
     reload()
   }

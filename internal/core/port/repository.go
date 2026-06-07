@@ -32,6 +32,7 @@ type IntegrationRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.Integration, error)
 	Delete(ctx context.Context, id string) error
 	Upsert(ctx context.Context, integration *domain.Integration) error
+	GetProviderFields(ctx context.Context, providerName string) ([]domain.ProviderConfigField, error)
 }
 
 type TemplateRepository interface {
