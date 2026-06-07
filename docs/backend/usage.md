@@ -10,7 +10,7 @@
 │  go get .../wpd-message-gateway  │  git clone → make start          │
 │  gateway.New(config)             │  POST /v1/email (HTTP)           │
 │  Config lives in your code       │  Config lives in PostgreSQL      │
-│  No DB required                  │  React Portal UI to manage       │
+│  No DB required                  │  React Portal UI (partial)       │
 └──────────────────────────────────┴──────────────────────────────────┘
 ```
 
@@ -109,6 +109,25 @@ Use this when you want to:
 
 ### Setup
 
+#### Option A: Docker Compose (Recommended)
+This spins up the entire stack including a PostgreSQL database (pre-loaded with migrations and permission/demo seeds), a hot-reloading Go backend (via `air`), and the Portal UI dev server:
+
+```bash
+# Start all services
+make dev
+
+# Stop all services
+make dev-down
+
+# Reset Database: Since DB init scripts run only on first boot, run this to reset data/schema:
+docker compose down -v
+```
+
+Open **http://localhost:10104** — the Portal UI.
+
+#### Option B: Native Setup (No Docker)
+If you prefer to run components directly on your host machine:
+
 ```bash
 git clone https://github.com/weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
@@ -116,16 +135,22 @@ cp configs/local.example.yml configs/local.yml
 make start
 ```
 
+For Option B, you must manually run PostgreSQL locally, apply schema migrations, and apply the SQL seeds (see below).
+
 Open **http://localhost:10104** — the Portal UI.
 
-### First Time Setup (Portal)
+### First time setup (Portal UI)
 
-1. Go to **http://localhost:10104**
-2. Register (email + password), then sign in
-3. **Create a workspace** (e.g. "myapp")
-4. Go to **Integrations** → add your email provider (Mailgun, etc.)
-5. Go to **API Keys** → create an API key (copy the secret — shown once)
-6. Go to **Settings** → set dispatch mode (`provider_only` for real sends)
+The Portal UI currently supports:
+
+1. **Register** and **sign in** (email + password)
+2. **Workspaces** — list workspaces you belong to and open one
+3. **Message logs** — audit trail of gateway send requests (Overview + channel tabs)
+4. **Send test** — send a test message through the gateway for the workspace
+
+You need at least one workspace before the list is useful. Provision workspaces, API keys, and dispatch mode via the **REST API** (no Portal pages for these yet). See [E2E bootstrap](./e2e-testing.md#2-bootstrap-create-workspace-and-api-key) for a full curl flow used in CI.
+
+For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_mailgun_config.sql`, and optionally `003_demo_workspace.sql`.
 
 ### Sending via HTTP
 
@@ -294,38 +319,54 @@ result, err := gw.SendChat(ctx, &contracts.ChatMessage{
 | POST | `/v1/push` | API key + `X-Workspace-Key` |
 | POST | `/v1/chat` | API key + `X-Workspace-Key` |
 
-### Portal Endpoints (JWT auth required)
+### Portal REST API (JWT auth)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Create portal user (returns JWT) |
-| POST | `/api/v1/auth/login` | Login portal user (returns JWT) |
-| GET | `/api/v1/auth/me` | Current user |
-| GET | `/api/v1/workspaces` | List my workspaces |
-| POST | `/api/v1/workspaces` | Create workspace |
-| POST | `/api/v1/workspaces/join` | Join workspace with PIN |
-| GET | `/api/v1/workspaces/:wid` | Get workspace |
-| PATCH | `/api/v1/workspaces/:wid` | Update workspace |
-| GET | `/api/v1/workspaces/:wid/members` | List members |
-| DELETE | `/api/v1/workspaces/:wid/members/:uid` | Remove member |
-| GET | `/api/v1/workspaces/:wid/api-keys` | List API keys |
-| POST | `/api/v1/workspaces/:wid/api-keys` | Create API key |
-| DELETE | `/api/v1/workspaces/:wid/api-keys/:kid` | Delete API key |
-| POST | `/api/v1/workspaces/:wid/api-keys/:kid/regenerate` | Regenerate secret |
-| GET | `/api/v1/workspaces/:wid/integrations` | List integrations |
-| POST | `/api/v1/workspaces/:wid/integrations` | Create/update integration |
-| DELETE | `/api/v1/workspaces/:wid/integrations/:iid` | Delete integration |
-| GET | `/api/v1/workspaces/:wid/templates` | List templates |
-| POST | `/api/v1/workspaces/:wid/templates` | Create template |
-| PATCH | `/api/v1/workspaces/:wid/templates/:tid` | Update template |
-| DELETE | `/api/v1/workspaces/:wid/templates/:tid` | Delete template |
-| GET | `/api/v1/workspaces/:wid/settings` | Get settings |
-| PATCH | `/api/v1/workspaces/:wid/settings` | Update settings |
-| GET | `/api/v1/workspaces/:wid/logs` | Message logs |
+Routes registered in `internal/presentation/router.go`. **Portal UI pages exist only for auth, workspace list, message logs, and send test** — other management routes are REST-only until UI is built.
 
-### Portal Inbox Endpoints (JWT + member + API key required)
+#### Auth
 
-See [Portal inbox](./portal-inbox.md) for full reference. Base: `/api/v1/workspaces/:wid/inbox/`
+| Method | Endpoint | Portal UI | Description |
+|--------|----------|:---------:|-------------|
+| POST | `/api/v1/auth/register` | ✓ | Create portal user (`first_name`, `last_name`, `email`, `password`) |
+| POST | `/api/v1/auth/login` | ✓ | Login (returns JWT) |
+| GET | `/api/v1/auth/verify-email` | | Email verification link handler |
+| GET | `/api/v1/auth/me` | | Current user (JWT) |
+
+#### Workspaces & messaging (Portal UI)
+
+| Method | Endpoint | Portal UI | Description |
+|--------|----------|:---------:|-------------|
+| GET | `/api/v1/workspaces` | ✓ | List workspaces for the logged-in user |
+| GET | `/api/v1/workspaces/:wid/logs` | ✓ | Message request logs (optionally filter by `channel`) |
+| POST | `/api/v1/workspaces/:wid/send-test/:channel` | ✓ | Send test via gateway (`email` / `sms` / `push` / `chat`) |
+
+#### Workspace provisioning & management (REST only — no Portal UI)
+
+Used by Bruno, curl, and CI bootstrap. Not documented endpoint-by-endpoint here; see `internal/presentation/router.go` and [E2E testing](./e2e-testing.md) for create workspace, API keys, settings, integrations, templates, and members.
+
+### Workspace access (portal JWT routes & RBAC)
+
+Workspace-scoped routes require a valid portal JWT and are governed by a Role-Based Access Control (RBAC) middleware backed by `wpd-gogate`.
+
+Roles and permissions are defined in [permission.go](../../internal/core/domain/permission.go):
+- **admin**: Full read/write access. The creator of a workspace is automatically assigned this role (as `admin` in both members repository and `gogate`).
+- **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus the ability to send test messages (`send.test`).
+
+To bootstrap roles and permissions, make sure you run the database seeds:
+1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.
+2. Run `database/seeds/002_seed_mailgun_config.sql` to seed Mailgun provider config fields.
+3. Run `database/seeds/003_demo_workspace.sql` (optional) to create a demo workspace, user, and assign the `admin` role to the demo user.
+
+### Dual Authorization Models
+
+The HTTP server uses two distinct authorization approaches by design:
+- **Portal Management API (`/api/v1/workspaces/:wid/...`)**: Restricts access using JWT tokens combined with fine-grained `wpd-gogate` permission middleware (`RequirePermission`).
+- **Inbox SSE API (`/api/v1/workspaces/:wid/inbox/...`)**: Restricts access using JWT tokens combined with a direct database workspace membership check (`RequireWorkspaceMember`) and the workspace API key (`RequireWorkspaceAPIKey`). This decoupled model allows client-side SDKs, SSE event streaming, and automation runners to interact with the simulated inbox without requiring full portal RBAC configuration.
+
+
+### Inbox API (captured messages — REST / Bruno, not Portal UI)
+
+The Portal UI shows **request logs** (`/logs`), not the memory **inbox** (`/inbox/*`). Inbox capture, SSE, and internal ingest are documented in [Portal inbox](./portal-inbox.md).
 
 ---
 
@@ -346,7 +387,7 @@ portal:
 ```
 
 > **Note:** Provider credentials (Mailgun API keys, etc.) are **NOT** in YAML files.
-> They are configured in the Portal UI and stored encrypted in PostgreSQL.
+> They are configured via the Portal REST API and stored encrypted in PostgreSQL.
 
 ### Environment Variables (Server)
 
@@ -365,16 +406,25 @@ MESSAGE_JWT_SECRET=your-jwt-secret
 
 # AES encryption key for provider credentials (32 bytes)
 MESSAGE_CONFIG_ENCRYPTION_KEY=your-32-byte-key-here
-
-# Internal ingest secret (optional)
-MESSAGE_INTERNAL_INGEST_SECRET=your-ingest-secret
 ```
 
 ---
 
 ## Message Dispatch Modes
 
-Control how messages are handled per workspace (set in Portal → Settings):
+Control how messages are handled per workspace. Default is `memory_only`.
+
+Set via REST (no Portal UI page yet):
+
+```bash
+PATCH /api/v1/workspaces/:wid/settings
+Authorization: Bearer <portal-jwt>
+Content-Type: application/json
+
+{ "message_dispatch_mode": "provider_only" }
+```
+
+See [Portal inbox](./portal-inbox.md) for mode behavior.
 
 | Mode | Behavior | Use Case |
 |------|----------|----------|
@@ -395,12 +445,12 @@ Using a Mailgun Sandbox Domain:
 
 ### Provider Not Sending
 
-Check workspace dispatch mode in Portal → Settings. If it's `memory_only`, messages are captured locally — not sent to the provider.
+Check workspace `message_dispatch_mode` via `GET /api/v1/workspaces/:wid/settings`. If it is `memory_only`, messages are captured locally — not sent to the provider.
 
 ### API Key Rejected
 
 - Ensure `X-Workspace-Key` matches the workspace's `unique_key` (slug, not UUID)
-- Verify the API key is active (Portal → API Keys)
+- Verify the API key is active (`GET /api/v1/workspaces/:wid/api-keys` with portal JWT)
 - Check `client_id` and `client_secret` — secret is shown once at creation
 
 ---
@@ -408,6 +458,6 @@ Check workspace dispatch mode in Portal → Settings. If it's `memory_only`, mes
 ## Related Documentation
 
 - [Architecture](./architecture.md) — System design
-- [Portal inbox](./portal-inbox.md) — Memory capture and inbox UI
+- [Portal inbox](./portal-inbox.md) — Memory capture and inbox REST API
 - [E2E Testing](./e2e-testing.md) — Automated testing patterns
 - [Contributing](./contributing.md) — Adding providers

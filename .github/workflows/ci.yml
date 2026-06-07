@@ -1,12 +1,15 @@
 name: CI
 
 on:
+  push:
+    branches: [develop, master]
   pull_request:
-    branches: [master]
+    branches: [develop, master]
 
 env:
   GO_VERSION: "1.26"
   NODE_VERSION: "20"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: read
@@ -39,7 +42,7 @@ jobs:
       - name: Install and run golangci-lint
         run: |
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
-          golangci-lint run --timeout=5m
+          golangci-lint run --timeout=5m ./cmd/... ./internal/... ./pkg/...
 
       - name: Summary
         if: always()
@@ -65,8 +68,8 @@ jobs:
 
       - name: Run tests
         run: |
-          go test -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee test-output.txt
-          echo "TEST_EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
+          go test -race -coverprofile=coverage.out -covermode=atomic ./cmd/... ./internal/... ./pkg/... 2>&1 | tee test-output.txt
+          exit ${PIPESTATUS[0]}
 
       - name: Upload coverage
         if: success()
@@ -108,7 +111,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build packages
-        run: go build ./...
+        run: go build ./cmd/... ./internal/... ./pkg/...
 
       - name: Build server
         run: |
@@ -138,7 +141,7 @@ jobs:
       - name: Run govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./... 2>&1 | tee vuln-output.txt || true
+          govulncheck ./cmd/... ./internal/... ./pkg/... 2>&1 | tee vuln-output.txt || true
 
       - name: Summary
         run: |
@@ -153,6 +156,20 @@ jobs:
   api-test:
     name: 🌐 API Test (Bruno)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gateway
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: gateway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gateway -d gateway"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -166,12 +183,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Initialize Database (Migrations & Seeds)
+        run: |
+          export PGPASSWORD="secret"
+          export PGHOST="127.0.0.1"
+          export PGPORT="5432"
+          export POSTGRES_USER="gateway"
+          export POSTGRES_DB="gateway"
+          
+          sed 's|/docker-entrypoint-initdb.d|database|g' database/init-db.sh | bash
+
       - name: Build and start server
         run: |
           go build -o bin/server ./cmd/server
           CONFIG_PATH=configs/local.example.yml ./bin/server &
 
-          # Wait for server
+      # Wait for server
+      - name: Wait for server to be ready
+        run: |
           for i in {1..30}; do
             if curl -s http://localhost:10101/health > /dev/null 2>&1; then
               echo "Server ready"
@@ -188,7 +217,7 @@ jobs:
         run: |
           cd tests/bruno
           bru run --env memory 2>&1 | tee bruno-output.txt
-          echo "BRUNO_EXIT=$?" >> $GITHUB_ENV
+          exit ${PIPESTATUS[0]}
 
       - name: Stop server
         if: always()

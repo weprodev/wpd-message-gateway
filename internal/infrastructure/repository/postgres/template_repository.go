@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -22,7 +23,7 @@ func NewTemplateRepository(client *pgsql.PgClient) port.TemplateRepository {
 
 func (r *TemplateRepository) Create(ctx context.Context, template *domain.Template) error {
 	query := `
-		INSERT INTO templates (workspace_id, name, unique_key, channel_type, category, subject, content_html, is_active, is_default)
+		INSERT INTO templates (workspace_id, name, unique_key, channel_type, category, subject, content, is_active, is_default)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at
 	`
@@ -30,7 +31,11 @@ func (r *TemplateRepository) Create(ctx context.Context, template *domain.Templa
 		template.WorkspaceID, template.Name, template.UniqueKey, template.ChannelType,
 		nullIfEmpty(template.Category), nullIfEmpty(template.Subject), template.ContentHTML, template.IsActive, template.IsDefault,
 	).Scan(&template.ID, &template.CreatedAt, &template.UpdatedAt)
-	return err
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create template", "error", err, "workspace_id", template.WorkspaceID, "unique_key", template.UniqueKey)
+		return err
+	}
+	return nil
 }
 
 func nullIfEmpty(s string) interface{} {
@@ -42,7 +47,7 @@ func nullIfEmpty(s string) interface{} {
 
 func (r *TemplateRepository) GetByWorkspaceAndKey(ctx context.Context, workspaceID, uniqueKey string) (*domain.Template, error) {
 	query := `
-		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content_html, is_active, is_default, created_at, updated_at
+		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content, is_active, is_default, created_at, updated_at
 		FROM templates
 		WHERE workspace_id = $1 AND unique_key = $2
 	`
@@ -55,6 +60,7 @@ func (r *TemplateRepository) GetByWorkspaceAndKey(ctx context.Context, workspace
 		return nil, fmt.Errorf("template key=%s: %w", uniqueKey, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get template by workspace and key", "error", err, "workspace_id", workspaceID, "unique_key", uniqueKey)
 		return nil, err
 	}
 	if subject.Valid {
@@ -68,7 +74,7 @@ func (r *TemplateRepository) GetByWorkspaceAndKey(ctx context.Context, workspace
 
 func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*domain.Template, error) {
 	query := `
-		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content_html, is_active, is_default, created_at, updated_at
+		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content, is_active, is_default, created_at, updated_at
 		FROM templates WHERE id = $1
 	`
 	var t domain.Template
@@ -80,6 +86,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*domain.Te
 		return nil, fmt.Errorf("template %s: %w", id, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get template by id", "error", err, "id", id)
 		return nil, err
 	}
 	if subject.Valid {
@@ -93,12 +100,13 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*domain.Te
 
 func (r *TemplateRepository) ListByWorkspace(ctx context.Context, workspaceID string) ([]domain.Template, error) {
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
-		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content_html, is_active, is_default, created_at, updated_at
+		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content, is_active, is_default, created_at, updated_at
 		FROM templates
 		WHERE workspace_id = $1
 		ORDER BY name ASC
 	`, workspaceID)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to list templates for workspace", "error", err, "workspace_id", workspaceID)
 		return nil, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -109,6 +117,7 @@ func (r *TemplateRepository) ListByWorkspace(ctx context.Context, workspaceID st
 		var subject, category sql.NullString
 		if err := rows.Scan(&t.ID, &t.WorkspaceID, &t.Name, &t.UniqueKey, &t.ChannelType, &category, &subject,
 			&t.ContentHTML, &t.IsActive, &t.IsDefault, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan template in list", "error", err, "workspace_id", workspaceID)
 			return nil, err
 		}
 		if subject.Valid {
@@ -119,7 +128,11 @@ func (r *TemplateRepository) ListByWorkspace(ctx context.Context, workspaceID st
 		}
 		out = append(out, t)
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for templates", "error", err, "workspace_id", workspaceID)
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *TemplateRepository) Update(ctx context.Context, template *domain.Template) error {
@@ -130,7 +143,7 @@ func (r *TemplateRepository) Update(ctx context.Context, template *domain.Templa
 			channel_type = $4,
 			category = $5,
 			subject = $6,
-			content_html = $7,
+			content = $7,
 			is_active = $8,
 			is_default = $9,
 			updated_at = NOW()
@@ -138,12 +151,17 @@ func (r *TemplateRepository) Update(ctx context.Context, template *domain.Templa
 	`, template.ID, template.Name, template.UniqueKey, template.ChannelType,
 		nullIfEmpty(template.Category), nullIfEmpty(template.Subject), template.ContentHTML,
 		template.IsActive, template.IsDefault, template.WorkspaceID)
-	return err
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to update template", "error", err, "id", template.ID, "workspace_id", template.WorkspaceID)
+		return err
+	}
+	return nil
 }
 
 func (r *TemplateRepository) Delete(ctx context.Context, id string) error {
 	res, err := r.client.GetDB(ctx).ExecContext(ctx, `DELETE FROM templates WHERE id = $1`, id)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to delete template", "error", err, "id", id)
 		return err
 	}
 	n, _ := res.RowsAffected()

@@ -11,8 +11,14 @@ portal:
   ui_enabled: true
   ui_port: 10104
 
-# Mailpit Integration (optional)
-# To use Mailpit, start it with: make mailpit
+# Database configuration
+database:
+  host: localhost
+  port: 5432
+  user: gateway
+  password: secret
+  dbname: gateway
+  sslmode: disable
 
 providers:
   defaults:

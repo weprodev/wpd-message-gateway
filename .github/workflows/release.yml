@@ -16,6 +16,9 @@ on:
           - minor
           - major
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   release:
     name: 📦 Release
@@ -166,7 +169,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract metadata (App)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -176,13 +179,35 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.new_version }}
             type=raw,value=latest
 
-      - name: Build and push
+      - name: Extract metadata (Migration)
+        id: meta-migration
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-migration
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release.outputs.new_version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.new_version }}
+            type=raw,value=latest
+
+      - name: Build and push App
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Migration
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.migration
+          push: true
+          tags: ${{ steps.meta-migration.outputs.tags }}
+          labels: ${{ steps.meta-migration.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

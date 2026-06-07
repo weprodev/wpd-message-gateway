@@ -23,6 +23,8 @@ description: Generate a custom checklist for the current feature based on user r
 
 **Metaphor**: If your spec is code written in English, the checklist is its unit test suite. You're testing whether the requirements are well-written, complete, unambiguous, and ready for implementation - NOT whether the implementation works.
 
+**After `/speckit.implement`**: Run **`/smell develop`** then **`make audit`** per **`docs/agents/verification.md`** before treating the feature as complete.
+
 ## User Input
 
 ```text

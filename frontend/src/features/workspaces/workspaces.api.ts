@@ -10,6 +10,6 @@ export async function fetchWorkspaces(): Promise<
     const err = (await res.json().catch(() => ({}))) as { message?: string }
     return { ok: false, status: res.status, message: err.message }
   }
-  const workspaces = (await res.json()) as Workspace[]
-  return { ok: true, workspaces }
+  const workspaces = (await res.json()) as Workspace[] | null
+  return { ok: true, workspaces: workspaces ?? [] }
 }

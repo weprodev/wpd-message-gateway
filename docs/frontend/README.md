@@ -1,41 +1,28 @@
 # Portal frontend — documentation index
 
-The **Message Gateway Portal** UI lives in [`frontend/`](../../frontend/) (Vite, React, TypeScript, Tailwind). This folder collects **repo-specific** guidance and links; implementation details and scripts are in [`frontend/README.md`](../../frontend/README.md).
+Implementation lives in [`frontend/`](../../frontend/). Start with **[architecture.md](./architecture.md)** for folder layout and dependency rules.
 
-## Stack
-
-| Topic | Where to read |
-| ----- | ------------- |
-| **shadcn/ui** — docs & component catalogue | [ui.shadcn.com/docs](https://ui.shadcn.com/docs) |
-| **shadcn/ui** — installation (Vite + React setup) | [ui.shadcn.com/docs/installation](https://ui.shadcn.com/docs/installation) |
-| **Vite** | [vite.dev/guide](https://vite.dev/guide/) |
-| **TypeScript** | [typescriptlang.org/docs](https://www.typescriptlang.org/docs/) |
-| **React** | [react.dev](https://react.dev/) |
-| **Tailwind CSS** | [tailwindcss.com/docs](https://tailwindcss.com/docs) |
-
-## In this repository
+## In this folder
 
 | Document | Purpose |
 | -------- | ------- |
-| [conventions.md](./conventions.md) | DDD-style feature folders, KISS/DRY/SOLID, naming — aligns with this repo’s Portal |
-| [frontend-engineer.md](./frontend-engineer.md) | **Role & workflow** — principal-style understand→plan→act, architecture, security, Storybook, shadcn alignment |
-| [shadcn/SKILL.md](./shadcn/SKILL.md) | **shadcn/ui skill** (rules, CLI, patterns) — in-repo copy; upstream [skills.sh/shadcn/ui/shadcn](https://skills.sh/shadcn/ui/shadcn) |
-| [shadcn/rules/](./shadcn/rules/) | Styling, forms, composition, icons, base vs radix |
-| [`frontend/README.md`](../../frontend/README.md) | Scripts, `make` targets, `src/` layout |
+| [architecture.md](./architecture.md) | Layers, routing, feature isolation |
+| [conventions.md](./conventions.md) | Naming, KISS/DRY/SOLID, shadcn |
+| [frontend-engineer.md](./frontend-engineer.md) | Workflow, aesthetics, self-review |
+| [shadcn/SKILL.md](./shadcn/SKILL.md) | shadcn/ui contract and CLI |
 
-## Backend / shared docs
+## Stack (external)
 
-- [Architecture](../backend/architecture.md) — system boundaries, gateway vs portal
-- [Code conventions](../backend/code-conventions.md) — **Go** conventions (backend); Portal uses TypeScript rules in [conventions.md](./conventions.md)
-- [Usage](../backend/usage.md) — HTTP API and SDK usage
-- [Backend engineer role](../backend/backend-engineer.md) — Go layers, registry, `make audit`
+[Vite](https://vite.dev/guide/) · [React](https://react.dev/) · [TypeScript](https://www.typescriptlang.org/docs/) · [Tailwind](https://tailwindcss.com/docs) · [shadcn/ui](https://ui.shadcn.com/docs)
 
-## Cursor / AI
+## Backend
 
-To install the **interactive** shadcn skill into Cursor (CLI-backed), use the upstream installer:
+[Architecture](../backend/architecture.md) · [Usage](../backend/usage.md) · [Code conventions](../backend/code-conventions.md)
+
+## Cursor / shadcn skill install
 
 ```bash
 npx skills add https://github.com/shadcn/ui --skill shadcn
 ```
 
-The copy under **`docs/frontend/shadcn/`** remains the **source of truth** for humans and for agents that read the repo without the skill runtime.
+The in-repo copy under `shadcn/` remains the source of truth for this project.

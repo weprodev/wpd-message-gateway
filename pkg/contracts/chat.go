@@ -25,8 +25,8 @@ type ChatButton struct {
 	Phone string `json:"phone,omitempty"`
 }
 
-// ChatSender defines the contract for sending chat/social media messages.
+// ChatSender defines the contract for sending chat messages.
 type ChatSender interface {
-	Send(ctx context.Context, message *ChatMessage) (*SendResult, error)
+	Send(ctx context.Context, chat ChatMessage) (*SendResult, error)
 	Name() string
 }

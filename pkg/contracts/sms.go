@@ -11,6 +11,6 @@ type SMS struct {
 
 // SMSSender defines the contract for sending SMS messages.
 type SMSSender interface {
-	Send(ctx context.Context, sms *SMS) (*SendResult, error)
+	Send(ctx context.Context, sms SMS) (*SendResult, error)
 	Name() string
 }

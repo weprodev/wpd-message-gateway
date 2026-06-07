@@ -5,9 +5,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
@@ -35,6 +37,7 @@ type GatewayService struct {
 	templates    port.TemplateRepository
 	settings     port.WorkspaceSettingsRepository
 	inbox        port.InboxWriter
+	logs         port.MessageRequestLogRepository
 
 	emailCache *emailSenderCache
 	smsCache   *smsSenderCache
@@ -51,75 +54,77 @@ func NewGatewayService(
 	templates port.TemplateRepository,
 	settings port.WorkspaceSettingsRepository,
 	inbox port.InboxWriter,
+	logs port.MessageRequestLogRepository,
 ) *GatewayService {
 	return &GatewayService{
 		integrations: integrations,
 		templates:    templates,
 		settings:     settings,
 		inbox:        inbox,
-		emailCache:   newProviderCache[port.EmailSender](),
-		smsCache:     newProviderCache[port.SMSSender](),
-		pushCache:    newProviderCache[port.PushSender](),
-		chatCache:    newProviderCache[port.ChatSender](),
+		logs:         logs,
+		emailCache:   newProviderCache[contracts.EmailSender](),
+		smsCache:     newProviderCache[contracts.SMSSender](),
+		pushCache:    newProviderCache[contracts.PushSender](),
+		chatCache:    newProviderCache[contracts.ChatSender](),
 	}
 }
 
 // SendEmail dispatches an email for workspaceID according to its dispatch mode.
-func (s *GatewayService) SendEmail(ctx context.Context, workspaceID string, email *contracts.Email) (*contracts.SendResult, error) {
+func (s *GatewayService) SendEmail(ctx context.Context, workspaceID string, email contracts.Email) (*contracts.SendResult, error) {
 	mode := s.resolveDispatchMode(ctx, workspaceID)
 	return s.dispatch(ctx, workspaceID, mode, channelEmail,
 		func() (*contracts.SendResult, error) { return s.writeEmailToInbox(ctx, workspaceID, email) },
-		func(intg *domain.Integration) (*contracts.SendResult, error) {
+		func(sendCtx context.Context, intg *domain.Integration) (*contracts.SendResult, error) {
 			sender, err := resolveEmailSender(s.emailCache, intg)
 			if err != nil {
 				return nil, err
 			}
-			return sender.Send(ctx, email)
+			return sender.Send(sendCtx, email)
 		},
 	)
 }
 
 // SendSMS dispatches an SMS for workspaceID according to its dispatch mode.
-func (s *GatewayService) SendSMS(ctx context.Context, workspaceID string, sms *contracts.SMS) (*contracts.SendResult, error) {
+func (s *GatewayService) SendSMS(ctx context.Context, workspaceID string, sms contracts.SMS) (*contracts.SendResult, error) {
 	mode := s.resolveDispatchMode(ctx, workspaceID)
 	return s.dispatch(ctx, workspaceID, mode, channelSMS,
 		func() (*contracts.SendResult, error) { return s.writeSMSToInbox(ctx, workspaceID, sms) },
-		func(intg *domain.Integration) (*contracts.SendResult, error) {
+		func(sendCtx context.Context, intg *domain.Integration) (*contracts.SendResult, error) {
 			sender, err := resolveSMSSender(s.smsCache, intg)
 			if err != nil {
 				return nil, err
 			}
-			return sender.Send(ctx, sms)
+			return sender.Send(sendCtx, sms)
 		},
 	)
 }
 
 // SendPush dispatches a push notification for workspaceID according to its dispatch mode.
-func (s *GatewayService) SendPush(ctx context.Context, workspaceID string, push *contracts.PushNotification) (*contracts.SendResult, error) {
+func (s *GatewayService) SendPush(ctx context.Context, workspaceID string, push contracts.PushNotification) (*contracts.SendResult, error) {
 	mode := s.resolveDispatchMode(ctx, workspaceID)
 	return s.dispatch(ctx, workspaceID, mode, channelPush,
 		func() (*contracts.SendResult, error) { return s.writePushToInbox(ctx, workspaceID, push) },
-		func(intg *domain.Integration) (*contracts.SendResult, error) {
+		func(sendCtx context.Context, intg *domain.Integration) (*contracts.SendResult, error) {
 			sender, err := resolvePushSender(s.pushCache, intg)
 			if err != nil {
 				return nil, err
 			}
-			return sender.Send(ctx, push)
+			return sender.Send(sendCtx, push)
 		},
 	)
 }
 
 // SendChat dispatches a chat message for workspaceID according to its dispatch mode.
-func (s *GatewayService) SendChat(ctx context.Context, workspaceID string, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
+func (s *GatewayService) SendChat(ctx context.Context, workspaceID string, chat contracts.ChatMessage) (*contracts.SendResult, error) {
 	mode := s.resolveDispatchMode(ctx, workspaceID)
 	return s.dispatch(ctx, workspaceID, mode, channelChat,
 		func() (*contracts.SendResult, error) { return s.writeChatToInbox(ctx, workspaceID, chat) },
-		func(intg *domain.Integration) (*contracts.SendResult, error) {
+		func(sendCtx context.Context, intg *domain.Integration) (*contracts.SendResult, error) {
 			sender, err := resolveChatSender(s.chatCache, intg)
 			if err != nil {
 				return nil, err
 			}
-			return sender.Send(ctx, chat)
+			return sender.Send(sendCtx, chat)
 		},
 	)
 }
@@ -135,56 +140,73 @@ func (s *GatewayService) dispatch(
 	mode domain.MessageDispatchMode,
 	channel string,
 	writeToInbox func() (*contracts.SendResult, error),
-	sendViaProvider func(*domain.Integration) (*contracts.SendResult, error),
+	sendViaProvider func(context.Context, *domain.Integration) (*contracts.SendResult, error),
 ) (*contracts.SendResult, error) {
+	slog.InfoContext(ctx, "dispatching message", "workspace_id", workspaceID, "dispatch_mode", mode, "channel", channel)
 	switch mode {
 	case domain.DispatchMemoryOnly:
 		r, err := writeToInbox()
 		if err != nil {
+			slog.ErrorContext(ctx, "inbox write failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
-		attachMeta(r, mode, channel, "")
+		attachMeta(r, mode, channel, "", memoryProviderName)
+		slog.InfoContext(ctx, "message dispatched via memory only", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 		return r, nil
 
 	case domain.DispatchProviderOnly:
 		intg, err := s.activeIntegration(ctx, workspaceID, channel)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
 		// If the stored integration IS the memory provider, fall through to inbox.
 		if intg.ProviderName == memoryProviderName {
 			r, err := writeToInbox()
 			if err != nil {
+				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
 				return nil, err
 			}
-			attachMeta(r, mode, channel, intg.ID)
+			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
+			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 			return r, nil
 		}
-		r, err := sendViaProvider(intg)
+		providerCtx := applogger.WithProvider(ctx, intg.ProviderName)
+		r, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
 			return nil, err
 		}
-		attachMeta(r, mode, channel, intg.ID)
+		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
+		slog.InfoContext(ctx, "message dispatched via provider only", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID)
 		return r, nil
 
 	case domain.DispatchMemoryAndProvider:
 		intg, err := s.activeIntegration(ctx, workspaceID, channel)
 		if err != nil {
+			slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
 		// If the integration is already memory, a single write is enough.
 		if intg.ProviderName == memoryProviderName {
 			r, err := writeToInbox()
 			if err != nil {
+				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
 				return nil, err
 			}
-			attachMeta(r, mode, channel, intg.ID)
+			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
+			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 			return r, nil
 		}
 		// Both paths: capture to inbox first (non-fatal), then send via provider.
-		inboxResult, _ := writeToInbox() // inbox failure does not abort the send
-		provResult, err := sendViaProvider(intg)
+		inboxResult, err := writeToInbox()
 		if err != nil {
+			slog.WarnContext(ctx, "inbox write failed (non-fatal)", "error", err, "workspace_id", workspaceID, "channel", channel)
+		}
+		providerCtx := applogger.WithProvider(ctx, intg.ProviderName)
+		provResult, err := sendViaProvider(providerCtx, intg)
+		if err != nil {
+			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
 			return nil, err
 		}
 		if inboxResult != nil {
@@ -193,16 +215,19 @@ func (s *GatewayService) dispatch(
 			}
 			provResult.Meta["inbox_message_id"] = inboxResult.ID
 		}
-		attachMeta(provResult, mode, channel, intg.ID)
+		attachMeta(provResult, mode, channel, intg.ID, intg.ProviderName)
+		slog.InfoContext(ctx, "message dispatched via memory and provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", provResult.ID)
 		return provResult, nil
 
 	default:
 		// Undefined modes fall back to memory_only (safe default).
+		slog.WarnContext(ctx, "unknown dispatch mode, falling back to memory only", "workspace_id", workspaceID, "mode", mode)
 		r, err := writeToInbox()
 		if err != nil {
+			slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
 			return nil, err
 		}
-		attachMeta(r, domain.DispatchMemoryOnly, channel, "")
+		attachMeta(r, domain.DispatchMemoryOnly, channel, "", memoryProviderName)
 		return r, nil
 	}
 }
@@ -233,7 +258,7 @@ func (s *GatewayService) activeIntegration(ctx context.Context, workspaceID, cha
 
 // inbox write helpers — each converts a domain error into meaningful context.
 
-func (s *GatewayService) writeEmailToInbox(ctx context.Context, workspaceID string, email *contracts.Email) (*contracts.SendResult, error) {
+func (s *GatewayService) writeEmailToInbox(ctx context.Context, workspaceID string, email contracts.Email) (*contracts.SendResult, error) {
 	if s.inbox == nil {
 		return nil, fmt.Errorf("inbox writer not configured")
 	}
@@ -244,7 +269,7 @@ func (s *GatewayService) writeEmailToInbox(ctx context.Context, workspaceID stri
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-func (s *GatewayService) writeSMSToInbox(ctx context.Context, workspaceID string, sms *contracts.SMS) (*contracts.SendResult, error) {
+func (s *GatewayService) writeSMSToInbox(ctx context.Context, workspaceID string, sms contracts.SMS) (*contracts.SendResult, error) {
 	if s.inbox == nil {
 		return nil, fmt.Errorf("inbox writer not configured")
 	}
@@ -255,7 +280,7 @@ func (s *GatewayService) writeSMSToInbox(ctx context.Context, workspaceID string
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-func (s *GatewayService) writePushToInbox(ctx context.Context, workspaceID string, push *contracts.PushNotification) (*contracts.SendResult, error) {
+func (s *GatewayService) writePushToInbox(ctx context.Context, workspaceID string, push contracts.PushNotification) (*contracts.SendResult, error) {
 	if s.inbox == nil {
 		return nil, fmt.Errorf("inbox writer not configured")
 	}
@@ -266,7 +291,7 @@ func (s *GatewayService) writePushToInbox(ctx context.Context, workspaceID strin
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID string, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
+func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID string, chat contracts.ChatMessage) (*contracts.SendResult, error) {
 	if s.inbox == nil {
 		return nil, fmt.Errorf("inbox writer not configured")
 	}
@@ -279,16 +304,27 @@ func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID strin
 
 // attachMeta stamps standard dispatch metadata onto a result without allocating
 // if Meta is already populated.
-func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID string) {
+func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID, providerName string) {
 	if r == nil {
 		return
 	}
 	if r.Meta == nil {
-		r.Meta = make(map[string]string, 3)
+		r.Meta = make(map[string]string, 4)
 	}
 	r.Meta["dispatch_mode"] = string(mode)
 	r.Meta["channel"] = channel
 	if integrationID != "" {
 		r.Meta["integration_id"] = integrationID
 	}
+	if providerName != "" {
+		r.Meta["provider_name"] = providerName
+	}
+}
+
+// RecordLog persists a MessageRequestLog entry. Failures are logged with slog.
+func (s *GatewayService) RecordLog(ctx context.Context, entry *domain.MessageRequestLog) error {
+	if s.logs == nil || entry.WorkspaceID == "" {
+		return nil
+	}
+	return s.logs.Create(ctx, entry)
 }

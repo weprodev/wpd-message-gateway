@@ -1,0 +1,28 @@
+meta {
+  name: Register
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "first_name": "Test",
+    "last_name": "User",
+    "email": "newuser@example.com",
+    "password": "password123"
+  }
+}
+
+tests {
+  test("should register user successfully", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.email).to.equal("newuser@example.com");
+  });
+}

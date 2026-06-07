@@ -26,4 +26,9 @@ tests {
     expect(res.body).to.have.property("id");
     expect(res.body).to.have.property("chat");
   });
+
+  test("should have chat content", function() {
+    expect(res.body.chat).to.have.property("to");
+    expect(res.body.chat).to.have.property("message");
+  });
 }

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -31,14 +32,17 @@ func PortalJWTBearerOrQuery(secret string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if secret == "" {
+				slog.ErrorContext(c.Request().Context(), "Portal JWT auth failed: secret not configured")
 				return echo.NewHTTPError(http.StatusServiceUnavailable, "portal JWT not configured")
 			}
 			raw := bearerTokenFromRequest(c)
 			if raw == "" {
+				slog.WarnContext(c.Request().Context(), "Portal JWT auth failed: missing bearer token")
 				return echo.NewHTTPError(http.StatusUnauthorized, "missing bearer token")
 			}
 			claims, err := authjwt.Parse(raw, secret)
 			if err != nil {
+				slog.WarnContext(c.Request().Context(), "Portal JWT auth failed: invalid token", "error", err)
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
 			}
 			ctx := c.Request().Context()
@@ -70,13 +74,16 @@ func RequireWorkspaceMember(members port.WorkspaceMemberRepository) echo.Middlew
 		return func(c echo.Context) error {
 			wid := c.Param("wid")
 			if wid == "" {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceMember failed: missing workspace id param")
 				return echo.NewHTTPError(http.StatusBadRequest, "missing workspace id")
 			}
 			uid := GetPortalUserID(c.Request().Context())
 			if uid == "" {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceMember failed: missing user context", "workspace_id", wid)
 				return echo.NewHTTPError(http.StatusUnauthorized, "missing user context")
 			}
 			if _, err := members.GetRole(c.Request().Context(), wid, uid); err != nil {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceMember failed: user is not a member", "workspace_id", wid, "user_id", uid, "error", err)
 				return echo.NewHTTPError(http.StatusForbidden, "not a member of this workspace")
 			}
 			return next(c)
@@ -91,6 +98,7 @@ func RequireWorkspaceAPIKey(apiKeys port.APIKeyRepository) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			wid := c.Param("wid")
 			if wid == "" {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceAPIKey failed: missing workspace id param")
 				return echo.NewHTTPError(http.StatusBadRequest, "missing workspace id")
 			}
 			clientID := strings.TrimSpace(c.Request().Header.Get(HeaderWorkspaceAPIClientID))
@@ -102,16 +110,20 @@ func RequireWorkspaceAPIKey(apiKeys port.APIKeyRepository) echo.MiddlewareFunc {
 				secret = c.QueryParam(QueryClientSecret)
 			}
 			if clientID == "" || secret == "" {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceAPIKey failed: missing credentials", "workspace_id", wid)
 				return echo.NewHTTPError(http.StatusUnauthorized, "missing API key credentials (X-Api-Client-Id and X-Api-Client-Secret)")
 			}
 			key, err := apiKeys.GetByClientID(c.Request().Context(), clientID)
 			if err != nil || !key.IsActive {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceAPIKey failed: invalid or inactive key", "workspace_id", wid, "client_id", clientID)
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid API key")
 			}
 			if !crypto.CheckSecretHash(secret, key.ClientSecretHash) {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceAPIKey failed: invalid secret", "workspace_id", wid, "client_id", clientID)
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid API key secret")
 			}
 			if key.WorkspaceID != wid {
+				slog.WarnContext(c.Request().Context(), "RequireWorkspaceAPIKey failed: workspace mismatch", "workspace_id", wid, "client_id", clientID, "apiKey_workspace_id", key.WorkspaceID)
 				return echo.NewHTTPError(http.StatusForbidden, "API key does not belong to this workspace")
 			}
 			_ = apiKeys.UpdateLastUsedAt(c.Request().Context(), key.ID)

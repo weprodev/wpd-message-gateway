@@ -20,6 +20,41 @@ export default defineConfig([globalIgnores(['dist', 'storybook-static']), {
     globals: globals.browser,
   },
 }, {
+  files: ['src/features/**/*.{ts,tsx}'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [{
+        group: ['@/features/*'],
+        message: 'Features are isolated — use relative imports within the same feature. Route composition lives in core/router.',
+      }],
+    }],
+  },
+}, {
+  files: ['src/shared/**/*.{ts,tsx}'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [{
+        group: ['@/features/*'],
+        message: 'shared/ must not import features/. Compose pages in core/router instead.',
+      }],
+    }],
+  },
+}, {
+  files: ['src/core/**/*.{ts,tsx}'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [{
+        group: ['@/features/*'],
+        message: 'Only core/router may import feature modules.',
+      }],
+    }],
+  },
+}, {
+  files: ['src/core/router/**/*.{ts,tsx}'],
+  rules: {
+    'no-restricted-imports': 'off',
+  },
+}, {
   files: ['src/components/ui/**/*.{tsx,ts}'],
   rules: {
     'react-refresh/only-export-components': 'off',

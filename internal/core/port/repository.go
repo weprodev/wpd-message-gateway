@@ -9,7 +9,7 @@ import (
 type WorkspaceRepository interface {
 	Create(ctx context.Context, workspace *domain.Workspace) error
 	GetByID(ctx context.Context, id string) (*domain.Workspace, error)
-	GetByUniqueKey(ctx context.Context, uniqueKey string) (*domain.Workspace, error)
+	GetBySlug(ctx context.Context, slug string) (*domain.Workspace, error)
 	Update(ctx context.Context, workspace *domain.Workspace) error
 	SetStatus(ctx context.Context, id, status string) error
 	ListForUser(ctx context.Context, userID string) ([]domain.Workspace, error)
@@ -32,6 +32,8 @@ type IntegrationRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.Integration, error)
 	Delete(ctx context.Context, id string) error
 	Upsert(ctx context.Context, integration *domain.Integration) error
+	GetProviderFields(ctx context.Context, providerName string) ([]domain.ProviderConfigField, error)
+	ListProviders(ctx context.Context) ([]domain.Provider, error)
 }
 
 type TemplateRepository interface {
@@ -46,4 +48,10 @@ type TemplateRepository interface {
 type MessageRequestLogRepository interface {
 	Create(ctx context.Context, log *domain.MessageRequestLog) error
 	ListWithSource(ctx context.Context, q MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error)
+}
+type UserRepository interface {
+	Create(ctx context.Context, u *domain.User) error
+	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	GetByID(ctx context.Context, id string) (*domain.User, error)
+	SetEmailVerified(ctx context.Context, id string) error
 }

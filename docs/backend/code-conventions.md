@@ -5,26 +5,26 @@ Follow [Effective Go](https://go.dev/doc/effective_go) plus these project-specif
 ## Project Structure
 
 ```
-internal/           # Private application code
+internal/           # Private application code (HTTP server mode)
 ├── app/            # Config, wire, validation, provider blank imports (imports.go)
 ├── core/           # Domain, ports, services
 │   ├── domain/     # Domain types
-│   ├── port/       # Interface definitions + sentinel errors
+│   ├── port/       # Repository + inbox interfaces, sentinel errors
 │   └── service/    # GatewayService, PortalService, provider cache, etc.
 ├── infrastructure/ # External integrations
+│   ├── authgate/   # RBAC adapter
+│   ├── inbox/      # In-memory inbox store (port adapter)
 │   ├── logger/     # Structured logging
-│   ├── provider/   # Email/SMS/Push/Chat provider implementations
 │   └── repository/ # Postgres repositories
-├── presentation/   # HTTP layer
-│   ├── handler/    # Request handlers
-│   └── middleware/ # Auth, JWT, inbox API key
-└── registry/       # Provider factory registry (init() self-registration)
+└── presentation/   # HTTP layer
+    ├── handler/    # Request handlers
+    └── middleware/ # Auth, JWT, inbox API key
 
-pkg/                # Public packages
-├── contracts/      # Message types (single source of truth)
-├── auth/           # Hashing helpers (portal)
-├── encryption/     # AES helpers
-└── gateway/        # Embedded SDK
+pkg/                # Public packages (embedded SDK + shared contracts)
+├── contracts/      # Message types + sender interfaces (EmailSender, …)
+├── gateway/        # Embedded SDK entry point
+├── registry/       # Provider factory registry (init() self-registration)
+└── provider/       # Provider implementations (mailgun, memory, …)
 ```
 
 ## Naming
@@ -47,26 +47,26 @@ const ProviderName = "mailgun"
 Always add compile-time check:
 
 ```go
-var _ port.EmailSender = (*Provider)(nil)
+var _ contracts.EmailSender = (*Provider)(nil)
 ```
 
-Define interfaces in `internal/core/port/`, not alongside implementations.
+Sender interfaces (`EmailSender`, `SMSSender`, …) live in **`pkg/contracts/`**. Repository and inbox interfaces live in **`internal/core/port/`**.
 
 ## Provider Registration
 
 Use the **self-registration pattern** via `init()`:
 
 ```go
-// internal/infrastructure/provider/sendgrid/register.go
+// pkg/provider/sendgrid/register.go
 package sendgrid
 
 import (
-    "github.com/weprodev/wpd-message-gateway/internal/core/port"
-    "github.com/weprodev/wpd-message-gateway/internal/registry"
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+    "github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 func init() {
-    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig, _ registry.MailpitConfig) (port.EmailSender, error) {
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig) (contracts.EmailSender, error) {
         return New(Config{
             APIKey:    cfg.APIKey,
             FromEmail: cfg.FromEmail,
@@ -80,7 +80,7 @@ func init() {
 **Required:** Add blank import in `internal/app/imports.go`:
 
 ```go
-_ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid"
+_ "github.com/weprodev/wpd-message-gateway/pkg/provider/sendgrid"
 ```
 
 ## Context
@@ -116,10 +116,11 @@ HTTP handlers map sentinels to status codes:
 
 ```go
 switch {
-case errors.Is(err, port.ErrNotFound):     return c.JSON(http.StatusNotFound, ...)
-case errors.Is(err, port.ErrConflict):     return c.JSON(http.StatusConflict, ...)
-case errors.Is(err, port.ErrUnauthorized): return c.JSON(http.StatusUnauthorized, ...)
-default:                                    return c.JSON(http.StatusInternalServerError, ...)
+case errors.Is(err, port.ErrNotFound):           return c.JSON(http.StatusNotFound, ...)
+case errors.Is(err, port.ErrConflict):           return c.JSON(http.StatusConflict, ...)
+case errors.Is(err, port.ErrUnauthorized):       return c.JSON(http.StatusUnauthorized, ...)
+case errors.Is(err, port.ErrInvalidCredentials): return c.JSON(http.StatusUnauthorized, ...)
+default:                                        return c.JSON(http.StatusInternalServerError, ...)
 }
 ```
 
@@ -128,7 +129,7 @@ default:                                    return c.JSON(http.StatusInternalSer
 Validate at the start of public functions:
 
 ```go
-func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
+func (p *Provider) Send(ctx context.Context, email contracts.Email) (*contracts.SendResult, error) {
     if len(email.To) == 0 {
         return nil, fmt.Errorf("%s: recipient required", ProviderName)
     }

@@ -29,5 +29,8 @@ Documentation for the Portal web UI interface.
 - **[shadcn/ui Skill](./frontend/shadcn/SKILL.md)** — Rules and usage guide for the `components/ui` library.
 
 ## Meta
+
+- **[AI agents](./agents/master-agent.md)** — Playbooks in `docs/agents/`; **[verification chain](./agents/verification.md)** (lint → `/smell` → `make audit`).
+- **`/smell`** — Diff review (`.claude/commands/smell.md`, base `develop`).
 - **[System architecture (Excalidraw)](./assets/diagram.excalidraw)** — HTTP server, gateway, providers, portal vs memory inbox.
 - **[PostgreSQL ERD (draw.io)](./assets/database-schema.drawio)** — Tables and FKs from `database/migrations/*.up.sql`.

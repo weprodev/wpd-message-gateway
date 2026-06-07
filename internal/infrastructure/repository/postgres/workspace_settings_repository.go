@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -26,6 +27,9 @@ func (r *WorkspaceSettingsRepository) Get(ctx context.Context, workspaceID, key 
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get workspace setting", "error", err, "workspace_id", workspaceID, "key", key)
+	}
 	return v, err
 }
 
@@ -35,6 +39,9 @@ func (r *WorkspaceSettingsRepository) Set(ctx context.Context, workspaceID, key,
 		VALUES ($1, $2, $3)
 		ON CONFLICT (workspace_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
 	`, workspaceID, key, value)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to set workspace setting", "error", err, "workspace_id", workspaceID, "key", key)
+	}
 	return err
 }
 
@@ -44,6 +51,7 @@ func (r *WorkspaceSettingsRepository) GetAll(ctx context.Context, workspaceID st
 		workspaceID,
 	)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to query all workspace settings", "error", err, "workspace_id", workspaceID)
 		return nil, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -52,9 +60,14 @@ func (r *WorkspaceSettingsRepository) GetAll(ctx context.Context, workspaceID st
 	for rows.Next() {
 		var k, v string
 		if err := rows.Scan(&k, &v); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan workspace setting", "error", err, "workspace_id", workspaceID)
 			return nil, err
 		}
 		out[k] = v
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for workspace settings", "error", err, "workspace_id", workspaceID)
+		return nil, err
+	}
+	return out, nil
 }

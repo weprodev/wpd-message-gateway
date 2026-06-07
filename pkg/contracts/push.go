@@ -14,6 +14,6 @@ type PushNotification struct {
 
 // PushSender defines the contract for sending push notifications.
 type PushSender interface {
-	Send(ctx context.Context, notification *PushNotification) (*SendResult, error)
+	Send(ctx context.Context, push PushNotification) (*SendResult, error)
 	Name() string
 }

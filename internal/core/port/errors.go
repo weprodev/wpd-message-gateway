@@ -16,6 +16,10 @@ var (
 	// ErrUnauthorized is returned when credentials are missing or invalid.
 	ErrUnauthorized = errors.New("unauthorized")
 
+	// ErrInvalidCredentials is returned for failed portal login (unknown user or wrong password).
+	// Callers may map it to HTTP 401 without treating it as an infrastructure failure.
+	ErrInvalidCredentials = errors.New("invalid credentials")
+
 	// ErrInvalidInput is returned when caller-supplied data fails validation.
 	ErrInvalidInput = errors.New("invalid input")
 

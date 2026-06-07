@@ -1,0 +1,24 @@
+FROM golang:1.26-alpine AS builder
+
+# Install git
+RUN apk upgrade --no-cache && apk add --no-cache git
+
+# Install migrate tool (pinned for reproducible builds)
+RUN CGO_ENABLED=0 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+
+FROM alpine:3.20
+
+# Install postgresql-client for seeding
+RUN apk upgrade --no-cache && apk add --no-cache postgresql-client
+
+# Copy migrate binary to a different location (shim target)
+COPY --from=builder /go/bin/migrate /migrate-tool
+
+# Copy migration files (migrations and seeds)
+COPY database /database
+
+# Copy shared migration+seed script
+COPY scripts/run_migrations.sh /migrate
+RUN chmod +x /migrate
+
+ENTRYPOINT ["/migrate"]

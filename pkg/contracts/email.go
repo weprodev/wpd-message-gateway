@@ -19,6 +19,6 @@ type Email struct {
 
 // EmailSender defines the contract for sending emails.
 type EmailSender interface {
-	Send(ctx context.Context, email *Email) (*SendResult, error)
+	Send(ctx context.Context, email Email) (*SendResult, error)
 	Name() string
 }

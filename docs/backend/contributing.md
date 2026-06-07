@@ -2,6 +2,18 @@
 
 ## Quick Start
 
+### Option A: Docker Compose (Recommended)
+This spins up the entire stack including a PostgreSQL database (preloaded with migrations and permission/demo seeds), a hot-reloading Go backend, and the Portal UI dev server:
+
+```bash
+git clone git@github.com:weprodev/wpd-message-gateway.git
+cd wpd-message-gateway
+make dev
+```
+
+### Option B: Native Setup (No Docker)
+If you prefer to run components directly on your host machine:
+
 ```bash
 git clone git@github.com:weprodev/wpd-message-gateway.git
 cd wpd-message-gateway
@@ -23,11 +35,11 @@ The system uses a **self-registration pattern** via Go's `init()` mechanism. Whe
 ### Step 1: Create the Provider Package
 
 ```bash
-mkdir -p internal/infrastructure/provider/sendgrid
+mkdir -p pkg/provider/sendgrid
 ```
 
 ```go
-// internal/infrastructure/provider/sendgrid/sendgrid.go
+// pkg/provider/sendgrid/sendgrid.go
 package sendgrid
 
 import (
@@ -39,7 +51,7 @@ import (
 
 const ProviderName = "sendgrid"
 
-// Provider implements port.EmailSender for SendGrid.
+// Provider implements contracts.EmailSender for SendGrid.
 type Provider struct {
     apiKey    string
     fromEmail string
@@ -47,9 +59,7 @@ type Provider struct {
 }
 
 // compile-time interface check
-var _ interface {
-    Send(context.Context, *contracts.Email) (*contracts.SendResult, error)
-} = (*Provider)(nil)
+var _ contracts.EmailSender = (*Provider)(nil)
 
 func New(cfg Config) (*Provider, error) {
     if cfg.APIKey == "" {
@@ -62,7 +72,7 @@ func New(cfg Config) (*Provider, error) {
     }, nil
 }
 
-func (p *Provider) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
+func (p *Provider) Send(ctx context.Context, email contracts.Email) (*contracts.SendResult, error) {
     // Call SendGrid HTTP API here
     return &contracts.SendResult{
         ID:      "sg-msg-id",
@@ -81,25 +91,22 @@ type Config struct {
 ### Step 2: Self-Register via `init()`
 
 ```go
-// internal/infrastructure/provider/sendgrid/register.go
+// pkg/provider/sendgrid/register.go
 package sendgrid
 
 import (
-    "github.com/weprodev/wpd-message-gateway/internal/core/port"
-    "github.com/weprodev/wpd-message-gateway/internal/registry"
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+    "github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 func init() {
-    registry.RegisterEmailProvider(
-        "sendgrid",
-        func(cfg registry.EmailConfig, _ registry.MailpitConfig) (port.EmailSender, error) {
-            return New(Config{
-                APIKey:    cfg.APIKey,
-                FromEmail: cfg.FromEmail,
-                FromName:  cfg.FromName,
-            })
-        },
-    )
+    registry.RegisterEmailProvider("sendgrid", func(cfg registry.EmailConfig) (contracts.EmailSender, error) {
+        return New(Config{
+            APIKey:    cfg.APIKey,
+            FromEmail: cfg.FromEmail,
+            FromName:  cfg.FromName,
+        })
+    })
 }
 ```
 
@@ -111,9 +118,9 @@ package app
 
 import (
     // Provider self-registration — order does not matter
-    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
-    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
-    _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/sendgrid" // ← add this
+    _ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
+    _ "github.com/weprodev/wpd-message-gateway/pkg/provider/memory"
+    _ "github.com/weprodev/wpd-message-gateway/pkg/provider/sendgrid" // ← add this
 )
 ```
 
@@ -135,20 +142,18 @@ gw, _ := gateway.New(gateway.Config{
 gw.SendEmail(ctx, email)
 ```
 
-### Step 5: Use in Server Mode (via Portal UI)
+### Step 5: Use in server mode (REST API)
 
-1. Start the server and open the Portal
-2. Go to **Integrations** for your workspace
-3. Add integration → select channel **Email**, provider **sendgrid**
-4. Enter `api_key`, `from_email`, `from_name` in the JSON config
-5. The `GatewayService` reads this from DB and instantiates your provider via the registry factory
+1. Start the server and obtain a portal JWT (`POST /api/v1/auth/login`)
+2. `POST /api/v1/workspaces/:wid/integrations` with channel **email**, provider **sendgrid**, and JSON config (`api_key`, `from_email`, `from_name`)
+3. The `GatewayService` reads this from DB and instantiates your provider via the registry factory
 
-> Provider config in server mode is stored **AES-encrypted** in the `integrations` table. Users configure credentials in the UI — not in YAML files.
+> Provider config in server mode is stored **AES-encrypted** in the `integrations` table. Configure via REST — not in YAML files. (No Portal UI page for integrations yet.)
 
 ### Step 6: Add Tests
 
 ```go
-// internal/infrastructure/provider/sendgrid/sendgrid_test.go
+// pkg/provider/sendgrid/sendgrid_test.go
 package sendgrid
 
 import (
@@ -207,7 +212,7 @@ make audit   # format, lint, test, security scan
 ## Provider Directory Layout
 
 ```
-internal/infrastructure/provider/
+pkg/provider/
 ├── mailgun/
 │   ├── mailgun.go      # Provider implementation
 │   └── register.go     # init() self-registration
@@ -233,7 +238,7 @@ internal/infrastructure/provider/
 ```text
 ┌─────────────────────┐   init()   ┌────────────────────────────┐
 │  Provider Package   │──────────▶ │  Provider Registry         │
-│  (register.go)      │            │  (internal/app/registry)   │
+│  (register.go)      │            │  (pkg/registry)            │
 │                     │            │                            │
 │  emailFactories[    │            │  emailFactories[           │
 │    "sendgrid"       │            │    "sendgrid"              │
@@ -252,23 +257,24 @@ internal/infrastructure/provider/
 
 Same pattern — use the corresponding registry function and port interface:
 
-| Channel | Registry function | Port interface |
+| Channel | Registry function | Contract interface |
 |---------|------------------|----------------|
-| Email | `registry.RegisterEmailProvider(name, factory)` | `port.EmailSender` |
-| SMS | `registry.RegisterSMSProvider(name, factory)` | `port.SMSSender` |
-| Push | `registry.RegisterPushProvider(name, factory)` | `port.PushSender` |
-| Chat | `registry.RegisterChatProvider(name, factory)` | `port.ChatSender` |
+| Email | `registry.RegisterEmailProvider(name, factory)` | `contracts.EmailSender` |
+| SMS | `registry.RegisterSMSProvider(name, factory)` | `contracts.SMSSender` |
+| Push | `registry.RegisterPushProvider(name, factory)` | `contracts.PushSender` |
+| Chat | `registry.RegisterChatProvider(name, factory)` | `contracts.ChatSender` |
 
 ---
 
 ## Pull Request Checklist
 
-- [ ] `make audit` passes (format, lint, test, security)
+- [ ] **`/smell develop`** — no BLOCKER/HIGH ([verification.md](../agents/verification.md))
+- [ ] **`make audit`** passes (format, lint, test, security)
 - [ ] Tests added with meaningful coverage
-- [ ] Interface check: `var _ port.EmailSender = (*Provider)(nil)`
+- [ ] Interface check: `var _ contracts.EmailSender = (*Provider)(nil)`
 - [ ] `register.go` with `init()` for self-registration
 - [ ] Blank import added to `internal/app/imports.go`
-- [ ] No provider credentials in YAML — use environment variables or the Portal UI
+- [ ] No provider credentials in YAML — use environment variables (embedded SDK) or Portal REST API (server mode)
 - [ ] Commit messages follow [Conventional Commits](../workflow.md#commit-conventions)
 
 ---

@@ -17,14 +17,14 @@ The gateway is designed to serve two completely different use cases from a singl
 │  ┌────────────────┐     ┌─────────────────────┐                      │
 │  │  Your Go App   │────▶│  pkg/gateway.New()  │                      │
 │  └────────────────┘     │  (no server, no DB) │                      │
-│                          └──────┬──────────────┘                     │
+│                         └──────┬──────────────┘                      │
 │                                 │ uses registry                      │
 │                                 ▼                                    │
 │                   ┌─────────────────────────┐                        │
-│                   │  Provider (Mailgun, etc) │                       │
+│                   │  Provider (Mailgun, etc)│                        │
 │                   └─────────────────────────┘                        │
 │                                                                      │
-│  Config lives in your code. No infrastructure required.               │
+│  Config lives in your code. No infrastructure required.              │
 └──────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -47,14 +47,14 @@ The gateway is designed to serve two completely different use cases from a singl
 │                        │                                             │
 │             ┌──────────▼──────────┐                                  │
 │             │  PostgreSQL DB      │ ← single source of truth         │
-│             │  workspaces         │   for ALL configuration           │
+│             │  workspaces         │   for ALL configuration          │
 │             │  integrations       │   (provider credentials,         │
 │             │  api_keys           │    workspace settings,           │
 │             │  templates          │    members, logs, etc.)          │
 │             │  workspace_settings │                                  │
 │             └─────────────────────┘                                  │
 │                                                                      │
-│  Config lives in PostgreSQL — configured via the React UI.             │
+│  Config lives in PostgreSQL — configured via the React UI.           │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -90,6 +90,7 @@ gw.SendEmail(ctx, &contracts.Email{
 ```
 
 **Key characteristics:**
+
 - No PostgreSQL required
 - No HTTP server required
 - Provider credentials live in your application config (env vars, secrets manager, etc.)
@@ -107,7 +108,7 @@ gw.SendEmail(ctx, &contracts.Email{
 │                        External World                           │
 │  ┌────────────────────┐      ┌──────────────────────────────┐   │
 │  │   React Portal UI  │      │  HTTP Clients (any language) │   │
-│  │  (config, auth,     │      │  POST /v1/email              │   │
+│  │  (config, auth,     │      │  POST /v1/email             │   │
 │  │   logs, templates) │      │  POST /v1/sms  etc.          │   │
 │  └────────────────────┘      └──────────────────────────────┘   │
 └──────────────┬──────────────────────────┬───────────────────────┘
@@ -131,7 +132,7 @@ gw.SendEmail(ctx, &contracts.Email{
 │                    (internal/core/)                             │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │   PortalService                                          │   │
-│  │   Email+PIN auth · Workspaces · Members · API keys       │   │
+│  │   Email+password auth · Workspaces · Members · API keys  │   │
 │  │   Integrations · Templates · Settings · Logs             │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -152,11 +153,11 @@ gw.SendEmail(ctx, &contracts.Email{
 │                  Infrastructure Layer                           │
 │               (internal/infrastructure/)                        │
 │  ┌─────────────────────┐   ┌───────────────────────────────┐    │
-│  │  Provider Adapters  │   │  Repository Implementations   │    │
+│  │  Inbox UI Capture   │   │  Repository Implementations   │    │
 │  │  ─────────────────  │   │  ──────────────────────────── │    │
-│  │  memory/            │   │  postgres/                    │    │
-│  │  mailgun/           │   │    WorkspaceRepository        │    │
-│  │  (+ more via init())│   │    APIKeyRepository           │    │
+│  │  inbox/             │   │  postgres/                    │    │
+│  │  (portal store)     │   │    WorkspaceRepository        │    │
+│  │                     │   │    APIKeyRepository           │    │
 │  └──────────┬──────────┘   │    IntegrationRepository      │    │
 │             │              │    ... (all entities)         │    │
 │    ┌────────▼──────┐       └───────────────────────────────┘    │
@@ -176,19 +177,18 @@ gw.SendEmail(ctx, &contracts.Email{
 
 ---
 
-## Authentication Model
+## Authentication & Authorization Model
 
-### Portal Access (UI & Management API)
+### Portal Access (UI, Management API & RBAC)
 
-Portal accounts use **email + password** (passwords are stored hashed; see migrations for the exact column names and constraints).
+Portal accounts use **email + password** (passwords are stored hashed). All management requests to `/api/v1/workspaces/:wid/...` require a valid JWT token (`Authorization: Bearer <portal-jwt>`) and are authorized via Role-Based Access Control (RBAC) powered by the `wpd-gogate` library.
 
-```text
-1. Register: POST /api/v1/auth/register { "email", "password", "display_name" } → JWT
-2. Login:    POST /api/v1/auth/login    { "email", "password" } → JWT
-3. Subsequent /api/v1/* requests: Authorization: Bearer <portal-jwt>
-```
+The core service layer decouples from `wpd-gogate` by depending on the `port.AuthorizationGate` interface. The implementation adapter lives in `internal/infrastructure/authgate/gate_adapter.go`.
 
-**Workspace PIN** is separate: it’s used when **joining** a workspace (e.g. `POST /api/v1/workspaces/join`), not for day-to-day portal login.
+- **admin**: Full read/write access to settings, integrations, templates, API keys, and member removal. Assigned automatically to the creator of a workspace.
+- **member**: Read-only access to workspaces, settings, templates, API keys, plus permission to send test messages (`send.test`).
+
+Public workspaces (`is_private = false`) are dynamically accessible to any authenticated user as a `"viewer"` with read-only permissions (i.e. `*.read` operations are bypassed and approved automatically without requiring explicit membership or Casbin checks). All write operations on public workspaces remain strictly restricted to workspace admins.
 
 ### Send API Auth (Machine-to-Machine)
 
@@ -203,11 +203,12 @@ X-Api-Client-Secret: <secret>
 X-Workspace-Key: <workspace-unique-key>
 ```
 
-**Workspace API keys** are managed per-workspace in the Portal:
-- Created in Portal UI → Settings → API Keys
-- Used by your app/service to send messages
-- Scoped to a single workspace
-- Can be revoked, regenerated any time
+### Dual Authorization Design
+
+The application enforces two distinct authorization streams to balance security and usability:
+1. **Portal REST API**: Restricts access using JWT tokens combined with fine-grained `wpd-gogate` permission middleware (`RequirePermission`).
+2. **Inbox SSE API (`/api/v1/workspaces/:wid/inbox/...`)**: Restricts access using JWT tokens combined with a direct database workspace membership check (`RequireWorkspaceMember`) and the workspace API key (`RequireWorkspaceAPIKey`). This design allows client-side SDKs, SSE event streaming, and automation runners to interact with the simulated inbox without requiring full portal RBAC configuration.
+
 
 ---
 
@@ -224,13 +225,19 @@ To avoid docs drifting from the real schema, treat these as the sources of truth
 
 This doc intentionally does **not** duplicate full column lists.
 
-### Configuring Providers via the UI
+### Configuring providers (server mode)
 
-1. **Open Portal** → select workspace
-2. **Go to Integrations** → Add Integration
-3. **Select channel** (Email, SMS, Push, Chat) and **provider** (Mailgun, etc.)
-4. **Enter credentials** — stored AES-encrypted in `integrations` table
-5. **Set dispatch mode** in Settings → `memory_only` | `provider_only` | `memory_and_provider`
+Provider credentials are stored AES-encrypted in the `integrations` table. Configure via **Portal REST API** (no Integrations UI page yet):
+
+1. Portal JWT from login
+2. `POST /api/v1/workspaces/:wid/integrations` with channel, provider name, and config JSON
+3. Set dispatch mode: `PATCH /api/v1/workspaces/:wid/settings` with `message_dispatch_mode`
+
+See [Usage guide](./usage.md) and [E2E bootstrap](./e2e-testing.md).
+
+### Portal UI coverage
+
+The React Portal (`frontend/`) currently implements: auth, workspace list, message **logs**, and **send test**. Memory inbox browsing, integrations, API keys, templates, members, and settings are REST/Bruno only until UI pages land.
 
 ---
 
@@ -238,13 +245,14 @@ This doc intentionally does **not** duplicate full column lists.
 
 Each workspace independently controls how outbound messages are handled:
 
-| Mode | Behavior |
-|------|----------|
-| `memory_only` | Captured in-process RAM only. No external provider called. Default for development. |
-| `provider_only` | Sent through the connected integration only. No in-memory copy. |
-| `memory_and_provider` | Stored in memory AND sent through the integration. |
+| Mode                  | Behavior                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. |
+| `provider_only`       | Sent through the connected integration only. No in-memory copy.                     |
+| `memory_and_provider` | Stored in memory AND sent through the integration.                                  |
 
-Configured via Portal UI → Settings, or directly via:
+Configured via `PATCH /api/v1/workspaces/:wid/settings` (REST — no Portal UI page yet):
+
 ```
 PATCH /api/v1/workspaces/:wid/settings
 { "message_dispatch_mode": "provider_only" }
@@ -350,8 +358,7 @@ wpd-message-gateway/
 │   │   ├── config.go        # Server config (port, JWT)
 │   │   ├── wire.go          # Dependency injection — wires all layers
 │   │   ├── validation.go    # Config validation
-│   │   ├── imports.go       # Blank imports to trigger provider init()
-│   │   └── registry/        # Provider factory registry (shared by SDK + server)
+│   │   └── imports.go       # Blank imports to trigger provider init()
 │   │
 │   ├── core/                # Business logic (domain-pure)
 │   │   ├── domain/          # Types: Workspace, User, APIKey, Integration...
@@ -361,28 +368,33 @@ wpd-message-gateway/
 │   │   │   └── portal_service.go   # Auth, workspaces, API keys, etc.
 │   │   └── authjwt/         # JWT sign/parse
 │   │
-│   ├── infrastructure/      # DB + provider adapters
-│   │   ├── provider/
-│   │   │   ├── mailgun/     # Mailgun email provider
-│   │   │   └── memory/      # In-memory capture (dev/testing)
+│   ├── infrastructure/      # DB + provider + auth adapters
+│   │   ├── authgate/        # wpd-gogate RBAC adapter implementation
+│   │   ├── inbox/           # In-process UI capture store
+│   │   ├── logger/          # Application-wide context-aware logger
 │   │   └── repository/
 │   │       └── postgres/    # All PostgreSQL repository implementations
 │   │
-│   └── presentation/        # HTTP layer
-│       ├── router.go        # All route definitions
-│       ├── handler/
-│       │   ├── gateway_handler.go       # POST /v1/* (send messages)
-│       │   ├── portal_handler.go        # /api/v1/* (auth, workspace CRUD)
-│       │   └── portal_inbox_handler.go  # /api/v1/workspaces/:wid/inbox/*
-│       └── middleware/
-│           ├── auth.go              # API key auth for /v1/*
-│           ├── portal_jwt.go        # Portal JWT for /api/v1/*
-│           └── portal_inbox_auth.go # Inbox-specific auth (JWT + member + key)
+│   ├── presentation/        # HTTP layer
+│   │   ├── router.go        # All route definitions
+│   │   ├── handler/
+│   │   │   ├── gateway_handler.go       # POST /v1/* (send messages)
+│   │   │   ├── portal_handler.go        # /api/v1/* (auth, workspace CRUD)
+│   │   │   ├── portal_inbox_handler.go  # /api/v1/workspaces/:wid/inbox/*
+│   │   │   └── send_helper.go           # Shared message dispatcher & logger
+│   │   └── middleware/
+│   │       ├── auth.go              # API key auth for /v1/*
+│   │       ├── portal_jwt.go        # Portal JWT for /api/v1/*
+│   │       ├── portal_inbox_auth.go # Inbox-specific auth (JWT + member + key)
+│   │       └── rbac.go              # wpd-gogate permission validator
+│   │
 │
 ├── pkg/                     # Public packages (imported by external Go apps)
 │   ├── contracts/           # Message types: Email, SMS, PushNotification...
 │   ├── auth/                # Hash utilities (shared between SDK and server)
 │   ├── encryption/          # AES encryption (for DB-stored provider config)
+│   ├── provider/            # Provider Adapters (mailgun, memory, etc)
+│   ├── registry/            # Provider factory registry
 │   └── gateway/             # Embedded SDK — gateway.New() for pure Go usage
 │       ├── gateway.go       # Gateway struct, SendEmail/SMS/Push/Chat
 │       ├── config.go        # Config struct + New() constructor
@@ -390,7 +402,7 @@ wpd-message-gateway/
 │
 ├── frontend/                # React Portal UI (Vite + TypeScript + Tailwind)
 │   └── src/
-│       ├── features/        # auth, workspaces, email, etc.
+│       ├── features/        # auth, workspaces, inbox (message logs)
 │       └── components/      # design system components
 │
 └── docs/                    # Documentation
@@ -406,14 +418,15 @@ A **workspace** is the primary isolation unit. All resources (API keys, integrat
 
 ### 2. Integrations — DB-Stored Provider Config (Server Mode)
 
-In server mode, provider credentials (Mailgun API keys, etc.) are stored **encrypted** in the `integrations` table. The Portal UI is the only way to configure them. There are no provider credentials in YAML files.
+In server mode, provider credentials (Mailgun API keys, etc.) are stored **encrypted** in the `integrations` table. Configure them via the **Portal REST API** — not in YAML files. (No Integrations UI page yet.)
 
 ### 3. Ports (Interfaces)
 
 Ports define **capabilities** — the "What" (Send Email), not the "How" (using Mailgun API).
 
-- **Location**: `internal/core/port/`
-- **Interfaces**: `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`
+- **Sender interfaces**: `pkg/contracts/` — `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`
+- **Server ports**: `internal/core/port/` — repository contracts, `InboxReader`, `InboxWriter`
+- **Message payloads** (`Email`, `SMS`, `SendResult`, …): defined **only** in `pkg/contracts/` — ports and services use those types; they are not duplicated under `internal/core/domain/`.
 - **Benefit**: Providers are interchangeable — any implementation that satisfies the interface works
 
 ### 4. Provider Self-Registration
@@ -422,29 +435,39 @@ Providers register via Go's `init()` mechanism (Open/Closed Principle):
 
 ```text
 Provider Package          Provider Registry
-(register.go)   ──init()──▶  (internal/app/registry)
+(register.go)   ──init()──▶  (pkg/registry)
                  RegisterEmailProvider("mailgun", factory)
 
 Adding a new provider requires NO changes to existing code.
-Only create new files in internal/infrastructure/provider/<name>/
+Only create new files in pkg/provider/<name>/
 ```
 
 ### 5. Memory Provider & Dispatch Modes
 
 The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with `dispatch_mode`, you can:
-- Use `memory_only` for local development (see messages in Portal inbox)
+
+- Use `memory_only` for local development (captured messages via inbox REST API / Bruno)
 - Use `provider_only` in production (messages go to real provider)
 - Use `memory_and_provider` to keep a local copy AND send to the real provider
 
-### 6. Portal (Always On)
+### 6. Portal (always on)
 
-The React Portal UI is **always enabled** when running the server. It serves as:
-- Authentication entry point (email + password)
-- Workspace management
-- Provider configuration (integrations)
-- Message template management
-- Captured message inbox (for memory dispatch mode)
-- API key management
+The React Portal runs at `portal.ui_port` (default **10104**) when the server starts.
+
+**Portal UI today:** sign in, list workspaces, view message logs, send test messages.
+
+**REST only (no UI pages yet):** workspace create, integrations, API keys, templates, members, settings, memory inbox browser. See [Portal UI coverage](#portal-ui-coverage) above and [Usage guide](./usage.md).
+
+---
+
+## Request Tracing & Correlation
+
+To enable robust trace tracking across all layers, the gateway employs an end-to-end correlation ID pipeline:
+
+1. **Correlation Generation**: Echo's `RequestID` middleware generates a unique request UUID for every incoming HTTP request, placing it in the `X-Request-ID` header.
+2. **Context Propagation**: A custom correlation middleware extracts this request ID and injects it into the standard Go `context.Context` (accessible via `logger.GetRequestID(ctx)`).
+3. **Structured slog Hooking**: An application-wide custom `ContextHandler` intercepts all standard `slog.InfoContext` / `slog.ErrorContext` calls. It transparently extracts the `request_id`, `workspace_id`, `api_key_id`, `channel`, and `provider` attributes from the context and automatically appends them to printed log records without requiring manual logging boilerplate.
+4. **Audit Trail Tracking**: The presentation-layer `SendHelper` automatically populates the `request_id` column on the `message_request_logs` PostgreSQL table, linking individual requests directly to database audit trails.
 
 ---
 
@@ -458,13 +481,13 @@ The React Portal UI is **always enabled** when running the server. It serves as:
 
 ### SOLID Principles
 
-| Principle | Application |
-|-----------|-------------|
+| Principle                 | Application                                                       |
+| ------------------------- | ----------------------------------------------------------------- |
 | **Single Responsibility** | Each provider handles one vendor. GatewayService handles routing. |
-| **Open/Closed** | Add new providers without modifying existing code. |
-| **Liskov Substitution** | Any `EmailSender` implementation works interchangeably. |
-| **Interface Segregation** | Separate interfaces for Email, SMS, Push, Chat. |
-| **Dependency Inversion** | Core depends on abstractions (ports), not implementations. |
+| **Open/Closed**           | Add new providers without modifying existing code.                |
+| **Liskov Substitution**   | Any `EmailSender` implementation works interchangeably.           |
+| **Interface Segregation** | Separate interfaces for Email, SMS, Push, Chat.                   |
+| **Dependency Inversion**  | Core depends on abstractions (ports), not implementations.        |
 
 ### Other Principles
 
@@ -478,6 +501,6 @@ The React Portal UI is **always enabled** when running the server. It serves as:
 
 - [Usage Guide](./usage.md) — SDK and HTTP API usage
 - [Contributing](./contributing.md) — Adding providers
-- [Portal inbox](./portal-inbox.md) — Memory capture and Portal UI
+- [Portal inbox](./portal-inbox.md) — Memory capture and inbox REST API
 - [E2E Testing](./e2e-testing.md) — Automated testing patterns
 - [Workflow](../workflow.md) — CI/CD and release process

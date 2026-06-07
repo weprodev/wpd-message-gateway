@@ -1,4 +1,4 @@
-.PHONY: install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync start stop test audit build clean docker-check dev dev-down help ui-install ui ui-build ui-format ui-test ui-lint storybook
+.PHONY: it install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync agents agents-kill start stop test audit build clean docker-check dev dev-down help ui-install ui ui-build ui-format ui-test ui-lint storybook
 
 # ============================================================================
 # ANSI Color Codes
@@ -10,6 +10,9 @@ BLUE    := \033[34m
 MAGENTA := \033[35m
 BOLD    := \033[1m
 RESET   := \033[0m
+
+# Go packages only (excludes frontend/node_modules vendored Go stubs)
+GO_PKGS := ./cmd/... ./internal/... ./pkg/...
 
 .DEFAULT_GOAL := help
 
@@ -51,7 +54,7 @@ install:
 	@printf "$(BOLD)$(CYAN)🔧 Installing development tools...$(RESET)\n"
 	@go install golang.org/x/tools/cmd/goimports@latest
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
 	@printf "$(GREEN)✅ Development tools installed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🌐 Installing frontend dependencies...$(RESET)\n"
@@ -65,49 +68,45 @@ install:
 	@printf "$(BOLD)$(MAGENTA)💡 Next step:$(RESET) Run $(YELLOW)make start$(RESET) to begin development\n"
 	@printf "\n"
 
-## Interactive local setup (macOS only): install CLIs + choose models/tools
+## Initialize configuration for FlowAI
 setup:
-	@bash ./scripts/setup.sh
+	@flowai init
 
 # ============================================================================
 # Spec Kit / AI Workflow Commands
 # ============================================================================
 
+## Spec Kit: Interactive workflow orchestrator
+it:
+	@flowai run master
+
 ## Spec Kit: create a new feature spec (FEATURE="...")
 specify spec:
-	@bash ./scripts/feature.sh specify
-
-## Spec Kit: ask targeted questions and update spec.md
-clarify clr:
-	@bash ./scripts/speckit.sh clarify
+	@flowai run spec
 
 ## Spec Kit: produce plan.md (+ design artifacts)
 plan pln:
-	@bash ./scripts/speckit.sh plan
+	@flowai run plan
 
 ## Spec Kit: produce tasks.md
 tasks tsk:
-	@bash ./scripts/speckit.sh tasks
+	@flowai run tasks
 
 ## Spec Kit: implement tasks.md phase-by-phase
 implement impl:
-	@bash ./scripts/speckit.sh implement
+	@flowai run implement
 
-## Spec Kit: read-only consistency analysis (spec/plan/tasks)
-analyze alyz:
-	@bash ./scripts/speckit.sh analyze
+## Spec Kit: review implementation natively
+review rv:
+	@flowai run review
 
-## Spec Kit: requirements-quality checklist (DOMAIN="security|api|ux|...")
-checklist chk:
-	@bash ./scripts/speckit.sh checklist "$(DOMAIN)"
+## Launch tmux multi-agent session (requires make setup first)
+agents:
+	@flowai start
 
-## Create PR linked to the feature issue (if present)
-pr:
-	@bash ./scripts/feature.sh pr
-
-## Sync local spec kit files to the linked GitHub issue body
-sync:
-	@bash ./scripts/feature.sh sync
+## Kill the active tmux agent session
+agents-kill:
+	@flowai kill
 
 # ============================================================================
 # Local Server Operations
@@ -167,7 +166,7 @@ stop:
 test:
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🧪 Running tests...$(RESET)\n"
-	@go test ./...
+	@go test $(GO_PKGS)
 	@printf "$(GREEN)✅ All tests passed!$(RESET)\n"
 
 ## Full quality check: format + lint + test (Go + frontend), govulncheck, then compile checks (Go + Vite + Storybook)
@@ -187,7 +186,7 @@ audit:
 	@printf "$(GREEN)✅ Frontend formatted!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔍 Linting Go...$(RESET)\n"
-	@golangci-lint run ./...
+	@golangci-lint run $(GO_PKGS)
 	@printf "$(GREEN)✅ Go lint passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔍 Linting frontend...$(RESET)\n"
@@ -195,7 +194,7 @@ audit:
 	@printf "$(GREEN)✅ Frontend lint passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🧪 Testing Go...$(RESET)\n"
-	@go test ./...
+	@go test $(GO_PKGS)
 	@printf "$(GREEN)✅ Go tests passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🧪 Testing frontend...$(RESET)\n"
@@ -203,11 +202,11 @@ audit:
 	@printf "$(GREEN)✅ Frontend tests passed!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔒 govulncheck (Go)...$(RESET)\n"
-	@govulncheck ./...
+	@govulncheck $(GO_PKGS)
 	@printf "$(GREEN)✅ No Go vulnerabilities reported!$(RESET)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)🔨 Verifying builds (Go + Vite app + Storybook)...$(RESET)\n"
-	@go build ./...
+	@go build $(GO_PKGS)
 	@cd frontend && npm run build:all
 	@printf "$(GREEN)✅ All builds succeeded!$(RESET)\n"
 	@printf "\n"
@@ -219,7 +218,7 @@ audit:
 build:
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🔨 Building Go + frontend (app + Storybook)...$(RESET)\n"
-	@go build ./...
+	@go build $(GO_PKGS)
 	@cd frontend && npm run build:all
 	@printf "$(GREEN)✅ Build successful!$(RESET)\n"
 
@@ -297,15 +296,15 @@ docker-check:
 		exit 1; \
 	)
 
-## Start Gateway and Portal UI via Docker Compose
+## Start Gateway, DB, and Portal UI via Docker Compose (with hot-reloading)
 dev: docker-check
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway and Portal UI via Docker...$(RESET)\n"
-	@docker compose up -d
-	@printf "$(GREEN)✅ Gateway started!$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway, database, and Portal UI via Docker...$(RESET)\n"
+	@docker compose up -d --build
+	@printf "$(GREEN)✅ All services started!$(RESET)\n"
 	@printf "\n"
 	@printf "   $(BOLD)Gateway API:$(RESET)  http://localhost:10101\n"
-	@printf "   $(BOLD)Portal UI:$(RESET)    Run $(YELLOW)make start$(RESET) → http://localhost:10104\n"
+	@printf "   $(BOLD)Portal UI:$(RESET)    http://localhost:10104\n"
 	@printf "\n"
 
 ## Stop Docker Compose
@@ -336,6 +335,7 @@ help:
 	@printf "   $(YELLOW)make audit$(RESET)        Full check: fmt+lint+test (Go+UI), govulncheck, builds\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🤖 Spec Kit / AI Workflow$(RESET)\n"
+	@printf "   $(YELLOW)make it$(RESET)           Start interactive end-to-end AI orchestrator\n"
 	@printf "   $(YELLOW)make specify|spec$(RESET)   Create spec (FEATURE=\"...\")\n"
 	@printf "   $(YELLOW)make clarify|clr$(RESET)    Ask questions to clarify spec\n"
 	@printf "   $(YELLOW)make plan|pln$(RESET)       Generate plan.md (+ design artifacts)\n"
@@ -343,8 +343,6 @@ help:
 	@printf "   $(YELLOW)make analyze|alyz$(RESET)   Read-only consistency analysis\n"
 	@printf "   $(YELLOW)make implement|impl$(RESET) Implement tasks.md phase-by-phase\n"
 	@printf "   $(YELLOW)make checklist|chk$(RESET)  Requirements-quality check (DOMAIN=\"...\")\n"
-	@printf "   $(YELLOW)make sync$(RESET)         Sync local specs to GitHub Issue\n"
-	@printf "   $(YELLOW)make pr$(RESET)           Create PR (auto-syncs and links issue)\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🎨 UI / Frontend Development$(RESET)\n"
 	@printf "   $(YELLOW)make ui$(RESET)           Start UI development server\n"
@@ -359,8 +357,8 @@ help:
 	@printf "   $(YELLOW)make clean$(RESET)        Clean build artifacts\n"
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)🐳 Docker$(RESET)\n"
-	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway via Docker\n"
-	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker\n"
+	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway, DB, and UI via Docker (with hot-reloading)\n"
+	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker containers\n"
 	@printf "\n"
 
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"

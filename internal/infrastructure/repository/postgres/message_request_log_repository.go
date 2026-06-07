@@ -3,7 +3,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"strconv"
+	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -45,10 +46,14 @@ func (r *MessageRequestLogRepository) Create(ctx context.Context, log *domain.Me
 	if log.ProviderName != "" {
 		provider = log.ProviderName
 	}
-	return r.client.GetDB(ctx).QueryRowContext(ctx, query,
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
 		log.WorkspaceID, apiKeyID, log.ChannelType, log.HTTPMethod, log.StatusCode, log.Endpoint,
 		provider, reqID, dur, errMsg,
 	).Scan(&log.ID, &log.CreatedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "workspace_id", log.WorkspaceID, "endpoint", log.Endpoint)
+	}
+	return err
 }
 
 func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port.MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error) {
@@ -67,38 +72,43 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	where := "l.workspace_id = $1"
 	argPos := 2
 	if q.ChannelType != "" {
-		where += " AND l.channel_type = $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND l.channel_type = $%d", argPos)
 		args = append(args, q.ChannelType)
 		argPos++
 	}
 	if q.From != nil {
-		where += " AND l.created_at >= $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND l.created_at >= $%d", argPos)
 		args = append(args, *q.From)
 		argPos++
 	}
 	if q.To != nil {
-		where += " AND l.created_at <= $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND l.created_at <= $%d", argPos)
 		args = append(args, *q.To)
 	}
 
 	countQuery := "SELECT COUNT(*) FROM message_request_logs l WHERE " + where
 	var total int
 	if err := db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "database error: failed to count message request logs", "error", err, "workspace_id", q.WorkspaceID)
 		return nil, 0, err
 	}
 
-	listQuery := `
+	// LIMIT and OFFSET come from bounded Go int values clamped above — not from user input.
+	// database/sql does not support parameterised LIMIT/OFFSET in standard Postgres; using
+	// fmt.Sprintf with validated integers is the correct approach here.
+	listQuery := fmt.Sprintf(`
 		SELECT l.id, l.workspace_id, l.api_key_id, l.channel_type, l.http_method, l.status_code, l.endpoint,
 			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.created_at,
 			COALESCE(k.name, ''), COALESCE(k.client_id, '')
 		FROM message_request_logs l
 		LEFT JOIN api_keys k ON k.id = l.api_key_id
-		WHERE ` + where + `
+		WHERE %s
 		ORDER BY l.created_at DESC
-		LIMIT ` + strconv.Itoa(q.Limit) + ` OFFSET ` + strconv.Itoa(q.Offset)
+		LIMIT %d OFFSET %d`, where, q.Limit, q.Offset)
 
 	rows, err := db.QueryContext(ctx, listQuery, args...)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to query message request logs", "error", err, "workspace_id", q.WorkspaceID)
 		return nil, 0, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -116,6 +126,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 			&prov, &reqID, &dur, &errMsg, &row.CreatedAt,
 			&row.SourceName, &row.ClientID,
 		); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan message request log", "error", err, "workspace_id", q.WorkspaceID)
 			return nil, 0, err
 		}
 		if apiKeyID.Valid {
@@ -135,5 +146,9 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 		}
 		out = append(out, row)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for message request logs", "error", err, "workspace_id", q.WorkspaceID)
+		return nil, 0, err
+	}
+	return out, total, nil
 }

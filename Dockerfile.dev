@@ -1,0 +1,13 @@
+FROM golang:1.26-alpine
+
+# Install git and certificates
+RUN apk add --no-cache git ca-certificates
+
+# Install Air for hot-reloading
+RUN go install github.com/air-verse/air@v1.61.1
+
+WORKDIR /app
+
+EXPOSE 10101
+
+CMD ["air", "-c", ".air.toml"]

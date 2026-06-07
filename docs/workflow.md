@@ -11,7 +11,7 @@ CI/CD pipeline, commit conventions, and release process.
 │                                                                 │
 │   ci.yml (runs on PR only)                                      │
 │   ┌────────┬────────┬──────────┬──────────┬──────────┬────────┐ │
-│   │ 🔍Lint │ 🧪Test │ 🔨Build  │ 🔒Security│ 🌐Bruno  │ 🎨Web  │ │
+│   │ 🔍Lint │ 🧪Test │ 🔨Build  │ 🔒Security│ 🌐Bruno  │ 🎨Web │ │
 │   └────────┴────────┴──────────┴──────────┴──────────┴────────┘ │
 │                            │                                    │
 │                       📊 Summary                                │
@@ -52,25 +52,25 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) for automati
 <type>(<scope>): <description>
 ```
 
-| Type | Bump | Example |
-|------|------|---------|
-| `feat` | Minor | `feat(sendgrid): add provider` |
-| `fix` | Patch | `fix(mailgun): handle rate limit` |
-| `feat!` | Major | `feat!: new API format` |
-| `docs`, `chore`, `refactor` | Patch | `docs: update readme` |
+| Type                        | Bump  | Example                           |
+| --------------------------- | ----- | --------------------------------- |
+| `feat`                      | Minor | `feat(sendgrid): add provider`    |
+| `fix`                       | Patch | `fix(mailgun): handle rate limit` |
+| `feat!`                     | Major | `feat!: new API format`           |
+| `docs`, `chore`, `refactor` | Patch | `docs: update readme`             |
 
 ## CI Pipeline
 
 Runs on **pull requests** to `master`:
 
-| Job | What it does |
-|-----|--------------|
-| 🔍 Lint | `gofmt`, `golangci-lint` |
-| 🧪 Test | `go test -race` + coverage |
-| 🔨 Build | Compile binary |
-| 🔒 Security | `govulncheck` |
+| Job         | What it does                             |
+| ----------- | ---------------------------------------- |
+| 🔍 Lint     | `gofmt`, `golangci-lint`                 |
+| 🧪 Test     | `go test -race` + coverage               |
+| 🔨 Build    | Compile binary                           |
+| 🔒 Security | `govulncheck`                            |
 | 🌐 API Test | Bruno CLI tests (`bru run --env memory`) |
-| 🎨 Web UI | Build Portal frontend |
+| 🎨 Web UI   | Build Portal frontend                    |
 
 ```bash
 # Run locally
@@ -81,11 +81,11 @@ make audit
 
 Automatic on push to `master`. Manual trigger available in Actions → Release.
 
-| Commits contain | Version bump |
-|-----------------|--------------|
-| `BREAKING CHANGE` or `feat!:` | Major (v1 → v2) |
-| `feat:` | Minor (v1.0 → v1.1) |
-| `fix:`, `docs:`, etc. | Patch (v1.0.0 → v1.0.1) |
+| Commits contain               | Version bump            |
+| ----------------------------- | ----------------------- |
+| `BREAKING CHANGE` or `feat!:` | Major (v1 → v2)         |
+| `feat:`                       | Minor (v1.0 → v1.1)     |
+| `fix:`, `docs:`, etc.         | Patch (v1.0.0 → v1.0.1) |
 
 ## Docker Image
 
@@ -133,8 +133,8 @@ steps:
   - run: npm test
     env:
       EMAIL_API: http://localhost:10101
-  
-  - run: curl -H "Authorization: Bearer $JWT" -H "X-Api-Client-Id: $ID" -H "X-Api-Client-Secret: $SECRET" "http://localhost:10101/api/v1/workspaces/$WID/inbox/emails" | jq '.emails[0].email.subject'
+
+  - run: curl -H "Authorization: Bearer $JWT" -H "X-Api-Client-Id: $ID" -H "X-Api-Client-Secret: $SECRET" "http://localhost:10101/api/v1/workspaces/$WID/inbox/emails" | jq '.[0].email.subject'
 ```
 
 ## Branch Strategy
@@ -148,7 +148,8 @@ master ───●─────●─────●───── (releases
 
 ## PR Checklist
 
-- [ ] `make audit` passes
+- [ ] **`/smell develop`** — no BLOCKER/HIGH (`.claude/commands/smell.md`, [verification.md](./agents/verification.md))
+- [ ] **`make audit`** passes
 - [ ] Tests added
 - [ ] Commits follow conventions
 

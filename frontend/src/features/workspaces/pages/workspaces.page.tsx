@@ -1,78 +1,157 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { getToken } from "@/core/api/client"
-import { ROUTES } from "@/app/paths"
-import { Button } from "@/components/ui/button"
-import { fetchWorkspaces } from "@/features/workspaces/workspaces.api"
-import type { Workspace } from "@/features/workspaces/workspace.types"
+import { ROUTES } from "@/core/router/routes"
+import { SearchInput } from "@/components/ui/search-input"
+import { Spinner } from "@/components/ui/spinner"
+import { WorkspaceCard } from "../components/workspace-card"
+import { WorkspaceActions } from "../components/workspace-actions"
+import { EmptyState } from "../components/empty-state"
+import { CreateWorkspaceModal } from "../components/create-workspace-modal"
+import { SuccessModal } from "../components/success-modal"
+import { JoinWorkspaceModal } from "../components/join-workspace-modal"
+import { useWorkspaces } from "../hooks/use-workspaces.hook"
+import type { Workspace } from "../workspace.types"
 
 export function WorkspacesPage() {
   const navigate = useNavigate()
-  const [list, setList] = useState<Workspace[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { workspaces, isLoading, error, reload } = useWorkspaces()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!getToken()) {
-      navigate(ROUTES.login, { replace: true })
-      return
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [successModalOpen, setSuccessModalOpen] = useState(false)
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [newWorkspace, setNewWorkspace] = useState<{ id: string; name: string } | null>(null)
+
+  const filteredWorkspaces = workspaces.filter(
+    (workspace) =>
+      workspace.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      workspace.slug.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  const handleSelectWorkspace = (workspace: Workspace) => {
+    setSelectedWorkspaceId(workspace.id)
+    navigate(ROUTES.workspace.overview(workspace.id))
+  }
+
+  const handleCreateWorkspace = () => {
+    setCreateModalOpen(true)
+  }
+
+  const handleJoinWorkspace = () => {
+    setJoinModalOpen(true)
+  }
+
+  const handleWorkspaceCreated = (workspaceId: string, workspaceName: string) => {
+    setNewWorkspace({ id: workspaceId, name: workspaceName })
+    setSuccessModalOpen(true)
+    reload()
+  }
+
+  const handleWorkspaceJoined = () => {
+    reload()
+  }
+
+  const handleContinueToDashboard = () => {
+    if (newWorkspace) {
+      navigate(ROUTES.workspace.overview(newWorkspace.id))
     }
-    let cancelled = false
-    ;(async () => {
-      const result = await fetchWorkspaces()
-      if (cancelled) return
-      if (!result.ok) {
-        if (result.status === 401) {
-          navigate(ROUTES.login, { replace: true })
-          return
-        }
-        setError(result.message ?? "Failed to load workspaces")
-        return
-      }
-      setList(result.workspaces)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [navigate])
+    setSuccessModalOpen(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 py-16">
+        <Spinner size="lg" />
+        <span className="text-sm text-text-secondary">Loading workspaces...</span>
+      </div>
+    )
+  }
+
+  if (workspaces.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-6 py-16">
+        <EmptyState
+          onCreateWorkspace={handleCreateWorkspace}
+          onJoinWorkspace={handleJoinWorkspace}
+        />
+
+        <CreateWorkspaceModal
+          isOpen={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onSuccess={handleWorkspaceCreated}
+        />
+
+        <JoinWorkspaceModal
+          isOpen={joinModalOpen}
+          onClose={() => setJoinModalOpen(false)}
+          onSuccess={handleWorkspaceJoined}
+        />
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Your workspaces</h1>
-        <p className="text-muted-foreground">Workspaces you belong to (from the portal API).</p>
+    <div className="flex w-full max-w-[720px] flex-col items-center gap-12 px-6 py-16">
+      <div className="flex w-full max-w-[640px] flex-col items-center gap-2 text-center">
+        <h1 className="text-4xl font-bold leading-tight text-foreground">Your Workspaces</h1>
+        <p className="text-base leading-normal text-text-secondary">Select a workspace to continue</p>
+        <p className="text-xs leading-4 text-text-tertiary">Connecting your world seamlessly!</p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled title="Use POST /api/v1/workspaces from API or Bruno">
-          Create workspace
-        </Button>
-        <Button type="button" variant="outline" disabled title="Use POST /api/v1/workspaces/join">
-          Join with PIN
-        </Button>
-      </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {list === null && !error ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : null}
-      {list && list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No workspaces yet. Create one via the API or seed data, then add your user as a member.
+
+      {error ? (
+        <p className="w-full rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-center text-sm font-medium text-destructive">
+          {error}
         </p>
       ) : null}
-      {list && list.length > 0 ? (
-        <ul className="divide-y rounded-md border bg-card">
-          {list.map((w) => (
-            <li key={w.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="font-medium">{w.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1">{w.unique_key}</code> · {w.status}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+
+      <WorkspaceActions
+        variant="card"
+        onCreateWorkspace={handleCreateWorkspace}
+        onJoinWorkspace={handleJoinWorkspace}
+      />
+
+      <SearchInput
+        placeholder="Search workspaces..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full max-w-[560px]"
+      />
+
+      <div className="flex w-full flex-col gap-3">
+        {filteredWorkspaces.map((workspace) => (
+          <WorkspaceCard
+            key={workspace.id}
+            workspace={workspace}
+            isSelected={selectedWorkspaceId === workspace.id}
+            onSelect={handleSelectWorkspace}
+          />
+        ))}
+        {filteredWorkspaces.length === 0 ? (
+          <p className="py-6 text-center text-sm text-text-tertiary">
+            No workspaces matched your search.
+          </p>
+        ) : null}
+      </div>
+
+      <CreateWorkspaceModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={handleWorkspaceCreated}
+      />
+
+      <SuccessModal
+        isOpen={successModalOpen}
+        workspaceName={newWorkspace?.name || ""}
+        onContinue={handleContinueToDashboard}
+      />
+
+      <JoinWorkspaceModal
+        isOpen={joinModalOpen}
+        onClose={() => setJoinModalOpen(false)}
+        onSuccess={handleWorkspaceJoined}
+      />
     </div>
   )
 }

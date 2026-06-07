@@ -1,0 +1,30 @@
+meta {
+  name: Create API Key
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/api-keys
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{portalJwt}}
+}
+
+body:json {
+  {
+    "name": "Production E2E Key"
+  }
+}
+
+tests {
+  test("should create API key successfully", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.id).to.be.a("string");
+    expect(res.body.client_id).to.be.a("string");
+    expect(res.body.client_secret).to.be.a("string");
+  });
+}

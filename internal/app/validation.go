@@ -3,13 +3,52 @@ package app
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
-	"github.com/weprodev/wpd-message-gateway/internal/registry"
+	pkgconfig "github.com/weprodev/go-pkg/config"
+
+	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // ValidateConfig validates required configuration.
 func ValidateConfig(cfg *Config) error {
+	// 1. Validate JWT Secret
+	jwtSecret := cfg.Portal.JWTSecret
+	if v := os.Getenv("MESSAGE_JWT_SECRET"); v != "" {
+		jwtSecret = v
+	}
+	if jwtSecret == "REPLACE_JWT_SECRET" {
+		return fmt.Errorf("MESSAGE_JWT_SECRET must not use the default placeholder 'REPLACE_JWT_SECRET'")
+	}
+	if len(jwtSecret) < 32 {
+		return fmt.Errorf("MESSAGE_JWT_SECRET (or portal.jwt_secret) must be at least 32 characters, got %d", len(jwtSecret))
+	}
+
+	// 2. Validate Config Encryption Key
+	encKey := cfg.EncryptionKey
+	if v := os.Getenv("MESSAGE_CONFIG_ENCRYPTION_KEY"); v != "" {
+		encKey = v
+	}
+	if len(encKey) < 32 {
+		return fmt.Errorf("MESSAGE_CONFIG_ENCRYPTION_KEY must be at least 32 characters (or set encryption_key in config), got %d", len(encKey))
+	}
+
+	// 3. Validate Database connection fields
+	dbConfig := pkgconfig.ApplyDatabaseOverrides(cfg.Database)
+	dbErrs, dbWarns := pkgconfig.ValidateDatabaseConfig(dbConfig)
+	for _, w := range dbWarns {
+		slog.Warn("database configuration warning", "warning", w)
+	}
+	if len(dbErrs) > 0 {
+		return fmt.Errorf("invalid database configuration: %s", strings.Join(dbErrs, "; "))
+	}
+
+	// 4. Log warning if Portal Base URL is not configured
+	if cfg.Portal.BaseURL == "" {
+		slog.Warn("portal.base_url is not configured. Email verification links will be relative or broken.")
+	}
+
 	missingProviders := []string{}
 
 	// At least one default provider should be configured

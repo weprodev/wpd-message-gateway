@@ -7,15 +7,19 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weprodev/wpd-message-gateway/internal/registry"
+	pkgconfig "github.com/weprodev/go-pkg/config"
+
+	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // Config represents the application configuration.
 type Config struct {
-	Environment string         `yaml:"environment"`
-	Server      ServerConfig   `yaml:"server"`
-	Portal      PortalConfig   `yaml:"portal,omitempty"`
-	Providers   ProviderConfig `yaml:"providers"`
+	Environment   string                   `yaml:"environment"`
+	EncryptionKey string                   `yaml:"encryption_key,omitempty"`
+	Server        ServerConfig             `yaml:"server"`
+	Portal        PortalConfig             `yaml:"portal,omitempty"`
+	Database      pkgconfig.DatabaseConfig `yaml:"database,omitempty"`
+	Providers     ProviderConfig           `yaml:"providers"`
 	// Parsed provider configs - using registry types as single source of truth
 	EmailProviders map[string]registry.EmailConfig `yaml:"-"`
 	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
@@ -28,11 +32,12 @@ type ServerConfig struct {
 	Port int `yaml:"port"`
 }
 
-// PortalConfig holds JWT settings for the web portal.
+// PortalConfig holds JWT settings and portal URL for the web portal.
 type PortalConfig struct {
 	JWTSecret   string `yaml:"jwt_secret"`
 	JWTTTLHours int    `yaml:"jwt_ttl_hours"`
 	UIPort      int    `yaml:"ui_port"`
+	BaseURL     string `yaml:"base_url"`
 }
 
 // ProviderConfig holds provider configuration.
@@ -119,6 +124,10 @@ func (c *Config) applyEnvOverrides() {
 			c.Providers.Defaults.Chat = val
 		case "MESSAGE_JWT_SECRET":
 			c.Portal.JWTSecret = val
+		case "MESSAGE_PORTAL_BASE_URL":
+			c.Portal.BaseURL = val
+		case "MESSAGE_CONFIG_ENCRYPTION_KEY":
+			c.EncryptionKey = val
 		}
 	}
 }

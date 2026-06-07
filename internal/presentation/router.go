@@ -6,25 +6,33 @@ import (
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 
 	pkgapi "github.com/weprodev/go-pkg/api"
 	pkglogger "github.com/weprodev/go-pkg/logger"
 	pkgvalidator "github.com/weprodev/go-pkg/validator"
+	gogate "github.com/weprodev/wpd-gogate"
 )
 
 // Router holds HTTP handlers and Echo configuration.
 type Router struct {
-	gatewayHandler     *handler.GatewayHandler
-	portalInboxHandler *handler.PortalInboxHandler
-	portalHandler      *handler.PortalHandler
-	jwtSecret          string
-	apiKeyRepo         port.APIKeyRepository
-	workspaceRepo      port.WorkspaceRepository
-	memberRepo         port.WorkspaceMemberRepository
-	logger             *pkglogger.Logger
+	gatewayHandler           *handler.GatewayHandler
+	portalInboxHandler       *handler.PortalInboxHandler
+	portalAuthHandler        *handler.PortalAuthHandler
+	portalWorkspaceHandler   *handler.PortalWorkspaceHandler
+	portalIntegrationHandler *handler.PortalIntegrationHandler
+	portalTemplateHandler    *handler.PortalTemplateHandler
+	portalHandler            *handler.PortalHandler
+	jwtSecret                string
+	apiKeyRepo               port.APIKeyRepository
+	workspaceRepo            port.WorkspaceRepository
+	memberRepo               port.WorkspaceMemberRepository
+	logger                   *pkglogger.Logger
+	gate                     *gogate.Gate
 }
 
 // NewRouter creates a new router bundle.
@@ -34,19 +42,29 @@ func NewRouter(
 	apiKeyRepo port.APIKeyRepository,
 	workspaceRepo port.WorkspaceRepository,
 	memberRepo port.WorkspaceMemberRepository,
+	portalAuth *handler.PortalAuthHandler,
+	portalWorkspace *handler.PortalWorkspaceHandler,
+	portalIntegration *handler.PortalIntegrationHandler,
+	portalTemplate *handler.PortalTemplateHandler,
 	portal *handler.PortalHandler,
 	jwtSecret string,
 	logger *pkglogger.Logger,
+	gate *gogate.Gate,
 ) *Router {
 	return &Router{
-		gatewayHandler:     gateway,
-		portalInboxHandler: portalInbox,
-		portalHandler:      portal,
-		jwtSecret:          jwtSecret,
-		apiKeyRepo:         apiKeyRepo,
-		workspaceRepo:      workspaceRepo,
-		memberRepo:         memberRepo,
-		logger:             logger,
+		gatewayHandler:           gateway,
+		portalInboxHandler:       portalInbox,
+		portalAuthHandler:        portalAuth,
+		portalWorkspaceHandler:   portalWorkspace,
+		portalIntegrationHandler: portalIntegration,
+		portalTemplateHandler:    portalTemplate,
+		portalHandler:            portal,
+		jwtSecret:                jwtSecret,
+		apiKeyRepo:               apiKeyRepo,
+		workspaceRepo:            workspaceRepo,
+		memberRepo:               memberRepo,
+		logger:                   logger,
+		gate:                     gate,
 	}
 }
 
@@ -58,6 +76,21 @@ func (rt *Router) Setup() *echo.Echo {
 	e.Validator = pkgvalidator.NewValidator()
 
 	e.Use(echomiddleware.Recover())
+	e.Use(echomiddleware.RequestID())
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			reqID := c.Response().Header().Get(echo.HeaderXRequestID)
+			if reqID == "" {
+				reqID = c.Request().Header.Get(echo.HeaderXRequestID)
+			}
+			if reqID != "" {
+				ctx := c.Request().Context()
+				ctx = applogger.WithRequestID(ctx, reqID)
+				c.SetRequest(c.Request().WithContext(ctx))
+			}
+			return next(c)
+		}
+	})
 	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{
 		LogStatus:   true,
 		LogURI:      true,
@@ -65,7 +98,7 @@ func (rt *Router) Setup() *echo.Echo {
 		LogLatency:  true,
 		LogRemoteIP: true,
 		LogValuesFunc: func(c echo.Context, v echomiddleware.RequestLoggerValues) error {
-			slog.Info("request",
+			slog.InfoContext(c.Request().Context(), "request summary",
 				slog.String("method", v.Method),
 				slog.String("uri", v.URI),
 				slog.Int("status", v.Status),
@@ -85,7 +118,6 @@ func (rt *Router) Setup() *echo.Echo {
 			customMiddleware.HeaderWorkspaceKey,
 			customMiddleware.HeaderWorkspaceAPIClientID,
 			customMiddleware.HeaderWorkspaceAPISecret,
-			customMiddleware.HeaderInternalSecret,
 		},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -101,36 +133,50 @@ func (rt *Router) Setup() *echo.Echo {
 	api := e.Group("/api/v1")
 
 	// Portal API — always enabled.
+	pa := rt.portalAuthHandler
+	pw := rt.portalWorkspaceHandler
+	pi := rt.portalIntegrationHandler
+	pt := rt.portalTemplateHandler
 	ph := rt.portalHandler
-	api.POST("/auth/register", ph.Register)
-	api.POST("/auth/login", ph.Login)
+
+	api.POST("/auth/register", pa.Register)
+	api.GET("/auth/verify-email", pa.VerifyEmail)
+	api.POST("/auth/login", pa.Login)
 
 	protected := api.Group("")
 	protected.Use(customMiddleware.PortalJWT(rt.jwtSecret))
-	protected.GET("/auth/me", ph.Me)
-	protected.POST("/workspaces/join", ph.JoinWorkspace)
-	protected.GET("/workspaces", ph.ListWorkspaces)
-	protected.POST("/workspaces", ph.CreateWorkspace)
-	protected.GET("/workspaces/:wid", ph.GetWorkspace)
-	protected.PATCH("/workspaces/:wid", ph.PatchWorkspace)
-	protected.GET("/workspaces/:wid/members", ph.ListMembers)
-	protected.DELETE("/workspaces/:wid/members/:userId", ph.RemoveMember)
-	protected.GET("/workspaces/:wid/api-keys", ph.ListAPIKeys)
-	protected.POST("/workspaces/:wid/api-keys", ph.CreateAPIKey)
-	protected.DELETE("/workspaces/:wid/api-keys/:keyId", ph.DeleteAPIKey)
-	protected.POST("/workspaces/:wid/api-keys/:keyId/regenerate", ph.RegenerateAPIKey)
-	protected.GET("/workspaces/:wid/logs", ph.ListLogs)
-	protected.GET("/workspaces/:wid/integrations", ph.ListIntegrations)
-	protected.POST("/workspaces/:wid/integrations", ph.UpsertIntegration)
-	protected.DELETE("/workspaces/:wid/integrations/:iid", ph.DeleteIntegration)
-	protected.GET("/workspaces/:wid/templates", ph.ListTemplates)
-	protected.POST("/workspaces/:wid/templates", ph.CreateTemplate)
-	protected.PATCH("/workspaces/:wid/templates/:tid", ph.PatchTemplate)
-	protected.DELETE("/workspaces/:wid/templates/:tid", ph.DeleteTemplate)
-	protected.GET("/workspaces/:wid/settings", ph.GetSettings)
-	protected.PATCH("/workspaces/:wid/settings", ph.PatchSettings)
-	protected.GET("/workspaces/:wid/invitations", ph.ListInvitations)
-	protected.POST("/workspaces/:wid/invitations", ph.CreateInvitation)
+	protected.GET("/auth/me", pa.Me)
+	protected.POST("/workspaces/join", pw.JoinWorkspace)
+	protected.GET("/workspaces", pw.ListWorkspaces)
+	protected.POST("/workspaces", pw.CreateWorkspace)
+	protected.GET("/workspaces/:wid", pw.GetWorkspace, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionWorkspacesRead))
+	protected.PATCH("/workspaces/:wid", pw.PatchWorkspace, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionWorkspacesWrite))
+	protected.GET("/workspaces/:wid/members", pw.ListMembers, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionMembersRead))
+	protected.DELETE("/workspaces/:wid/members/:userId", pw.RemoveMember, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionMembersWrite))
+
+	protected.GET("/workspaces/:wid/api-keys", ph.ListAPIKeys, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionAPIKeysRead))
+	protected.POST("/workspaces/:wid/api-keys", ph.CreateAPIKey, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionAPIKeysWrite))
+	protected.DELETE("/workspaces/:wid/api-keys/:keyId", ph.DeleteAPIKey, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionAPIKeysWrite))
+	protected.POST("/workspaces/:wid/api-keys/:keyId/regenerate", ph.RegenerateAPIKey, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionAPIKeysWrite))
+	protected.GET("/workspaces/:wid/logs", ph.ListLogs, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionLogsRead))
+
+	protected.GET("/workspaces/:wid/integrations", pi.ListIntegrations, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsRead))
+	protected.POST("/workspaces/:wid/integrations", pi.UpsertIntegration, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsWrite))
+	protected.DELETE("/workspaces/:wid/integrations/:iid", pi.DeleteIntegration, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsWrite))
+	protected.GET("/workspaces/:wid/providers", pi.ListProviders, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsRead))
+	protected.GET("/workspaces/:wid/providers/:name/config", pi.GetProviderConfigFields, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionIntegrationsRead))
+
+	protected.GET("/workspaces/:wid/templates", pt.ListTemplates, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionTemplatesRead))
+	protected.POST("/workspaces/:wid/templates", pt.CreateTemplate, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionTemplatesWrite))
+	protected.PATCH("/workspaces/:wid/templates/:tid", pt.PatchTemplate, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionTemplatesWrite))
+	protected.DELETE("/workspaces/:wid/templates/:tid", pt.DeleteTemplate, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionTemplatesWrite))
+
+	protected.GET("/workspaces/:wid/settings", ph.GetSettings, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionSettingsRead))
+	protected.PATCH("/workspaces/:wid/settings", ph.PatchSettings, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionSettingsWrite))
+
+	protected.GET("/workspaces/:wid/invitations", pw.ListInvitations, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInvitationsRead))
+	protected.POST("/workspaces/:wid/invitations", pw.CreateInvitation, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInvitationsWrite))
+	protected.POST("/workspaces/:wid/send-test/:channel", ph.SendTest, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionSendTest))
 
 	// Inbox API — always enabled (portal is always on).
 	if rt.memberRepo != nil {
@@ -156,7 +202,8 @@ func (rt *Router) Setup() *echo.Echo {
 		inboxGroup.GET("/events", inbox.HandleSSE)
 
 		internal := api.Group("/workspaces/:wid/internal")
-		internal.Use(customMiddleware.InternalIngestSecret())
+		internal.Use(customMiddleware.PortalJWTBearerOrQuery(rt.jwtSecret))
+		internal.Use(customMiddleware.RequireWorkspaceMember(rt.memberRepo))
 		internal.POST("/email", inbox.HandleIngestEmail)
 		internal.POST("/sms", inbox.HandleIngestSMS)
 		internal.POST("/push", inbox.HandleIngestPush)

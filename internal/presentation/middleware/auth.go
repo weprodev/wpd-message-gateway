@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -21,7 +22,7 @@ const (
 	APIKeyIDKey contextKey = "api_key_id"
 	// APIKeyNameKey is the context key for the API key display name (product/service label).
 	APIKeyNameKey contextKey = "api_key_name"
-	// HeaderWorkspaceKey is the HTTP header carrying the workspace unique_key (stable slug).
+	// HeaderWorkspaceKey is the HTTP header carrying the workspace slug.
 	HeaderWorkspaceKey = "X-Workspace-Key"
 )
 
@@ -44,27 +45,33 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			}
 
 			if clientID == "" || secret == "" {
+				slog.WarnContext(c.Request().Context(), "API key auth failed: missing credentials")
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized: missing credentials")
 			}
 
 			apiKey, err := apiKeyRepo.GetByClientID(c.Request().Context(), clientID)
 			if err != nil || !apiKey.IsActive {
+				slog.WarnContext(c.Request().Context(), "API key auth failed: invalid or inactive client ID", "client_id", clientID)
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized: invalid or inactive client ID")
 			}
 
 			if !crypto.CheckSecretHash(secret, apiKey.ClientSecretHash) {
+				slog.WarnContext(c.Request().Context(), "API key auth failed: invalid secret", "client_id", clientID)
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized: invalid secret")
 			}
 
 			wsKey := strings.TrimSpace(c.Request().Header.Get(HeaderWorkspaceKey))
 			if wsKey == "" {
-				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace unique_key)")
+				slog.WarnContext(c.Request().Context(), "API key auth failed: missing workspace key header", "client_id", clientID)
+				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace slug)")
 			}
-			ws, werr := workspaceRepo.GetByUniqueKey(c.Request().Context(), wsKey)
+			ws, werr := workspaceRepo.GetBySlug(c.Request().Context(), wsKey)
 			if werr != nil || ws == nil {
+				slog.WarnContext(c.Request().Context(), "API key auth failed: unknown workspace key", "client_id", clientID, "workspace_key", wsKey)
 				return echo.NewHTTPError(http.StatusForbidden, "Unknown workspace key")
 			}
 			if ws.ID != apiKey.WorkspaceID {
+				slog.WarnContext(c.Request().Context(), "API key auth failed: workspace mismatch", "client_id", clientID, "apiKey_workspace_id", apiKey.WorkspaceID, "requested_workspace_id", ws.ID)
 				return echo.NewHTTPError(http.StatusForbidden, "API key is not valid for this workspace")
 			}
 

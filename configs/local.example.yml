@@ -7,7 +7,7 @@
 #
 # IMPORTANT: This file configures the SERVER (ports, JWT, optional features).
 # Provider credentials (Mailgun API keys, etc.) are NOT stored here.
-# They are configured in the Portal UI and stored AES-encrypted in PostgreSQL.
+# They are configured via the Portal REST API and stored AES-encrypted in PostgreSQL.
 #
 # For the embedded Go SDK (gateway.New()), pass config directly in code.
 # See: docs/backend/usage.md
@@ -15,12 +15,13 @@
 # ============================================================================
 
 environment: local
+encryption_key: "0123456789abcdef0123456789abcdef"
 
 # ----------------------------------------------------------------------------
 # Server Configuration
 # ----------------------------------------------------------------------------
 server:
-  port: 10101    # Gateway send API + Portal REST API
+  port: 10101 # Gateway send API + Portal REST API
 
 # ----------------------------------------------------------------------------
 # Portal (React UI + JWT auth)
@@ -28,13 +29,22 @@ server:
 portal:
   # Secret for signing portal JWTs. Must be at least 32 chars.
   # Override with: MESSAGE_JWT_SECRET=<secret>
-  jwt_secret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-
-  # How long portal JWTs remain valid.
+  jwt_secret: "0123456789abcdef0123456789abcdef"
   jwt_ttl_hours: 72
-
-  # Port for the React dev server (Portal UI).
   ui_port: 10104
+
+  # Base URL of the portal UI (optional, defaults to https://message-gateway.weprodev.com)
+  # Override with: MESSAGE_PORTAL_BASE_URL=<url>
+  base_url: "https://message-gateway.weprodev.com"
+
+# Database configuration (used if environment variables are not set)
+database:
+  host: localhost
+  port: 5432
+  user: gateway
+  password: secret
+  dbname: gateway
+  sslmode: disable
 
 # ============================================================================
 # Environment Variable Overrides
@@ -56,7 +66,18 @@ portal:
 # AES encryption key for provider credentials (32 bytes):
 #   MESSAGE_CONFIG_ENCRYPTION_KEY=your-32-byte-key-here0123456789ab
 #
-# Internal ingest secret (optional, for automation):
-#   MESSAGE_INTERNAL_INGEST_SECRET=your-ingest-secret
+# Portal UI Base URL for email verification links:
+#   MESSAGE_PORTAL_BASE_URL=https://inbox.weprodev.com
 #
 # ============================================================================
+
+# ----------------------------------------------------------------------------
+# Providers Configuration
+# ----------------------------------------------------------------------------
+providers:
+  defaults:
+    email: "memory"
+    sms: "memory"
+    push: "memory"
+    chat: "memory"
+

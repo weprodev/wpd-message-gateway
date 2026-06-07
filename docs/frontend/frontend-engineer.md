@@ -9,6 +9,12 @@ This document is both a **team playbook** and an **operational contract** for an
 
 It complements **[conventions.md](./conventions.md)**, **[frontend/README.md](../../frontend/README.md)**, and **[shadcn/SKILL.md](./shadcn/SKILL.md)**.
 
+**Agent skills (load both for frontend work):**
+
+- [typescript-react-reviewer](../../.cursor/skills/typescript-react-reviewer/SKILL.md) — React 19 + component review + [overlay](../../.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md) — [skills.sh/dotneet/claude-code-marketplace/typescript-react-reviewer](https://www.skills.sh/dotneet/claude-code-marketplace/typescript-react-reviewer)
+- [typescript-advanced-types](../../.cursor/skills/typescript-advanced-types/SKILL.md) — API unions, DTOs, generics + [overlay](../../.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md) — [skills.sh/wshobson/agents/typescript-advanced-types](https://www.skills.sh/wshobson/agents/typescript-advanced-types)
+- [software-architecture](../../.cursor/skills/software-architecture/SKILL.md) — feature-sliced boundaries + [overlay](../../.agents/skills/software-architecture/references/wpd-message-gateway.md) — [skills.sh/sickn33/antigravity-awesome-skills/software-architecture](https://www.skills.sh/sickn33/antigravity-awesome-skills/software-architecture)
+
 ---
 
 ## 1. Execution model (use for substantive work)
@@ -32,29 +38,35 @@ Before writing any code, establish a BOLD point-of-view:
 
 ### 1.4 Implement
 - Execute with restraint. Default toward typography, spacing, and bold contrast.
-- Ensure strict adherence to pattern rules (`paths.ts`, `*.api.ts`, shadcn conventions).
+- Follow [conventions.md](./conventions.md) and [architecture.md](./architecture.md) (barrels, `*.api.ts`, shadcn).
 
 ### 1.5 Verify (self-check)
-Run mentally or with tooling:
-- [ ] No **cross-feature imports** (maintain DDD isolation).
-- [ ] Accessible markup: Focus traps, `aria-*` tags, keyboard navigation.
-- [ ] **Storybook** updated for visual assertions.
-- [ ] Execution of **`make audit`** for holistic static analysis.
+
+Run [verification.md](../agents/verification.md):
+
+- [ ] Fast lint on touched frontend paths
+- [ ] **`/smell develop`** — no BLOCKER/HIGH on the diff
+- [ ] **`make audit`** passes from repo root
+- [ ] No **cross-feature imports** (maintain DDD isolation)
+- [ ] Accessible markup: focus traps, `aria-*`, keyboard navigation
+- [ ] **Storybook** updated for visual assertions
 
 ---
 
 ## 2. Architecture — layers
 
+See **[architecture.md](./architecture.md)** for the layer diagram, ESLint boundaries, and how to add features.
+
 | Layer | Responsibility |
 | ----- | ---------------- |
-| **`src/app/`** | Router, aggregated **`ROUTES`** ([`paths.ts`](../../frontend/src/app/paths.ts)), shell wiring — **not** feature domain logic. |
-| **`src/core/`** | Shared infrastructure: HTTP client, cross-cutting **non-domain** helpers. |
-| **`src/features/<name>/`** | Bounded feature: **`paths.ts`**, pages, **`*.api.ts`**, **`*.types.ts`**. |
-| **`src/components/ui/`** | shadcn-style primitives and shared UI building blocks. |
-| **`src/shared/`** | Layouts and cross-cutting UI that is **not** a single feature’s domain. |
-| **`src/lib/`** | Utilities (`cn()`, hooks). |
+| **`src/core/`** | HTTP client, React Query, **`router/`** (`ROUTES` + route tree) |
+| **`src/features/<name>/`** | Pages, layouts, hooks, `*.api.ts`, `*.types.ts`, `index.ts` barrel |
+| **`src/shared/`** | Generic layouts/UI — **no feature imports** |
+| **`src/components/ui/`** | shadcn primitives |
+| **`src/app/`** | Bootstrap helpers (e.g. home redirect) |
+| **`src/lib/`** | Utilities |
 
-**Feature independence (DDD-style):** Compose features at **`app/`** (routes, nav), not by importing **feature A from feature B**.
+Compose features in **`core/router/router.tsx`** only — not by importing feature A from feature B.
 
 ---
 
@@ -133,7 +145,8 @@ Ship interfaces that feel deliberate, premium, and current (e.g., Linear-style r
 
 | Doc | Link |
 | --- | ---- |
-| Portal README (scripts, layout) | [frontend/README.md](../../frontend/README.md) |
-| Frontend conventions | [conventions.md](./conventions.md) |
-| Frontend doc index | [README.md](./README.md) |
+| Architecture (layers, routing) | [architecture.md](./architecture.md) |
+| Portal README (scripts) | [frontend/README.md](../../frontend/README.md) |
+| Conventions | [conventions.md](./conventions.md) |
+| Doc index | [README.md](./README.md) |
 | shadcn skill | [shadcn/SKILL.md](./shadcn/SKILL.md) |

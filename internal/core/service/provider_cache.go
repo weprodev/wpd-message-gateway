@@ -4,11 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
-	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	"github.com/weprodev/wpd-message-gateway/internal/registry"
+	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
+	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // providerCache caches instantiated send providers keyed by integration ID and
@@ -50,20 +49,20 @@ func (c *providerCache[F]) set(intg *domain.Integration, f F) {
 	c.mu.Unlock()
 }
 
-// emailSenderCache resolves (and caches) port.EmailSenders from integrations.
-type emailSenderCache = providerCache[port.EmailSender]
+// emailSenderCache resolves (and caches) contracts.EmailSenders from integrations.
+type emailSenderCache = providerCache[contracts.EmailSender]
 
-// smsSenderCache resolves (and caches) port.SMSSenders from integrations.
-type smsSenderCache = providerCache[port.SMSSender]
+// smsSenderCache resolves (and caches) contracts.SMSSenders from integrations.
+type smsSenderCache = providerCache[contracts.SMSSender]
 
-// pushSenderCache resolves (and caches) port.PushSenders from integrations.
-type pushSenderCache = providerCache[port.PushSender]
+// pushSenderCache resolves (and caches) contracts.PushSenders from integrations.
+type pushSenderCache = providerCache[contracts.PushSender]
 
-// chatSenderCache resolves (and caches) port.ChatSenders from integrations.
-type chatSenderCache = providerCache[port.ChatSender]
+// chatSenderCache resolves (and caches) contracts.ChatSenders from integrations.
+type chatSenderCache = providerCache[contracts.ChatSender]
 
 // resolveEmailSender returns a cached or newly constructed EmailSender for the integration.
-func resolveEmailSender(cache *emailSenderCache, intg *domain.Integration) (port.EmailSender, error) {
+func resolveEmailSender(cache *emailSenderCache, intg *domain.Integration) (contracts.EmailSender, error) {
 	if s, ok := cache.get(intg); ok {
 		return s, nil
 	}
@@ -84,7 +83,7 @@ func resolveEmailSender(cache *emailSenderCache, intg *domain.Integration) (port
 }
 
 // resolveSMSSender returns a cached or newly constructed SMSSender.
-func resolveSMSSender(cache *smsSenderCache, intg *domain.Integration) (port.SMSSender, error) {
+func resolveSMSSender(cache *smsSenderCache, intg *domain.Integration) (contracts.SMSSender, error) {
 	if s, ok := cache.get(intg); ok {
 		return s, nil
 	}
@@ -105,7 +104,7 @@ func resolveSMSSender(cache *smsSenderCache, intg *domain.Integration) (port.SMS
 }
 
 // resolvePushSender returns a cached or newly constructed PushSender.
-func resolvePushSender(cache *pushSenderCache, intg *domain.Integration) (port.PushSender, error) {
+func resolvePushSender(cache *pushSenderCache, intg *domain.Integration) (contracts.PushSender, error) {
 	if s, ok := cache.get(intg); ok {
 		return s, nil
 	}
@@ -126,7 +125,7 @@ func resolvePushSender(cache *pushSenderCache, intg *domain.Integration) (port.P
 }
 
 // resolveChatSender returns a cached or newly constructed ChatSender.
-func resolveChatSender(cache *chatSenderCache, intg *domain.Integration) (port.ChatSender, error) {
+func resolveChatSender(cache *chatSenderCache, intg *domain.Integration) (contracts.ChatSender, error) {
 	if s, ok := cache.get(intg); ok {
 		return s, nil
 	}
@@ -145,6 +144,3 @@ func resolveChatSender(cache *chatSenderCache, intg *domain.Integration) (port.C
 	cache.set(intg, sender)
 	return sender, nil
 }
-
-// ensure time is used (for cacheKey.updatedAt type alignment).
-var _ = time.Now

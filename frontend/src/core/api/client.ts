@@ -1,34 +1,14 @@
 const TOKEN_KEY = "portal_token"
-const WS_API_PREFIX = "portal_ws_api_"
 
 export function getToken(): string | null {
+  if (typeof localStorage === "undefined") return null
   return localStorage.getItem(TOKEN_KEY)
 }
 
 export function setToken(token: string | null): void {
+  if (typeof localStorage === "undefined") return
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
-}
-
-export type WorkspaceApiCredentials = {
-  clientId: string
-  clientSecret: string
-}
-
-export function setWorkspaceApiKey(workspaceId: string, cred: WorkspaceApiCredentials | null): void {
-  const k = WS_API_PREFIX + workspaceId
-  if (cred) localStorage.setItem(k, JSON.stringify(cred))
-  else localStorage.removeItem(k)
-}
-
-export function getWorkspaceApiKey(workspaceId: string): WorkspaceApiCredentials | null {
-  const raw = localStorage.getItem(WS_API_PREFIX + workspaceId)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as WorkspaceApiCredentials
-  } catch {
-    return null
-  }
 }
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -41,19 +21,34 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   return fetch(path, { ...init, headers })
 }
 
-export async function apiFetchWorkspace(workspaceId: string, path: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers)
-  if (!headers.has("Content-Type") && init?.body) {
-    headers.set("Content-Type", "application/json")
-  }
-  const token = getToken()
-  if (token) headers.set("Authorization", `Bearer ${token}`)
-  const cred = getWorkspaceApiKey(workspaceId)
-  if (cred) {
-    headers.set("X-Api-Client-Id", cred.clientId)
-    headers.set("X-Api-Client-Secret", cred.clientSecret)
-  }
-  const base = `/api/v1/workspaces/${workspaceId}/inbox`
-  const url = path.startsWith("http") ? path : `${base}${path.startsWith("/") ? path : "/" + path}`
-  return fetch(url, { ...init, headers })
+export interface UserWorkspace {
+  id: string
+  name: string
+  slug: string
+  status: string
+  admin_email?: string
+  visibility?: "public" | "private"
+  icon_key?: string
+  created_at?: string
+  updated_at?: string
+  role?: string
+  permissions?: string[]
 }
+
+export interface UserProfile {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  email_verified: boolean
+  created_at: string
+  updated_at: string
+  workspaces?: UserWorkspace[]
+}
+
+export async function fetchUserProfile(): Promise<UserProfile | null> {
+  const res = await apiFetch("/api/v1/auth/me")
+  if (!res.ok) return null
+  return res.json() as Promise<UserProfile>
+}
+

@@ -1,7 +1,7 @@
 package app
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -14,18 +14,24 @@ import (
 
 	"github.com/weprodev/go-pkg/crypto"
 
+	gogate "github.com/weprodev/wpd-gogate"
+
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/authgate"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/inbox"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
+	"github.com/weprodev/wpd-message-gateway/pkg/provider/memory"
 )
 
 // Application holds all wired dependencies produced by Wire().
 type Application struct {
 	Config         *Config
+	AuthService    *service.AuthService
 	GatewayService *service.GatewayService
 	MemoryStore    *memory.Store
+	InboxStore     *inbox.Store
 	PgClient       *pgsql.PgClient
 	Echo           *echo.Echo
 }
@@ -33,8 +39,12 @@ type Application struct {
 // Wire builds and connects all application dependencies.
 // It returns an error if any required secret is missing or the DB is unreachable.
 func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
+	// Startup context: cap initialization time to avoid hanging indefinitely.
+	startCtx, startCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer startCancel()
+
 	// ── Database ────────────────────────────────────────────────────────────
-	dbConfig := pkgconfig.ApplyDatabaseOverrides(pkgconfig.DatabaseConfig{})
+	dbConfig := pkgconfig.ApplyDatabaseOverrides(cfg.Database)
 	pgClient, err := pgsql.NewPgClient(pgsql.PgConfig{
 		Host:           dbConfig.Host,
 		ConnectionName: dbConfig.ConnectionName,
@@ -51,9 +61,19 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		return nil, fmt.Errorf("connect to database: %w", err)
 	}
 
+	// ── RBAC Gate ───────────────────────────────────────────────────────────
+	gateEngine := gogate.NewGate(pgClient.GetDB(startCtx), nil)
+	if err := gateEngine.LoadPolicy(startCtx); err != nil {
+		return nil, fmt.Errorf("load RBAC policies: %w", err)
+	}
+	authGate := authgate.NewGoGateAdapter(gateEngine)
+
 	// ── Encryption service ──────────────────────────────────────────────────
-	encKey, err := resolveSecret("MESSAGE_CONFIG_ENCRYPTION_KEY", cfg.Environment, 32)
-	if err != nil {
+	encKey := cfg.EncryptionKey
+	if v := os.Getenv("MESSAGE_CONFIG_ENCRYPTION_KEY"); v != "" {
+		encKey = v
+	}
+	if err := validateSecret("MESSAGE_CONFIG_ENCRYPTION_KEY / encryption_key", encKey, 32, cfg.Environment); err != nil {
 		return nil, err
 	}
 	encService, err := crypto.NewAESService([]byte(encKey))
@@ -98,67 +118,61 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		Settings:     settingsRepo,
 		JWTSecret:    jwtSecret,
 		JWTTTL:       jwtTTL,
+		Gate:         authGate,
 	})
 
 	// ── Memory store & inbox writer ─────────────────────────────────────────
+	inboxStore := inbox.NewStore()
 	memoryStore := memory.GetStore()
-	inboxWriter := memory.NewInboxWriter(memoryStore)
+
+	// ── Auth service ──────────────────────────────────────────────────────
+	authService := service.NewAuthService(
+		userRepo,
+		inbox.NewInboxEmailSender(inboxStore, memory.NewEmailProvider(memoryStore)),
+		jwtSecret,
+		true,
+		jwtTTL,
+		24*time.Hour,
+		cfg.Portal.BaseURL,
+	)
 
 	// ── Gateway service ─────────────────────────────────────────────────────
-	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxWriter)
+	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxStore, logRepo)
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
-	portalHandler := handler.NewPortalHandler(portalSvc)
-	portalInboxHandler := handler.NewPortalInboxHandler(memoryStore)
-	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, logRepo)
+	portalHandler := handler.NewPortalHandler(portalSvc, gatewaySvc, logRepo)
+	portalAuthHandler := handler.NewPortalAuthHandler(portalSvc, authService)
+	portalWorkspaceHandler := handler.NewPortalWorkspaceHandler(portalSvc)
+	portalIntegrationHandler := handler.NewPortalIntegrationHandler(portalSvc)
+	portalTemplateHandler := handler.NewPortalTemplateHandler(portalSvc)
+	portalInboxHandler := handler.NewPortalInboxHandler(inboxStore, inboxStore)
+	gatewayHandler := handler.NewGatewayHandler(gatewaySvc)
 
 	// ── Router ──────────────────────────────────────────────────────────────
 	router := presentation.NewRouter(
 		gatewayHandler, portalInboxHandler,
 		apiKeyRepo, workspaceRepo, memberRepo,
+		portalAuthHandler, portalWorkspaceHandler, portalIntegrationHandler, portalTemplateHandler,
 		portalHandler, jwtSecret, sysLogger,
+		gateEngine,
 	)
 
 	return &Application{
 		Config:         cfg,
+		AuthService:    authService,
 		GatewayService: gatewaySvc,
 		MemoryStore:    memoryStore,
+		InboxStore:     inboxStore,
 		PgClient:       pgClient,
 		Echo:           router.Setup(),
 	}, nil
 }
 
-// resolveSecret returns the secret from env or cfg, failing if it is too short
-// in non-local environments. In local/test it falls back to a dev-only default
-// and warns — never used silently in production.
-func resolveSecret(envKey string, environment string, minLen int) (string, error) {
-	val := os.Getenv(envKey)
-	if len(val) >= minLen {
-		return val, nil
-	}
-	if isLocalEnv(environment) {
-		// Safe to use a well-known dev default — not a production secret.
-		return "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", nil
-	}
-	return "", fmt.Errorf(
-		"%s must be set to a %d+ character secret in %q environment; "+
-			"see docs/backend/usage.md for configuration instructions",
-		envKey, minLen, environment,
-	)
-}
-
-// validateSecret fails if the secret is too short in non-local environments.
+// validateSecret fails if the secret is missing or too short.
 func validateSecret(label, val string, minLen int, environment string) error {
 	if len(val) >= minLen {
 		return nil
 	}
-	if isLocalEnv(environment) {
-		return nil // dev-only: accept short/empty secrets
-	}
-	return errors.New(label + " must be at least " + fmt.Sprintf("%d", minLen) + " characters")
-}
-
-func isLocalEnv(env string) bool {
-	return env == "" || env == "local" || env == "test" || env == "development"
+	return fmt.Errorf("%s must be at least %d characters", label, minLen)
 }

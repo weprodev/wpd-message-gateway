@@ -1,8 +1,7 @@
 ---
 name: review-agent
 description: >-
-  Invoke for pull-request and code review: architecture fit, security, tests, UX/a11y, and CI alignment.
-  Uses docs/backend and docs/frontend as the review rubric.
+  Invoke for pull-request and code review. Run /smell first, then architecture/security/UX checklists.
   Prefer routing via docs/agents/master-agent.md unless the user already asked for a review-only pass.
 ---
 
@@ -11,6 +10,26 @@ description: >-
 Use this agent to **evaluate** a change (open PR, local diff, or design) against this repository’s **backend** and **frontend** contracts. The goal is consistent quality: correct layering, safe defaults, verifiable behavior, and maintainability.
 
 Orchestration note: the **[master-agent](./master-agent.md)** routes review vs implementation; this file is the **review rubric** (do not treat “looks fine” as sufficient—use the checklists).
+
+## 0. Code smell scan (mandatory — run first)
+
+Before architecture or checklist review, run **`/smell develop`** per **`.claude/commands/smell.md`**. Full chain: [verification.md](./verification.md).
+
+- **Base branch:** `develop` (override: `/smell main`)
+- **Scope:** Git diff only — cite catalog IDs (`MGW.*`, `CC.*`, `GO.*`, `TS.*`) in findings
+- **Gate:** Resolve all **BLOCKER** and **HIGH** before merge
+
+If you apply fixes from this review, **re-run the verification chain** before closing the review.
+
+Then apply the checklists below for gaps smell does not cover (UX, a11y, doc sync).
+
+For **Go diffs**, also load **golang-pro**: `.cursor/skills/golang-pro/SKILL.md` and `.agents/skills/golang-pro/references/wpd-message-gateway.md`.
+
+For **frontend diffs** (`frontend/`), also load **typescript-react-reviewer**: `.cursor/skills/typescript-react-reviewer/SKILL.md` and `.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md`.
+
+For **frontend type safety** (`*.types.ts`, `*.api.ts`, hooks narrowing unions), also load **typescript-advanced-types**: `.cursor/skills/typescript-advanced-types/SKILL.md` and `.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md`.
+
+For **architecture and layer violations** (refactors, new modules, cross-boundary imports), also load **software-architecture**: `.cursor/skills/software-architecture/SKILL.md` and `.agents/skills/software-architecture/references/wpd-message-gateway.md`.
 
 ## 1. Advanced Prompt & Safety Hygiene
 
@@ -62,6 +81,7 @@ Define criticality explicitly:
 ## 5. Review output format (for agents)
 
 Structure the response as:
+0. **Smell Report** — Summary from `/smell` (or inline if run in same session)
 1. **Task Classification** — What the change does (Security, Refactor, Feature).
 2. **Safety Assessment** — PII exposure risk, Error leakage risk.
 3. **Findings** — Bullets with severity (Blocker / Major / Minor / Nit).
@@ -70,4 +90,4 @@ Structure the response as:
 
 ---
 
-**Summary:** Align the PR with documented architecture and conventions. Prioritize safety, explicit layer purity, and performance metrics. Reject code that leaks internal errors or limits user accessibility.
+**Summary:** Run **`/smell`** first, then align the PR with documented architecture and conventions. After review fixes, repeat [verification.md](./verification.md).

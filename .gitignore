@@ -2,6 +2,10 @@
 .history/
 .cursor/
 .agent/
+.flowai/
+.gemini/
+.claude/
+.specify/
 
 # OS generated files
 .DS_Store
@@ -39,6 +43,10 @@ wpd-message-gateway
 go.work
 go.work.sum
 
+# Air (Go live reload watcher)
+tmp/
+build-errors.log
+
 # Frontend (Vite / React / Storybook)
 node_modules/
 frontend/node_modules/
@@ -59,3 +67,6 @@ configs/*.yml
 
 # Vendor
 vendor/
+
+# Agent signal files (transient, not committed)
+.specify/signals/*.ready
