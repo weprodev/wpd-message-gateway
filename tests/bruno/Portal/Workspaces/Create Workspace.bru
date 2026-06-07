@@ -1,0 +1,30 @@
+meta {
+  name: Create Workspace
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{portalJwt}}
+}
+
+body:json {
+  {
+    "name": "New Test Workspace",
+    "is_private": false
+  }
+}
+
+tests {
+  test("should create workspace successfully", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body).to.have.property("id");
+    expect(res.body.name).to.equal("New Test Workspace");
+  });
+}

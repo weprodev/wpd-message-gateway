@@ -188,7 +188,42 @@ func IntegrationConfigJSON(b []byte) ([]byte, error) {
 }
 
 func (s *PortalService) ListWorkspaces(ctx context.Context, userID string) ([]domain.Workspace, error) {
-	return s.workspaces.ListForUser(ctx, userID)
+	workspaces, err := s.workspaces.ListForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range workspaces {
+		w := &workspaces[i]
+		// Get role in this workspace
+		role, err := s.members.GetRole(ctx, w.ID, userID)
+		if err != nil {
+			// If not a member, check if it's public
+			if w.Visibility == "public" {
+				w.Role = "viewer"
+				w.Permissions = []string{
+					domain.PermissionWorkspacesRead,
+					domain.PermissionMembersRead,
+					domain.PermissionAPIKeysRead,
+					domain.PermissionLogsRead,
+					domain.PermissionIntegrationsRead,
+					domain.PermissionTemplatesRead,
+					domain.PermissionSettingsRead,
+					domain.PermissionInvitationsRead,
+				}
+			}
+			continue
+		}
+
+		w.Role = role
+		// Get permissions from gogate
+		perms, err := s.gate.GetAllPermissions(ctx, "users", userID, w.ID)
+		if err == nil {
+			w.Permissions = perms
+		}
+	}
+
+	return workspaces, nil
 }
 
 func (s *PortalService) WorkspaceByID(ctx context.Context, id string) (*domain.Workspace, error) {
@@ -301,7 +336,17 @@ func (s *PortalService) ListLogs(ctx context.Context, q port.MessageLogQuery) ([
 }
 
 func (s *PortalService) ListIntegrations(ctx context.Context, workspaceID string) ([]domain.Integration, error) {
-	return s.integrations.ListByWorkspace(ctx, workspaceID)
+	list, err := s.integrations.ListByWorkspace(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Integration, 0, len(list))
+	for _, intg := range list {
+		if intg.ProviderName != "memory" {
+			out = append(out, intg)
+		}
+	}
+	return out, nil
 }
 
 func (s *PortalService) UpsertIntegration(ctx context.Context, intg *domain.Integration) error {

@@ -214,6 +214,7 @@ CREATE UNIQUE INDEX idx_integrations_default_per_channel
     WHERE is_default = TRUE;
 
 CREATE INDEX idx_integrations_provider_id ON integrations(provider_id);
+CREATE INDEX idx_integrations_workspace_channel ON integrations(workspace_id, channel_type);
 
 CREATE TRIGGER trg_integrations_set_updated_at
     BEFORE UPDATE ON integrations
@@ -418,3 +419,13 @@ CREATE TABLE model_has_permissions (
 );
 
 CREATE INDEX idx_model_has_permissions_lookup ON model_has_permissions (model_id, model_type, team_id);
+
+-- ==============================================================================
+-- 20. SEED DEFAULT PROVIDERS
+-- ==============================================================================
+
+INSERT INTO providers (id, name, channel_type, status)
+VALUES
+    ('00000000-0000-0000-0000-000000000030', 'memory', 'email', 'active'),
+    ('00000000-0000-0000-0000-000000000031', 'mailgun', 'email', 'active')
+ON CONFLICT (id) DO NOTHING;

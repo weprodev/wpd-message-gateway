@@ -36,6 +36,15 @@ portal:
   # Override with: MESSAGE_PORTAL_BASE_URL=<url>
   base_url: "https://message-gateway.weprodev.com"
 
+# Database configuration (used if environment variables are not set)
+database:
+  host: localhost
+  port: 5432
+  user: gateway
+  password: yourpassword
+  dbname: gateway
+  sslmode: disable
+
 # ============================================================================
 # Environment Variable Overrides
 # ============================================================================

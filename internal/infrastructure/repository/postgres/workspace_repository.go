@@ -138,13 +138,13 @@ func (r *WorkspaceRepository) SetStatus(ctx context.Context, id, status string) 
 
 func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([]domain.Workspace, error) {
 	query := `
-		SELECT w.id, w.name, w.slug, u.email, w.status,
+		SELECT DISTINCT w.id, w.name, w.slug, u.email, w.status,
 		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
 		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at
 		FROM workspaces w
 		INNER JOIN users u ON u.id = w.owner_id
-		INNER JOIN workspace_members wm ON wm.workspace_id = w.id
-		WHERE wm.user_id = $1 AND w.status = 'active'
+		LEFT JOIN workspace_members wm ON wm.workspace_id = w.id
+		WHERE (wm.user_id = $1 OR w.is_private = false) AND w.status = 'active'
 		ORDER BY w.name ASC
 	`
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, query, userID)
@@ -154,7 +154,7 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 	}
 	defer rows.Close() //nolint:errcheck
 
-	var out []domain.Workspace
+	out := []domain.Workspace{}
 	for rows.Next() {
 		w, err := scanWorkspace(rows)
 		if err != nil {

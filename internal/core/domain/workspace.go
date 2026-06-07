@@ -14,4 +14,8 @@ type Workspace struct {
 	IconKey    string    `json:"icon_key,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+
+	// User access metadata
+	Role        string   `json:"role,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
 }

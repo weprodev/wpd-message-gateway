@@ -53,7 +53,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
   }, [activeWorkspaceId, navigate, trigger])
 
   const activeWorkspace =
-    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null
+    (workspaces || []).find((workspace) => workspace.id === activeWorkspaceId) ?? null
 
-  return { workspaces, activeWorkspace, isLoading, error, reload }
+  return { workspaces: workspaces || [], activeWorkspace, isLoading, error, reload }
 }

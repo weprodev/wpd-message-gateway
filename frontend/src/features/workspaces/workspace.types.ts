@@ -8,6 +8,8 @@ export interface Workspace {
   icon_key?: string
   created_at?: string
   updated_at?: string
+  role?: string
+  permissions?: string[]
 }
 
 export interface CreateWorkspaceData {

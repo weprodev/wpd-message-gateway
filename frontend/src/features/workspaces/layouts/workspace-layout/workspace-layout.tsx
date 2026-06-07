@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react"
-import { Link, Outlet, useParams } from "react-router-dom"
+import { Link, Outlet, useNavigate, useParams } from "react-router-dom"
 
 import { Icon } from "@/components/ui/icon"
 import { SidebarNav } from "@/components/ui/sidebar-nav"
 import { cn } from "@/lib/utils"
 import { ROUTES } from "@/core/router/routes"
+import { fetchUserProfile, setToken, type UserProfile } from "@/core/api/client"
 import { AppFooter } from "@/shared/components/app-footer"
 import { MessageGatewayLogo } from "@/shared/components/message-gateway-logo"
 import { ThemeToggle } from "@/shared/components/theme-toggle"
@@ -16,6 +17,23 @@ export function WorkspaceLayout() {
   const { workspaces, activeWorkspace } = useWorkspaces({ activeWorkspaceId: wid })
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+  const [user, setUser] = useState<UserProfile | null>(null)
+
+  useEffect(() => {
+    fetchUserProfile()
+      .then((profile) => {
+        if (profile) setUser(profile)
+      })
+      .catch((err) => {
+        console.error("Failed to load user profile:", err)
+      })
+  }, [])
+
+  const handleSignOut = () => {
+    setToken(null)
+    navigate(ROUTES.login, { replace: true })
+  }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -26,6 +44,7 @@ export function WorkspaceLayout() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans">
@@ -98,12 +117,38 @@ export function WorkspaceLayout() {
       </header>
 
       <main className="flex min-h-0 flex-1 gap-6 px-12 py-8">
-        <aside className="w-[260px] shrink-0 self-start sticky top-[112px]">
+        <aside className="w-[260px] shrink-0 self-start sticky top-[112px] flex flex-col gap-4">
           <SidebarNav
             sections={WORKSPACE_NAV_SECTIONS}
             workspaceId={wid}
             buildHref={workspaceHref}
           />
+          {user ? (
+            <div className="flex w-[260px] items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-brand text-sm font-semibold text-white">
+                  {((user.first_name?.[0] || "") + (user.last_name?.[0] || "")).toUpperCase() ||
+                    user.email.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate text-sm font-semibold text-foreground">
+                    {user.first_name} {user.last_name}
+                  </span>
+                  <span className="truncate text-[11px] text-text-secondary">
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="flex rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-hover hover:text-destructive shrink-0"
+                aria-label="Sign out"
+              >
+                <Icon name="logout" size="sm" />
+              </button>
+            </div>
+          ) : null}
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">

@@ -42,4 +42,6 @@ type WorkspaceSettingsRepository interface {
 type AuthorizationGate interface {
 	AssignRole(ctx context.Context, modelType, modelID, teamID, roleName string) error
 	RemoveRole(ctx context.Context, modelType, modelID, teamID, roleName string) error
+	GetRoleNames(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
+	GetAllPermissions(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
 }

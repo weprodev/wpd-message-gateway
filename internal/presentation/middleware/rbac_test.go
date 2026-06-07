@@ -11,7 +11,17 @@ import (
 	gogate "github.com/weprodev/wpd-gogate"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
+
+type mockWorkspaceRepository struct {
+	port.WorkspaceRepository
+	GetByIDFunc func(ctx context.Context, id string) (*domain.Workspace, error)
+}
+
+func (m *mockWorkspaceRepository) GetByID(ctx context.Context, id string) (*domain.Workspace, error) {
+	return m.GetByIDFunc(ctx, id)
+}
 
 func TestRequirePermission(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -41,7 +51,16 @@ func TestRequirePermission(t *testing.T) {
 			WithArgs("users", "user-123", "ws-1", domain.PermissionWorkspacesRead).
 			WillReturnRows(sqlmock.NewRows([]string{"type", "value"}).AddRow("permission", domain.PermissionWorkspacesRead))
 
-		mw := RequirePermission(gate, domain.PermissionWorkspacesRead)
+		wsRepo := &mockWorkspaceRepository{
+			GetByIDFunc: func(ctx context.Context, id string) (*domain.Workspace, error) {
+				return &domain.Workspace{
+					ID:         id,
+					Visibility: "private",
+				}, nil
+			},
+		}
+
+		mw := RequirePermission(gate, wsRepo, domain.PermissionWorkspacesRead)
 		handler := mw(func(c echo.Context) error {
 			return c.String(http.StatusOK, "OK")
 		})
@@ -73,7 +92,16 @@ func TestRequirePermission(t *testing.T) {
 			WithArgs("users", "user-123", "ws-1", domain.PermissionWorkspacesWrite).
 			WillReturnRows(sqlmock.NewRows([]string{"type", "value"})) // no rows matched
 
-		mw := RequirePermission(gate, domain.PermissionWorkspacesWrite)
+		wsRepo := &mockWorkspaceRepository{
+			GetByIDFunc: func(ctx context.Context, id string) (*domain.Workspace, error) {
+				return &domain.Workspace{
+					ID:         id,
+					Visibility: "private",
+				}, nil
+			},
+		}
+
+		mw := RequirePermission(gate, wsRepo, domain.PermissionWorkspacesWrite)
 		handler := mw(func(c echo.Context) error {
 			return c.String(http.StatusOK, "OK")
 		})
@@ -93,6 +121,41 @@ func TestRequirePermission(t *testing.T) {
 
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("unfulfilled expectations: %v", err)
+		}
+	})
+
+	t.Run("Public Workspace Read Access Bypass", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/workspaces/ws-1", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("wid")
+		c.SetParamValues("ws-1")
+
+		ctx := context.WithValue(req.Context(), PortalUserIDKey, "user-123")
+		c.SetRequest(req.WithContext(ctx))
+
+		wsRepo := &mockWorkspaceRepository{
+			GetByIDFunc: func(ctx context.Context, id string) (*domain.Workspace, error) {
+				return &domain.Workspace{
+					ID:         id,
+					Visibility: "public",
+				}, nil
+			},
+		}
+
+		// RequirePermission is called with read permission, but no SQL query is expected
+		// because the public read bypass logic should authorize the request instantly.
+		mw := RequirePermission(gate, wsRepo, domain.PermissionWorkspacesRead)
+		handler := mw(func(c echo.Context) error {
+			return c.String(http.StatusOK, "OK")
+		})
+
+		err := handler(c)
+		if err != nil {
+			t.Fatalf("expected handler to succeed: %v", err)
+		}
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK, got %d", rec.Code)
 		}
 	})
 }

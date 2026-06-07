@@ -34,8 +34,14 @@ type loginBody struct {
 }
 
 type tokenResponse struct {
-	Token string       `json:"token"`
-	User  *domain.User `json:"user"`
+	Token      string             `json:"token"`
+	User       *domain.User       `json:"user"`
+	Workspaces []domain.Workspace `json:"workspaces"`
+}
+
+type userProfileResponse struct {
+	*domain.User
+	Workspaces []domain.Workspace `json:"workspaces"`
 }
 
 func (h *PortalAuthHandler) Register(c echo.Context) error {
@@ -74,7 +80,12 @@ func (h *PortalAuthHandler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
 	}
 
-	return c.JSON(http.StatusOK, tokenResponse{Token: token, User: u})
+	workspaces, err := h.svc.ListWorkspaces(c.Request().Context(), u.ID.String())
+	if err != nil {
+		workspaces = []domain.Workspace{}
+	}
+
+	return c.JSON(http.StatusOK, tokenResponse{Token: token, User: u, Workspaces: workspaces})
 }
 
 func (h *PortalAuthHandler) Me(c echo.Context) error {
@@ -86,5 +97,11 @@ func (h *PortalAuthHandler) Me(c echo.Context) error {
 		}
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to load user")
 	}
-	return c.JSON(http.StatusOK, u)
+
+	workspaces, err := h.svc.ListWorkspaces(c.Request().Context(), uid)
+	if err != nil {
+		workspaces = []domain.Workspace{}
+	}
+
+	return c.JSON(http.StatusOK, userProfileResponse{User: u, Workspaces: workspaces})
 }

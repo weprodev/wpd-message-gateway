@@ -23,3 +23,11 @@ func (a *GoGateAdapter) AssignRole(ctx context.Context, modelType, modelID, team
 func (a *GoGateAdapter) RemoveRole(ctx context.Context, modelType, modelID, teamID, roleName string) error {
 	return a.gate.Model(modelType, modelID, teamID).RemoveRole(ctx, roleName)
 }
+
+func (a *GoGateAdapter) GetRoleNames(ctx context.Context, modelType, modelID, teamID string) ([]string, error) {
+	return a.gate.Model(modelType, modelID, teamID).GetRoleNames(ctx)
+}
+
+func (a *GoGateAdapter) GetAllPermissions(ctx context.Context, modelType, modelID, teamID string) ([]string, error) {
+	return a.gate.Model(modelType, modelID, teamID).GetAllPermissions(ctx)
+}

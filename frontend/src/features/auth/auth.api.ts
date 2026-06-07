@@ -38,3 +38,4 @@ export async function registerAccount(
   if (data.token) setToken(data.token)
   return { ok: true }
 }
+

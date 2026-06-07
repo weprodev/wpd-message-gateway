@@ -44,7 +44,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	defer startCancel()
 
 	// ── Database ────────────────────────────────────────────────────────────
-	dbConfig := pkgconfig.ApplyDatabaseOverrides(pkgconfig.DatabaseConfig{})
+	dbConfig := pkgconfig.ApplyDatabaseOverrides(cfg.Database)
 	pgClient, err := pgsql.NewPgClient(pgsql.PgConfig{
 		Host:           dbConfig.Host,
 		ConnectionName: dbConfig.ConnectionName,

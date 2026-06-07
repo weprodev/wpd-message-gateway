@@ -18,8 +18,24 @@ vi.mock("@/shared/context/theme-context", () => ({
   }),
 }))
 
+vi.mock("@/core/api/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/core/api/client")>()
+  return {
+    ...actual,
+    fetchUserProfile: vi.fn().mockResolvedValue({
+      id: "u1",
+      first_name: "Demo",
+      last_name: "User",
+      email: "demo@weprodev.com",
+      email_verified: true,
+      created_at: "",
+      updated_at: "",
+    }),
+  }
+})
+
 describe("WorkspaceLayout Component", () => {
-  it("renders layout header and sidebar", () => {
+  it("renders layout header, sidebar, and profile details", async () => {
     render(
       <MemoryRouter>
         <WorkspaceLayout />
@@ -28,5 +44,11 @@ describe("WorkspaceLayout Component", () => {
     expect(screen.getByText("Message Gateway")).toBeInTheDocument()
     expect(screen.getByText("Demo Workspace")).toBeInTheDocument()
     expect(screen.getByText("Navigation")).toBeInTheDocument()
+
+    // Wait for the mock user profile to be loaded and rendered
+    const userEmail = await screen.findByText("demo@weprodev.com")
+    expect(userEmail).toBeInTheDocument()
+    expect(screen.getByText("Demo User")).toBeInTheDocument()
   })
 })
+

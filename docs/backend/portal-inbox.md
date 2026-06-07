@@ -51,11 +51,8 @@ Your App
    │  POST /v1/email  (workspace: memory_only)
    ▼
 Memory Provider
-   ├──────────────────▶ Portal Inbox (REST + SSE)
-   │                      └── "inbox" tab shows email
-   │
-   └──────────────────▶ Mailpit (if enabled)
-                          └── HTML preview
+   └──────────────────▶ Portal Inbox (REST + SSE)
+                          └── "inbox" tab shows email
 ```
 
 ### Message Types in the Inbox
@@ -174,33 +171,6 @@ These endpoints are protected by the standard Portal authentication mechanisms. 
 
 ---
 
-## Optional: Mailpit
-
-For HTML email preview with rich rendering, forward captured emails to Mailpit:
-
-```bash
-make mailpit     # Starts Mailpit at http://localhost:10103
-```
-
-Enable forwarding in `configs/local.yml`:
-
-```yaml
-mailpit:
-  enabled: true
-```
-
-With Mailpit enabled: emails are stored in the Portal inbox **and** forwarded to Mailpit for rich preview.
-
-| | Portal Inbox | Mailpit |
-|--|--|--|
-| All channels | ✅ | ❌ email only |
-| REST API | ✅ | Limited |
-| SSE real-time | ✅ | ✅ |
-| HTML render | Basic | ✅ Rich |
-| Mobile preview | ❌ | ✅ |
-
----
-
 ## Server Configuration
 
 ```yaml
@@ -213,10 +183,6 @@ portal:
   jwt_secret: "your-secret-min-32-chars"
   jwt_ttl_hours: 72
   ui_port: 10104     # React dev server (Portal UI)
-
-# Optional:
-# mailpit:
-#   enabled: true
 ```
 
 > **Provider credentials** (Mailgun API keys, etc.) are **not** in this file.  

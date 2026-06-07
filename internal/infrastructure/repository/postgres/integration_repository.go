@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -24,32 +25,58 @@ func NewIntegrationRepository(client *pgsql.PgClient, enc port.EncryptionService
 	}
 }
 
+func (r *IntegrationRepository) getProviderID(ctx context.Context, tx *sql.Tx, name, channelType string) (string, error) {
+	var id string
+	query := `SELECT id FROM providers WHERE name = $1 AND channel_type = $2`
+	var err error
+	if tx != nil {
+		err = tx.QueryRowContext(ctx, query, name, channelType).Scan(&id)
+	} else {
+		err = r.client.GetDB(ctx).QueryRowContext(ctx, query, name, channelType).Scan(&id)
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("provider %s for channel %s not found: %w", name, channelType, port.ErrNotFound)
+	}
+	return id, err
+}
+
 func (r *IntegrationRepository) Create(ctx context.Context, integration *domain.Integration) error {
 	encryptedConfig, err := r.enc.Encrypt(integration.Config)
 	if err != nil {
 		return err
 	}
 
+	providerID, err := r.getProviderID(ctx, nil, integration.ProviderName, integration.ChannelType)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to resolve provider id for creation", "error", err, "workspace_id", integration.WorkspaceID, "provider_name", integration.ProviderName, "channel_type", integration.ChannelType)
+		return err
+	}
+
 	query := `
-		INSERT INTO integrations (workspace_id, channel_type, provider_name, encrypted_config, status, is_default)
+		INSERT INTO integrations (workspace_id, channel_type, provider_id, encrypted_config, status, is_default)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
 	`
 
 	err = r.client.GetDB(ctx).QueryRowContext(ctx, query,
-		integration.WorkspaceID, integration.ChannelType, integration.ProviderName,
+		integration.WorkspaceID, integration.ChannelType, providerID,
 		encryptedConfig, integration.Status, integration.IsDefault,
 	).Scan(&integration.ID, &integration.CreatedAt, &integration.UpdatedAt)
+
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create integration", "error", err, "workspace_id", integration.WorkspaceID, "provider_name", integration.ProviderName, "channel_type", integration.ChannelType)
+	}
 
 	return err
 }
 
 func (r *IntegrationRepository) GetActiveByWorkspaceAndChannel(ctx context.Context, workspaceID, channelType string) (*domain.Integration, error) {
 	query := `
-		SELECT id, workspace_id, channel_type, provider_name, encrypted_config, status, is_default, created_at, updated_at
-		FROM integrations
-		WHERE workspace_id = $1 AND channel_type = $2 AND status = 'connected'
-		ORDER BY is_default DESC, created_at DESC
+		SELECT i.id, i.workspace_id, i.channel_type, p.name AS provider_name, i.encrypted_config, i.status, i.is_default, i.created_at, i.updated_at
+		FROM integrations i
+		JOIN providers p ON i.provider_id = p.id
+		WHERE i.workspace_id = $1 AND i.channel_type = $2 AND i.status = 'connected'
+		ORDER BY i.is_default DESC, i.created_at DESC
 		LIMIT 1
 	`
 	var intg domain.Integration
@@ -62,6 +89,7 @@ func (r *IntegrationRepository) GetActiveByWorkspaceAndChannel(ctx context.Conte
 		return nil, fmt.Errorf("integration workspace=%s channel=%s: %w", workspaceID, channelType, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get active integration", "error", err, "workspace_id", workspaceID, "channel_type", channelType)
 		return nil, err
 	}
 
@@ -76,12 +104,14 @@ func (r *IntegrationRepository) GetActiveByWorkspaceAndChannel(ctx context.Conte
 
 func (r *IntegrationRepository) ListByWorkspace(ctx context.Context, workspaceID string) ([]domain.Integration, error) {
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
-		SELECT id, workspace_id, channel_type, provider_name, encrypted_config, status, is_default, created_at, updated_at
-		FROM integrations
-		WHERE workspace_id = $1
-		ORDER BY channel_type ASC, provider_name ASC
+		SELECT i.id, i.workspace_id, i.channel_type, p.name AS provider_name, i.encrypted_config, i.status, i.is_default, i.created_at, i.updated_at
+		FROM integrations i
+		JOIN providers p ON i.provider_id = p.id
+		WHERE i.workspace_id = $1
+		ORDER BY i.channel_type ASC, p.name ASC
 	`, workspaceID)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to list integrations for workspace", "error", err, "workspace_id", workspaceID)
 		return nil, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -92,6 +122,7 @@ func (r *IntegrationRepository) ListByWorkspace(ctx context.Context, workspaceID
 		var enc []byte
 		if err := rows.Scan(&intg.ID, &intg.WorkspaceID, &intg.ChannelType, &intg.ProviderName,
 			&enc, &intg.Status, &intg.IsDefault, &intg.CreatedAt, &intg.UpdatedAt); err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan integration in list", "error", err, "workspace_id", workspaceID)
 			return nil, err
 		}
 		dec, err := r.enc.Decrypt(enc)
@@ -101,13 +132,19 @@ func (r *IntegrationRepository) ListByWorkspace(ctx context.Context, workspaceID
 		intg.Config = dec
 		out = append(out, intg)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for integrations", "error", err, "workspace_id", workspaceID)
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *IntegrationRepository) GetByID(ctx context.Context, id string) (*domain.Integration, error) {
 	query := `
-		SELECT id, workspace_id, channel_type, provider_name, encrypted_config, status, is_default, created_at, updated_at
-		FROM integrations WHERE id = $1
+		SELECT i.id, i.workspace_id, i.channel_type, p.name AS provider_name, i.encrypted_config, i.status, i.is_default, i.created_at, i.updated_at
+		FROM integrations i
+		JOIN providers p ON i.provider_id = p.id
+		WHERE i.id = $1
 	`
 	var intg domain.Integration
 	var enc []byte
@@ -118,6 +155,7 @@ func (r *IntegrationRepository) GetByID(ctx context.Context, id string) (*domain
 		return nil, fmt.Errorf("integration %s: %w", id, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get integration by id", "error", err, "id", id)
 		return nil, err
 	}
 	dec, err := r.enc.Decrypt(enc)
@@ -131,6 +169,7 @@ func (r *IntegrationRepository) GetByID(ctx context.Context, id string) (*domain
 func (r *IntegrationRepository) Delete(ctx context.Context, id string) error {
 	res, err := r.client.GetDB(ctx).ExecContext(ctx, `DELETE FROM integrations WHERE id = $1`, id)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to delete integration", "error", err, "id", id)
 		return err
 	}
 	n, _ := res.RowsAffected()
@@ -146,7 +185,7 @@ func (r *IntegrationRepository) Upsert(ctx context.Context, integration *domain.
 		return err
 	}
 
-	return r.client.RunInTransaction(ctx, func(txCtx context.Context) error {
+	err = r.client.RunInTransaction(ctx, func(txCtx context.Context) error {
 		db := r.client.GetDB(txCtx)
 		if integration.IsDefault {
 			if _, err := db.ExecContext(txCtx, `
@@ -156,10 +195,21 @@ func (r *IntegrationRepository) Upsert(ctx context.Context, integration *domain.
 				return err
 			}
 		}
+
+		var providerID string
+		err := db.QueryRowContext(txCtx, `SELECT id FROM providers WHERE name = $1 AND channel_type = $2`,
+			integration.ProviderName, integration.ChannelType).Scan(&providerID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("provider %s for channel %s not found: %w", integration.ProviderName, integration.ChannelType, port.ErrNotFound)
+			}
+			return err
+		}
+
 		query := `
-			INSERT INTO integrations (workspace_id, channel_type, provider_name, encrypted_config, status, is_default)
+			INSERT INTO integrations (workspace_id, channel_type, provider_id, encrypted_config, status, is_default)
 			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (workspace_id, channel_type, provider_name)
+			ON CONFLICT (workspace_id, provider_id)
 			DO UPDATE SET
 				encrypted_config = EXCLUDED.encrypted_config,
 				status = EXCLUDED.status,
@@ -168,8 +218,13 @@ func (r *IntegrationRepository) Upsert(ctx context.Context, integration *domain.
 			RETURNING id, created_at, updated_at
 		`
 		return db.QueryRowContext(txCtx, query,
-			integration.WorkspaceID, integration.ChannelType, integration.ProviderName,
+			integration.WorkspaceID, integration.ChannelType, providerID,
 			encryptedConfig, integration.Status, integration.IsDefault,
 		).Scan(&integration.ID, &integration.CreatedAt, &integration.UpdatedAt)
 	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to upsert integration", "error", err, "workspace_id", integration.WorkspaceID, "provider_name", integration.ProviderName, "channel_type", integration.ChannelType)
+	}
+	return err
 }

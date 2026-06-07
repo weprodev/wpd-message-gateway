@@ -188,6 +188,8 @@ The core service layer decouples from `wpd-gogate` by depending on the `port.Aut
 - **admin**: Full read/write access to settings, integrations, templates, API keys, and member removal. Assigned automatically to the creator of a workspace.
 - **member**: Read-only access to workspaces, settings, templates, API keys, plus permission to send test messages (`send.test`).
 
+Public workspaces (`is_private = false`) are dynamically accessible to any authenticated user as a `"viewer"` with read-only permissions (i.e. `*.read` operations are bypassed and approved automatically without requiring explicit membership or Casbin checks). All write operations on public workspaces remain strictly restricted to workspace admins.
+
 ### Send API Auth (Machine-to-Machine)
 
 Sending messages via `/v1/*` requires **workspace API credentials** and the workspace unique key:

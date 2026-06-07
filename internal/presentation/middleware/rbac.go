@@ -1,38 +1,51 @@
 package middleware
 
 import (
-	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	gogate "github.com/weprodev/wpd-gogate"
+
+	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
-// RequirePermission wraps wpd-gogate's RequirePermission.
-// It extracts the portal user ID and workspace ID (:wid path parameter) from the context.
-func RequirePermission(gate *gogate.Gate, permissionName string) echo.MiddlewareFunc {
-	opts := gogate.MiddlewareOptions{
-		ModelType: "users",
-		ExtractModelID: func(c echo.Context) (any, error) {
+// RequirePermission wraps wpd-gogate's RequirePermission but intercepts checks for public workspaces.
+func RequirePermission(gate *gogate.Gate, workspaceRepo port.WorkspaceRepository, permissionName string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
 			uid := GetPortalUserID(c.Request().Context())
 			if uid == "" {
-				return nil, errors.New("missing user context")
+				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized: missing user context")
 			}
-			return uid, nil
-		},
-		ExtractTeamID: func(c echo.Context) (any, error) {
+
 			wid := c.Param("wid")
 			if wid == "" {
-				return nil, errors.New("missing workspace id")
+				return echo.NewHTTPError(http.StatusBadRequest, "Bad Request: missing workspace id")
 			}
-			return wid, nil
-		},
-		OnDenied: func(c echo.Context, permissionName string) error {
-			return echo.NewHTTPError(http.StatusForbidden, "Forbidden: missing permission "+permissionName)
-		},
-		OnError: func(c echo.Context, err error) error {
-			return echo.NewHTTPError(http.StatusInternalServerError, "Internal Server Error: authorization check failed")
-		},
+
+			// Get the workspace to check its visibility
+			ws, err := workspaceRepo.GetByID(c.Request().Context(), wid)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusNotFound, "Workspace not found")
+			}
+
+			// If workspace is public and it is a read-only request, allow access
+			if ws.Visibility == "public" && strings.HasSuffix(permissionName, ".read") {
+				return next(c)
+			}
+
+			// Otherwise, proceed with the standard permission check via gogate
+			allowed, err := gate.Check(c.Request().Context(), "users", uid, permissionName, wid)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "Internal Server Error: authorization check failed")
+			}
+
+			if !allowed {
+				return echo.NewHTTPError(http.StatusForbidden, "Forbidden: missing permission "+permissionName)
+			}
+
+			return next(c)
+		}
 	}
-	return gogate.RequirePermission(gate, permissionName, &opts)
 }

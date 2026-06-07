@@ -1,0 +1,29 @@
+meta {
+  name: List Workspaces
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/workspaces
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{portalJwt}}
+}
+
+tests {
+  test("should list workspaces successfully", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body).to.be.an("array");
+    if (res.body.length > 0) {
+      const ws = res.body[0];
+      expect(ws).to.have.property("id");
+      expect(ws).to.have.property("name");
+      expect(ws).to.have.property("role");
+      expect(ws).to.have.property("permissions");
+    }
+  });
+}

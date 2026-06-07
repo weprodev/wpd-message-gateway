@@ -32,7 +32,7 @@ func ValidateConfig(cfg *Config) error {
 	}
 
 	// 3. Validate Database connection fields
-	dbConfig := pkgconfig.ApplyDatabaseOverrides(pkgconfig.DatabaseConfig{})
+	dbConfig := pkgconfig.ApplyDatabaseOverrides(cfg.Database)
 	dbErrs, dbWarns := pkgconfig.ValidateDatabaseConfig(dbConfig)
 	for _, w := range dbWarns {
 		slog.Warn("database configuration warning", "warning", w)

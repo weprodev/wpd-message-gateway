@@ -7,15 +7,18 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	pkgconfig "github.com/weprodev/go-pkg/config"
+
 	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // Config represents the application configuration.
 type Config struct {
-	Environment string         `yaml:"environment"`
-	Server      ServerConfig   `yaml:"server"`
-	Portal      PortalConfig   `yaml:"portal,omitempty"`
-	Providers   ProviderConfig `yaml:"providers"`
+	Environment string                   `yaml:"environment"`
+	Server      ServerConfig             `yaml:"server"`
+	Portal      PortalConfig             `yaml:"portal,omitempty"`
+	Database    pkgconfig.DatabaseConfig `yaml:"database,omitempty"`
+	Providers   ProviderConfig           `yaml:"providers"`
 	// Parsed provider configs - using registry types as single source of truth
 	EmailProviders map[string]registry.EmailConfig `yaml:"-"`
 	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
