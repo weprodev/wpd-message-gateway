@@ -23,7 +23,7 @@ This project offers two distinct ways to integrate messaging into your architect
 1. **Embedded Go SDK:** A lightweight library for your Go applications. Send messages natively without running a separate server or database.
 2. **Standalone HTTP Gateway:** A fully-featured service deployable via Docker. Provides a unified REST API for any programming language, backed by PostgreSQL and a React UI.
 
-Write your messaging code once — switch between Mailgun, Twilio, Firebase, WhatsApp, and more without changing a single line of application code.
+Write your messaging code once — switch between different email, SMS, and chat providers without changing a single line of application code.
 
 ---
 
@@ -31,7 +31,7 @@ Write your messaging code once — switch between Mailgun, Twilio, Firebase, Wha
 
 - **Unified Interface:** Send Email, SMS, Push, and Chat messages through one consistent API.
 - **Provider Abstraction:** Change a configuration value to switch providers, not your code.
-- **DB-First Configuration:** Provider credentials and workspace settings in PostgreSQL (Portal REST API; UI pages partial).
+- **DB-First Configuration:** Provider catalog, fields, credentials, and settings stored in PostgreSQL and resolved dynamically.
 - **Workspace Isolation:** Multi-tenant support for separate providers, API keys, and templates per workspace.
 - **Developer-Friendly:** Includes a local Memory provider to capture messages locally and assert real payloads without mocking.
 
@@ -68,6 +68,70 @@ graph TD
 ```
 
 ---
+
+## System Architecture
+
+WPD Message Gateway is structured with clean architecture separation, allowing the same provider registry to run either in-process (SDK mode) or as a distributed service (Standalone HTTP mode).
+
+```mermaid
+graph LR
+    classDef client fill:#e1f5fe,stroke:#0288d1,stroke-width:1px;
+    classDef main fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef db fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px;
+    classDef ext fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px;
+
+    subgraph ClientLayer ["Client Interfaces"]
+        UI["🖥️ React Portal UI"]:::client
+        AppClient["💻 API Client (curl/Go/Node...)"]:::client
+    end
+
+    subgraph ServerLayer ["Go HTTP Gateway (Standalone)"]
+        API["📡 REST API Routes"]:::main
+        Svc["⚙️ Gateway & Portal Services"]:::main
+        Reg["📦 Provider Registry (Self-Registration)"]:::main
+    end
+
+    subgraph DBLayer ["Database Layer"]
+        DB[(🗄️ PostgreSQL)]:::db
+    end
+
+    subgraph ExternalServices ["External APIs"]
+        EmailProvider["📧 Email Providers"]:::ext
+        SMSProvider["💬 SMS Providers"]:::ext
+        ChatProvider["✈️ Chat Providers"]:::ext
+    end
+
+    %% Routing
+    UI -->|"/api/v1/* (Portal JWT)"| API
+    AppClient -->|"/v1/* (API Key)"| API
+    API --> Svc
+    Svc -->|Load Config| DB
+    Svc --> Reg
+    Reg --> EmailProvider
+    Reg --> SMSProvider
+    Reg --> ChatProvider
+```
+
+### 1. Embedded Go SDK (`pkg/gateway`)
+* **Zero Dependencies**: Requires no database, cache, or background server. It runs completely inside your application process.
+* **Provider Registry**: Uses Go's self-registration factory mechanism (Open/Closed Principle) to register messaging adapters.
+* **In-Memory Simulator**: Includes a built-in memory provider to capture sent payloads in-process, allowing you to test messaging without making actual network calls.
+
+### 2. Standalone HTTP Server (`cmd/server`)
+* **Layered Clean Architecture**:
+  * **Presentation Layer**: Thin Echo HTTP handlers mapped under RBAC permissions.
+  * **Core Layer**: Domain services executing business logic and orchestrating providers.
+  * **Infrastructure Layer**: PostgreSQL repository implementations storing API keys, workspace configurations, integrations, templates, and request logs.
+* **DB-First Configuration**: Provider credentials (stored AES-encrypted) and settings reside in PostgreSQL as the single source of truth—no server-side configuration files needed for provider setup.
+* **Context-Aware Tracing**: Context-aware structured logger (`slog`) automatically maps request correlation IDs across all handlers, services, and repositories to trace requests end-to-end.
+
+### 3. Portal React UI (`frontend/`)
+* **Modern UI & Design System**: A responsive React 19 single-page application built with Vite and clean CSS tokens.
+* **Dynamic Integrations UI**: Instead of hardcoding vendor configurations, the UI dynamically fetches provider metadata from the database and renders tailored configuration forms for connecting new providers.
+* **Workspace Isolation**: Allows tenant-level scoping of connected integrations, logs, and send tests.
+
+---
+
 
 ## Quick Start
 
@@ -142,7 +206,7 @@ Once running:
 
 1. Open **http://localhost:10104** — the Portal UI
 2. Create an account and sign in (or use the pre-seeded demo user: `demo@example.com` / `password`)
-3. Select the pre-seeded workspace or bootstrap a workspace and API key using the REST API (the Portal UI currently covers authentication, workspaces, message logs, and send tests; other provisioning is REST-only). See [E2E Bootstrap Guide](docs/backend/e2e-testing.md#2-bootstrap-create-workspace-and-api-key) for details.
+3. Select the pre-seeded workspace or create a new workspace, create an API key, and configure integrations directly in the Portal UI. (Alternatively, you can bootstrap via the REST API; see [E2E Bootstrap Guide](docs/backend/e2e-testing.md#2-bootstrap-create-workspace-and-api-key) for details).
 4. Send a message from any language:
 
 ```bash
@@ -183,31 +247,22 @@ make start
 
 ---
 
-## Supported Providers
-
-| Type | Providers | Status |
-|------|----------|--------|
-| **Email** | Mailgun, Memory | ✅ Available |
-| **SMS** | Memory | ✅ Memory · 🔜 Twilio |
-| **Push** | Memory | ✅ Memory · 🔜 Firebase |
-| **Chat** | Memory | ✅ Memory · 🔜 Slack, WhatsApp, Telegram |
-
-> **Adding a provider?** See [Contributing: Adding Providers](docs/backend/contributing.md).
-
----
-
 ## Portal UI
 
 Available at **http://localhost:10104** when the server runs.
 
 | Feature | Description |
 |---------|-------------|
-| **Sign in / Register** | Portal account (JWT for `/api/v1/*`) |
-| **Workspaces** | List and open a workspace |
-| **Message logs** | Audit trail of gateway send requests |
-| **Send test** | Test send per channel from the dashboard |
+| **Sign in / Register** | Register and sign in with first/last name (JWT-based session authentication) |
+| **Workspaces** | Create, view, and select workspaces |
+| **Message Logs** | Audit trail of gateway send requests with detailed metadata |
+| **Email Inbox** | Read and test outbound messages captured in real-time by the secure memory simulator |
+| **Email Templates** | Create and manage reusable HTML layouts and template assets |
+| **Integrations** | Dynamically view, configure, and connect messaging providers |
+| **Settings** | Configure workspace PIN, owner email, data retention policy, and manage/rotate API keys |
+| **Send Test** | Run manual test sends for any supported channel directly from the dashboard |
 
-Memory **inbox** capture, integrations, API keys, templates, members, and settings are **REST/Bruno only** today — see [Usage guide](docs/backend/usage.md) and [Portal inbox](docs/backend/portal-inbox.md).
+All workspace management and developer tools are fully accessible directly via the Portal UI. The Portal REST API is also fully documented for automated workflows. See [Usage guide](docs/backend/usage.md) and [Portal inbox](docs/backend/portal-inbox.md).
 
 ---
 
@@ -220,10 +275,10 @@ The gateway enforces a strict separation between **server infrastructure** and *
    - `DISPATCH_MODE`: Defines if messages are sent for real (`provider_only`), captured (`memory_only`), or both.
    - Database credentials (`DB_HOST`, `DB_USER`, etc.) for PostgreSQL.
    - `JWT_SECRET` for Portal UI session authentication.
-   *(Note: Never place provider credentials like Mailgun API keys in this file.)*
+   *(Note: Never place provider credentials like API keys in this file.)*
 
 2. **Provider credentials (server mode):**
-   Stored AES-encrypted in PostgreSQL. Configure via the **Portal REST API** (Integrations endpoints) — there is no Portal UI page for this yet. See [Usage guide](docs/backend/usage.md) and [E2E bootstrap](docs/backend/e2e-testing.md).
+   Stored AES-encrypted in PostgreSQL. Configure dynamically via the **Integrations** tab in the **Portal UI** (or programmatically via the Portal REST API). See [Usage guide](docs/backend/usage.md) and [E2E bootstrap](docs/backend/e2e-testing.md).
 
 ## E2E Testing
 
@@ -279,7 +334,7 @@ wpd-message-gateway/
 ├── internal/
 │   ├── app/             # Config, wire, validation, provider registration
 │   ├── core/            # Domain models, services, ports (interfaces)
-│   ├── infrastructure/  # Providers (mailgun, memory…) + Postgres repos + logger
+│   ├── infrastructure/  # Provider adapters + Postgres repos + logger
 │   ├── presentation/    # HTTP router, handlers, middleware
 │   └── registry/        # Provider factory registry (self-registration via init)
 ├── pkg/                 # Public Go packages

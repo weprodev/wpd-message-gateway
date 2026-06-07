@@ -14,11 +14,12 @@ import (
 
 // Config represents the application configuration.
 type Config struct {
-	Environment string                   `yaml:"environment"`
-	Server      ServerConfig             `yaml:"server"`
-	Portal      PortalConfig             `yaml:"portal,omitempty"`
-	Database    pkgconfig.DatabaseConfig `yaml:"database,omitempty"`
-	Providers   ProviderConfig           `yaml:"providers"`
+	Environment   string                   `yaml:"environment"`
+	EncryptionKey string                   `yaml:"encryption_key,omitempty"`
+	Server        ServerConfig             `yaml:"server"`
+	Portal        PortalConfig             `yaml:"portal,omitempty"`
+	Database      pkgconfig.DatabaseConfig `yaml:"database,omitempty"`
+	Providers     ProviderConfig           `yaml:"providers"`
 	// Parsed provider configs - using registry types as single source of truth
 	EmailProviders map[string]registry.EmailConfig `yaml:"-"`
 	SMSProviders   map[string]registry.SMSConfig   `yaml:"-"`
@@ -125,6 +126,8 @@ func (c *Config) applyEnvOverrides() {
 			c.Portal.JWTSecret = val
 		case "MESSAGE_PORTAL_BASE_URL":
 			c.Portal.BaseURL = val
+		case "MESSAGE_CONFIG_ENCRYPTION_KEY":
+			c.EncryptionKey = val
 		}
 	}
 }

@@ -153,6 +153,20 @@ jobs:
   api-test:
     name: 🌐 API Test (Bruno)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gateway
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: gateway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gateway -d gateway"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -166,12 +180,26 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Initialize Database (Migrations & Seeds)
+        # Read database config from configs/local.example.yml and run initialization script
+        run: |
+          DB_HOST=$(yq '.database.host' configs/local.example.yml)
+          DB_PORT=$(yq '.database.port' configs/local.example.yml)
+          DB_USER=$(yq '.database.user' configs/local.example.yml)
+          DB_PASS=$(yq '.database.password' configs/local.example.yml)
+          DB_NAME=$(yq '.database.dbname' configs/local.example.yml)
+          
+          PGPASSWORD="$DB_PASS" PGHOST="$DB_HOST" PGPORT="$DB_PORT" POSTGRES_USER="$DB_USER" POSTGRES_DB="$DB_NAME" \
+            sed 's|/docker-entrypoint-initdb.d|database|g' database/init-db.sh | bash
+
       - name: Build and start server
         run: |
           go build -o bin/server ./cmd/server
           CONFIG_PATH=configs/local.example.yml ./bin/server &
 
-          # Wait for server
+      # Wait for server
+      - name: Wait for server to be ready
+        run: |
           for i in {1..30}; do
             if curl -s http://localhost:10101/health > /dev/null 2>&1; then
               echo "Server ready"

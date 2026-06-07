@@ -69,8 +69,11 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	authGate := authgate.NewGoGateAdapter(gateEngine)
 
 	// ── Encryption service ──────────────────────────────────────────────────
-	encKey, err := resolveSecret("MESSAGE_CONFIG_ENCRYPTION_KEY", cfg.Environment, 32)
-	if err != nil {
+	encKey := cfg.EncryptionKey
+	if v := os.Getenv("MESSAGE_CONFIG_ENCRYPTION_KEY"); v != "" {
+		encKey = v
+	}
+	if err := validateSecret("MESSAGE_CONFIG_ENCRYPTION_KEY / encryption_key", encKey, 32, cfg.Environment); err != nil {
 		return nil, err
 	}
 	encService, err := crypto.NewAESService([]byte(encKey))
@@ -164,19 +167,6 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		PgClient:       pgClient,
 		Echo:           router.Setup(),
 	}, nil
-}
-
-// resolveSecret returns the secret from the environment, failing if it is missing or too short.
-func resolveSecret(envKey string, environment string, minLen int) (string, error) {
-	val := os.Getenv(envKey)
-	if len(val) >= minLen {
-		return val, nil
-	}
-	return "", fmt.Errorf(
-		"%s must be set to a %d+ character secret; "+
-			"see docs/backend/usage.md or the .env file for configuration instructions",
-		envKey, minLen,
-	)
 }
 
 // validateSecret fails if the secret is missing or too short.

@@ -26,9 +26,12 @@ func ValidateConfig(cfg *Config) error {
 	}
 
 	// 2. Validate Config Encryption Key
-	encKey := os.Getenv("MESSAGE_CONFIG_ENCRYPTION_KEY")
+	encKey := cfg.EncryptionKey
+	if v := os.Getenv("MESSAGE_CONFIG_ENCRYPTION_KEY"); v != "" {
+		encKey = v
+	}
 	if len(encKey) < 32 {
-		return fmt.Errorf("MESSAGE_CONFIG_ENCRYPTION_KEY must be at least 32 characters, got %d", len(encKey))
+		return fmt.Errorf("MESSAGE_CONFIG_ENCRYPTION_KEY must be at least 32 characters (or set encryption_key in config), got %d", len(encKey))
 	}
 
 	// 3. Validate Database connection fields
