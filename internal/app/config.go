@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weprodev/wpd-message-gateway/internal/registry"
+	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // Config represents the application configuration.

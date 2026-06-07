@@ -48,6 +48,10 @@ Determine **surface area** before coding:
 - [code-conventions.md](../backend/code-conventions.md)
 - [contributing.md](../backend/contributing.md) — providers, registration patterns
 - [e2e-testing.md](../backend/e2e-testing.md), [usage.md](../backend/usage.md)
+- **golang-pro skill** — `.cursor/skills/golang-pro/SKILL.md` + `.agents/skills/golang-pro/references/wpd-message-gateway.md` (idiomatic Go, layers, `-race` tests)
+- **typescript-react-reviewer skill** — `.cursor/skills/typescript-react-reviewer/SKILL.md` + `.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md` (React 19, feature slices, Storybook)
+- **typescript-advanced-types skill** — `.cursor/skills/typescript-advanced-types/SKILL.md` + `.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md` (API unions, `*.types.ts`, narrowing — load with react reviewer)
+- **software-architecture skill** — `.cursor/skills/software-architecture/SKILL.md` + `.agents/skills/software-architecture/references/wpd-message-gateway.md` (Clean Architecture, DDD, layer boundaries — load for new features and refactors)
 
 ## 4. Execution model (Multi-Agent Stack)
 

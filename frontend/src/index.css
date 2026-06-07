@@ -3,10 +3,13 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap');
 @config "../tailwind.config.js";
 
+@custom-variant dark (&:is(.dark *));
+
 /* Material Symbols: @font-face lives in icons.css (kept out of this bundle for Tailwind v4 tooling). */
 
 @layer base {
   :root {
+    --font-size: 16px;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -29,9 +32,10 @@
     --warning-foreground: 48 96% 89%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
+    --input-background: #f3f3f5;
+    --switch-background: #cbced4;
     --ring: 253 91% 64%;
-    --radius: 0.75rem;
-    --spacing-unit: 0.25rem;
+    --radius: 0.625rem;
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 
     /* Message Gateway Theme - Light */
@@ -47,6 +51,10 @@
     --color-secondary-button: #f9fafb;
     --color-secondary-button-hover: #f3f4f6;
     --shadow-card: 0px 8px 12px rgba(0, 0, 0, 0.06);
+    --color-success: #10b981;
+    --color-success-bg: #d1fae5;
+    --color-warning: #f59e0b;
+    --color-warning-bg: #fef3c7;
   }
 
   .dark {
@@ -58,7 +66,6 @@
     --popover-foreground: 210 40% 98%;
     --primary: 253 91% 64%;
     --primary-foreground: 0 0% 100%;
-    
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 220 25% 18%;
@@ -88,10 +95,18 @@
     --color-secondary-button: #111827;
     --color-secondary-button-hover: #1f2937;
     --shadow-card: 0px 8px 12px rgba(0, 0, 0, 0.4);
+    --color-success: #10b981;
+    --color-success-bg: #065f46;
+    --color-warning: #f59e0b;
+    --color-warning-bg: #78350f;
+  }
+
+  html {
+    font-size: var(--font-size);
   }
 
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
 
   body {

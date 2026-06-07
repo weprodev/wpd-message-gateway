@@ -153,11 +153,11 @@ gw.SendEmail(ctx, &contracts.Email{
 │                  Infrastructure Layer                           │
 │               (internal/infrastructure/)                        │
 │  ┌─────────────────────┐   ┌───────────────────────────────┐    │
-│  │  Provider Adapters  │   │  Repository Implementations   │    │
+│  │  Inbox UI Capture   │   │  Repository Implementations   │    │
 │  │  ─────────────────  │   │  ──────────────────────────── │    │
-│  │  memory/            │   │  postgres/                    │    │
-│  │  mailgun/           │   │    WorkspaceRepository        │    │
-│  │  (+ more via init())│   │    APIKeyRepository           │    │
+│  │  inbox/             │   │  postgres/                    │    │
+│  │  (portal store)     │   │    WorkspaceRepository        │    │
+│  │                     │   │    APIKeyRepository           │    │
 │  └──────────┬──────────┘   │    IntegrationRepository      │    │
 │             │              │    ... (all entities)         │    │
 │    ┌────────▼──────┐       └───────────────────────────────┘    │
@@ -368,10 +368,8 @@ wpd-message-gateway/
 │   │
 │   ├── infrastructure/      # DB + provider + auth adapters
 │   │   ├── authgate/        # wpd-gogate RBAC adapter implementation
+│   │   ├── inbox/           # In-process UI capture store
 │   │   ├── logger/          # Application-wide context-aware logger
-│   │   ├── provider/
-│   │   │   ├── mailgun/     # Mailgun email provider
-│   │   │   └── memory/      # In-memory capture (dev/testing)
 │   │   └── repository/
 │   │       └── postgres/    # All PostgreSQL repository implementations
 │   │
@@ -388,12 +386,13 @@ wpd-message-gateway/
 │   │       ├── portal_inbox_auth.go # Inbox-specific auth (JWT + member + key)
 │   │       └── rbac.go              # wpd-gogate permission validator
 │   │
-│   └── registry/            # Provider factory registry (shared by SDK + server)
 │
 ├── pkg/                     # Public packages (imported by external Go apps)
 │   ├── contracts/           # Message types: Email, SMS, PushNotification...
 │   ├── auth/                # Hash utilities (shared between SDK and server)
 │   ├── encryption/          # AES encryption (for DB-stored provider config)
+│   ├── provider/            # Provider Adapters (mailgun, memory, etc)
+│   ├── registry/            # Provider factory registry
 │   └── gateway/             # Embedded SDK — gateway.New() for pure Go usage
 │       ├── gateway.go       # Gateway struct, SendEmail/SMS/Push/Chat
 │       ├── config.go        # Config struct + New() constructor
@@ -423,8 +422,8 @@ In server mode, provider credentials (Mailgun API keys, etc.) are stored **encry
 
 Ports define **capabilities** — the "What" (Send Email), not the "How" (using Mailgun API).
 
-- **Location**: `internal/core/port/`
-- **Interfaces**: `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`, repository contracts, `InboxWriter`
+- **Sender interfaces**: `pkg/contracts/` — `EmailSender`, `SMSSender`, `PushSender`, `ChatSender`
+- **Server ports**: `internal/core/port/` — repository contracts, `InboxReader`, `InboxWriter`
 - **Message payloads** (`Email`, `SMS`, `SendResult`, …): defined **only** in `pkg/contracts/` — ports and services use those types; they are not duplicated under `internal/core/domain/`.
 - **Benefit**: Providers are interchangeable — any implementation that satisfies the interface works
 
@@ -434,11 +433,11 @@ Providers register via Go's `init()` mechanism (Open/Closed Principle):
 
 ```text
 Provider Package          Provider Registry
-(register.go)   ──init()──▶  (internal/registry)
+(register.go)   ──init()──▶  (pkg/registry)
                  RegisterEmailProvider("mailgun", factory)
 
 Adding a new provider requires NO changes to existing code.
-Only create new files in internal/infrastructure/provider/<name>/
+Only create new files in pkg/provider/<name>/
 ```
 
 ### 5. Memory Provider & Dispatch Modes

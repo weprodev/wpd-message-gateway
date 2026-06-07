@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/weprodev/go-pkg/pgsql"
 
@@ -41,8 +42,8 @@ func scanWorkspace(scanner interface {
 
 func (r *WorkspaceRepository) Create(ctx context.Context, workspace *domain.Workspace) error {
 	query := `
-		INSERT INTO workspaces (name, unique_key, admin_email, status, visibility, hashed_pin, icon_key)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO workspaces (name, slug, owner_id, status, is_private, hashed_pin_code, icon_key)
+		VALUES ($1, $2, (SELECT id FROM users WHERE email = $3), $4, $5 = 'private', $6, $7)
 		RETURNING id, created_at, updated_at
 	`
 	var hashedPin, icon interface{}
@@ -55,19 +56,27 @@ func (r *WorkspaceRepository) Create(ctx context.Context, workspace *domain.Work
 	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
 		workspace.Name, workspace.UniqueKey, workspace.AdminEmail, workspace.Status, workspace.Visibility, hashedPin, icon,
 	).Scan(&workspace.ID, &workspace.CreatedAt, &workspace.UpdatedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to create workspace", "error", err, "name", workspace.Name, "unique_key", workspace.UniqueKey)
+	}
 	return err
 }
 
 func (r *WorkspaceRepository) GetByID(ctx context.Context, id string) (*domain.Workspace, error) {
 	query := `
-		SELECT id, name, unique_key, admin_email, status, visibility, hashed_pin, icon_key, created_at, updated_at
-		FROM workspaces WHERE id = $1
+		SELECT w.id, w.name, w.slug, u.email, w.status,
+		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
+		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at
+		FROM workspaces w
+		INNER JOIN users u ON u.id = w.owner_id
+		WHERE w.id = $1
 	`
 	w, err := scanWorkspace(r.client.GetDB(ctx).QueryRowContext(ctx, query, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workspace %s: %w", id, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get workspace by id", "error", err, "id", id)
 		return nil, err
 	}
 	return &w, nil
@@ -75,14 +84,19 @@ func (r *WorkspaceRepository) GetByID(ctx context.Context, id string) (*domain.W
 
 func (r *WorkspaceRepository) GetByUniqueKey(ctx context.Context, uniqueKey string) (*domain.Workspace, error) {
 	query := `
-		SELECT id, name, unique_key, admin_email, status, visibility, hashed_pin, icon_key, created_at, updated_at
-		FROM workspaces WHERE unique_key = $1
+		SELECT w.id, w.name, w.slug, u.email, w.status,
+		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
+		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at
+		FROM workspaces w
+		INNER JOIN users u ON u.id = w.owner_id
+		WHERE w.slug = $1
 	`
 	w, err := scanWorkspace(r.client.GetDB(ctx).QueryRowContext(ctx, query, uniqueKey))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workspace key=%s: %w", uniqueKey, port.ErrNotFound)
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to get workspace by unique key", "error", err, "unique_key", uniqueKey)
 		return nil, err
 	}
 	return &w, nil
@@ -91,7 +105,11 @@ func (r *WorkspaceRepository) GetByUniqueKey(ctx context.Context, uniqueKey stri
 func (r *WorkspaceRepository) Update(ctx context.Context, workspace *domain.Workspace) error {
 	query := `
 		UPDATE workspaces SET
-			name = $2, admin_email = $3, visibility = $4, icon_key = $5, updated_at = NOW()
+			name = $2,
+			owner_id = (SELECT id FROM users WHERE email = $3),
+			is_private = ($4 = 'private'),
+			icon_key = $5,
+			updated_at = NOW()
 		WHERE id = $1
 	`
 	var icon interface{}
@@ -103,25 +121,35 @@ func (r *WorkspaceRepository) Update(ctx context.Context, workspace *domain.Work
 	_, err := r.client.GetDB(ctx).ExecContext(ctx, query,
 		workspace.ID, workspace.Name, workspace.AdminEmail, workspace.Visibility, icon,
 	)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to update workspace", "error", err, "id", workspace.ID)
+	}
 	return err
 }
 
 func (r *WorkspaceRepository) SetStatus(ctx context.Context, id, status string) error {
 	_, err := r.client.GetDB(ctx).ExecContext(ctx,
 		`UPDATE workspaces SET status = $2, updated_at = NOW() WHERE id = $1`, id, status)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to set workspace status", "error", err, "id", id, "status", status)
+	}
 	return err
 }
 
 func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([]domain.Workspace, error) {
 	query := `
-		SELECT w.id, w.name, w.unique_key, w.admin_email, w.status, w.visibility, w.hashed_pin, w.icon_key, w.created_at, w.updated_at
+		SELECT w.id, w.name, w.slug, u.email, w.status,
+		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
+		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at
 		FROM workspaces w
+		INNER JOIN users u ON u.id = w.owner_id
 		INNER JOIN workspace_members wm ON wm.workspace_id = w.id
 		WHERE wm.user_id = $1 AND w.status = 'active'
 		ORDER BY w.name ASC
 	`
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, query, userID)
 	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to list workspaces for user", "error", err, "user_id", userID)
 		return nil, err
 	}
 	defer rows.Close() //nolint:errcheck
@@ -130,9 +158,14 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 	for rows.Next() {
 		w, err := scanWorkspace(rows)
 		if err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan workspace in list", "error", err, "user_id", userID)
 			return nil, err
 		}
 		out = append(out, w)
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error: rows iteration failed for user workspaces", "error", err, "user_id", userID)
+		return nil, err
+	}
+	return out, nil
 }

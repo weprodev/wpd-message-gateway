@@ -2,6 +2,11 @@
 
 The operational contract for backend engineering in the WPD Message Gateway. As a Principal Go Engineer working on this project, you are expected to follow strict Domain-Driven Design (DDD) principles, Hexagonal Architecture, and idiomatic Go best practices (KISS, DRY, SOLID).
 
+**Agent skills (load both for backend work):**
+
+- [golang-pro](../../.cursor/skills/golang-pro/SKILL.md) — idioms + [overlay](../../.agents/skills/golang-pro/references/wpd-message-gateway.md) — [skills.sh/jeffallan/claude-skills/golang-pro](https://www.skills.sh/jeffallan/claude-skills/golang-pro)
+- [software-architecture](../../.cursor/skills/software-architecture/SKILL.md) — Clean Architecture + DDD + [overlay](../../.agents/skills/software-architecture/references/wpd-message-gateway.md) — [skills.sh/sickn33/antigravity-awesome-skills/software-architecture](https://www.skills.sh/sickn33/antigravity-awesome-skills/software-architecture)
+
 ## 1. Execution Model
 
 Use a structured, TDD-focused workflow for all backend modifications:
@@ -22,12 +27,12 @@ The backend strictly enforces Hexagonal Architecture (Ports and Adapters) mappin
 | Layer | Can Import | Cannot Import | Description |
 |-------|------------|---------------|-------------|
 | **Domain** | stdlib only | *Anything else* | Core behavior, types, consts. Zero dependencies. |
-| **Port** | Domain | Service, Infra, App | Interfaces requiring implementation by outer layers. |
-| **Service** | Port, Domain | Infra, Presentation | Business logic orchestrator; coordinates ports. |
-| **Infra** | Port, Domain | Presentation | DB, Memory, External Providers (Adapters). |
-| **Presentation** | Service, Port, Domain | Infra (except `internal/registry`) | HTTP Handlers, middleware, routers. |
-| **Registry** | All internal layers | *None* | Wires dependencies together (Dependency Injection). |
-| **App** | Registry, Config | *None* | CLI entrypoint, server boot, graceful shutdown. |
+| **Port** | Domain, `pkg/contracts` | Service, Infra, Presentation | Repository + inbox interfaces; sentinel errors. |
+| **Service** | Port, Domain, `pkg/contracts`, `pkg/registry` | Infra, Presentation | Business logic orchestrator; coordinates ports. |
+| **Infra** | Port, Domain, `pkg/contracts` | Presentation | DB, inbox store, logger, authgate (adapters). |
+| **Presentation** | Service, Port, Domain | Infra (direct SQL/provider SDK) | HTTP handlers, middleware, routers. |
+| **App** (`internal/app`) | All internal layers + `pkg/*` | — | Wire, config, validation, provider blank imports. |
+| **Public SDK** (`pkg/*`) | `pkg/*` only | `internal/*` | Embedded gateway, contracts, registry, providers. |
 
 **The Iron Rule:** Outer layers depend on inner layers. Inner layers *never* depend on outer layers.
 
@@ -68,7 +73,7 @@ All logging must be handled by the `logger` adapter wrapper (`internal/infrastru
 
 ## 4. Adding a Provider
 
-1. **Implementation** — Package inside `internal/infrastructure/provider/<name>/` implementing the relevant `port.*Sender` interfaces (see `mailgun`, `memory`).
+1. **Implementation** — Package inside `pkg/provider/<name>/` implementing `pkg/contracts.*Sender` (see `mailgun`, `memory`).
 2. **Registration** — `register.go` with `init()` calling registry methods (e.g., `registry.RegisterEmailProvider`).
 3. **Wiring** — Add a blank import in [`internal/app/imports.go`](../../internal/app/imports.go).
 

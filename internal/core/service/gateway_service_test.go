@@ -65,30 +65,30 @@ type stubInbox struct {
 	emailID string
 }
 
-func (s *stubInbox) WriteEmail(ctx context.Context, workspaceID string, email *contracts.Email) (string, error) {
+func (s *stubInbox) WriteEmail(ctx context.Context, workspaceID string, email contracts.Email) (string, error) {
 	if s.emailID != "" {
 		return s.emailID, nil
 	}
 	return "inbox-msg-1", nil
 }
 
-func (s *stubInbox) WriteSMS(ctx context.Context, workspaceID string, sms *contracts.SMS) (string, error) {
+func (s *stubInbox) WriteSMS(ctx context.Context, workspaceID string, sms contracts.SMS) (string, error) {
 	return "inbox-sms-1", nil
 }
 
-func (s *stubInbox) WritePush(ctx context.Context, workspaceID string, push *contracts.PushNotification) (string, error) {
+func (s *stubInbox) WritePush(ctx context.Context, workspaceID string, push contracts.PushNotification) (string, error) {
 	return "inbox-push-1", nil
 }
 
-func (s *stubInbox) WriteChat(ctx context.Context, workspaceID string, chat *contracts.ChatMessage) (string, error) {
+func (s *stubInbox) WriteChat(ctx context.Context, workspaceID string, chat contracts.ChatMessage) (string, error) {
 	return "inbox-chat-1", nil
 }
 
 func TestGatewayService_SendEmail_memoryOnly(t *testing.T) {
 	inbox := &stubInbox{emailID: "mem-1"}
-	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, inbox)
+	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, inbox, nil)
 
-	res, err := svc.SendEmail(context.Background(), "ws-1", &contracts.Email{
+	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
 		To:      []string{"a@b.com"},
 		Subject: "hi",
 		HTML:    "<p>x</p>",
@@ -105,12 +105,15 @@ func TestGatewayService_SendEmail_memoryOnly(t *testing.T) {
 	if res.Meta["channel"] != "email" {
 		t.Fatalf("channel: %v", res.Meta["channel"])
 	}
+	if res.Meta["provider_name"] != memoryProviderName {
+		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
+	}
 }
 
 func TestGatewayService_SendEmail_memoryOnly_inboxNil(t *testing.T) {
-	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, nil)
+	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, nil, nil)
 
-	_, err := svc.SendEmail(context.Background(), "ws-1", &contracts.Email{To: []string{"a@b.com"}, Subject: "s"})
+	_, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{To: []string{"a@b.com"}, Subject: "s"})
 	if err == nil {
 		t.Fatal("expected error when inbox is nil")
 	}
@@ -132,9 +135,9 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
 	}}
 	inbox := &stubInbox{emailID: "cap-1"}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox)
+	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil)
 
-	res, err := svc.SendEmail(context.Background(), "ws-1", &contracts.Email{
+	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
 		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
 	})
 	if err != nil {

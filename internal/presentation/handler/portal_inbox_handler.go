@@ -11,198 +11,191 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
 // PortalInboxHandler serves REST + SSE for the workspace-scoped message inbox (memory provider preview).
 // Routes require JWT + workspace membership + workspace API key (see middleware).
 type PortalInboxHandler struct {
-	store       *memory.Store
+	reader      port.InboxReader
+	writer      port.InboxWriter
 	mu          sync.RWMutex
 	subscribers map[string]map[chan []byte]bool // workspaceID -> subscriber channels
 }
 
-// NewPortalInboxHandler creates a handler for /api/v1/workspaces/:wid/inbox/...
-func NewPortalInboxHandler(store *memory.Store) *PortalInboxHandler {
+func NewPortalInboxHandler(reader port.InboxReader, writer port.InboxWriter) *PortalInboxHandler {
 	return &PortalInboxHandler{
-		store:       store,
+		reader:      reader,
+		writer:      writer,
 		subscribers: make(map[string]map[chan []byte]bool),
 	}
 }
 
-// workspaceIDParam extracts the :wid route parameter.
 func workspaceIDParam(c echo.Context) string {
 	return c.Param("wid")
 }
 
-// notYetSupported returns a JSON 404 for inbox endpoints that are not yet workspace-scoped.
-// These stubs exist to satisfy the router contract; they will be replaced once the
-// respective memory store types support per-workspace isolation.
-func notYetSupported(c echo.Context, msgType string) error {
-	return c.JSON(http.StatusNotFound, map[string]string{"error": msgType + " not found"})
-}
-
-// HandleStats returns message counts for the workspace inbox.
 func (h *PortalInboxHandler) HandleStats(c echo.Context) error {
-	return c.JSON(http.StatusOK, h.store.StatsForWorkspace(workspaceIDParam(c)))
+	return c.JSON(http.StatusOK, h.reader.StatsForWorkspace(workspaceIDParam(c)))
 }
 
-// HandleGetEmails returns stored emails for the workspace.
 func (h *PortalInboxHandler) HandleGetEmails(c echo.Context) error {
-	emails := h.store.EmailsForWorkspace(workspaceIDParam(c))
-	return c.JSON(http.StatusOK, emails)
+	return c.JSON(http.StatusOK, h.reader.EmailsForWorkspace(workspaceIDParam(c)))
 }
 
-// HandleGetEmailByID returns a single email if it belongs to the workspace.
 func (h *PortalInboxHandler) HandleGetEmailByID(c echo.Context) error {
 	id := c.Param("id")
-	email := h.store.EmailByIDForWorkspace(id, workspaceIDParam(c))
-	if email == nil {
+	email, ok := h.reader.EmailByIDForWorkspace(id, workspaceIDParam(c))
+	if !ok {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "email not found"})
 	}
 	return c.JSON(http.StatusOK, email)
 }
 
-// HandleDeleteEmailByID deletes an email for this workspace.
 func (h *PortalInboxHandler) HandleDeleteEmailByID(c echo.Context) error {
 	id := c.Param("id")
-	if !h.store.DeleteEmailByIDForWorkspace(id, workspaceIDParam(c)) {
+	if !h.reader.DeleteEmailByIDForWorkspace(id, workspaceIDParam(c)) {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "email not found"})
 	}
 	h.broadcast(workspaceIDParam(c), "email_deleted", id)
 	return c.NoContent(http.StatusNoContent)
 }
 
-// HandleGetSMS returns an empty list.
-// TODO: workspace-scope the SMS memory store, then return real results.
 func (h *PortalInboxHandler) HandleGetSMS(c echo.Context) error {
-	return c.JSON(http.StatusOK, []any{})
+	return c.JSON(http.StatusOK, h.reader.SMSForWorkspace(workspaceIDParam(c)))
 }
 
-// HandleGetSMSByID is not yet workspace-scoped; always returns 404.
 func (h *PortalInboxHandler) HandleGetSMSByID(c echo.Context) error {
-	return notYetSupported(c, "sms")
+	id := c.Param("id")
+	sms, ok := h.reader.SMSByIDForWorkspace(id, workspaceIDParam(c))
+	if !ok {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "sms not found"})
+	}
+	return c.JSON(http.StatusOK, sms)
 }
 
-// HandleDeleteSMSByID is not yet workspace-scoped; always returns 404.
 func (h *PortalInboxHandler) HandleDeleteSMSByID(c echo.Context) error {
-	return notYetSupported(c, "sms")
+	id := c.Param("id")
+	if !h.reader.DeleteSMSByIDForWorkspace(id, workspaceIDParam(c)) {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "sms not found"})
+	}
+	h.broadcast(workspaceIDParam(c), "sms_deleted", id)
+	return c.NoContent(http.StatusNoContent)
 }
 
-// HandleGetPush returns an empty list.
-// TODO: workspace-scope the push memory store, then return real results.
 func (h *PortalInboxHandler) HandleGetPush(c echo.Context) error {
-	return c.JSON(http.StatusOK, []any{})
+	return c.JSON(http.StatusOK, h.reader.PushForWorkspace(workspaceIDParam(c)))
 }
 
-// HandleGetPushByID is not yet workspace-scoped; always returns 404.
 func (h *PortalInboxHandler) HandleGetPushByID(c echo.Context) error {
-	return notYetSupported(c, "push notification")
+	id := c.Param("id")
+	push, ok := h.reader.PushByIDForWorkspace(id, workspaceIDParam(c))
+	if !ok {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "push not found"})
+	}
+	return c.JSON(http.StatusOK, push)
 }
 
-// HandleDeletePushByID is not yet workspace-scoped; always returns 404.
 func (h *PortalInboxHandler) HandleDeletePushByID(c echo.Context) error {
-	return notYetSupported(c, "push notification")
+	id := c.Param("id")
+	if !h.reader.DeletePushByIDForWorkspace(id, workspaceIDParam(c)) {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "push not found"})
+	}
+	h.broadcast(workspaceIDParam(c), "push_deleted", id)
+	return c.NoContent(http.StatusNoContent)
 }
 
-// HandleGetChat returns an empty list.
-// TODO: workspace-scope the chat memory store, then return real results.
 func (h *PortalInboxHandler) HandleGetChat(c echo.Context) error {
-	return c.JSON(http.StatusOK, []any{})
+	return c.JSON(http.StatusOK, h.reader.ChatForWorkspace(workspaceIDParam(c)))
 }
 
-// HandleGetChatByID is not yet workspace-scoped; always returns 404.
 func (h *PortalInboxHandler) HandleGetChatByID(c echo.Context) error {
-	return notYetSupported(c, "chat message")
+	id := c.Param("id")
+	chat, ok := h.reader.ChatByIDForWorkspace(id, workspaceIDParam(c))
+	if !ok {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "chat not found"})
+	}
+	return c.JSON(http.StatusOK, chat)
 }
 
-// HandleDeleteChatByID is not yet workspace-scoped; always returns 404.
 func (h *PortalInboxHandler) HandleDeleteChatByID(c echo.Context) error {
-	return notYetSupported(c, "chat message")
+	id := c.Param("id")
+	if !h.reader.DeleteChatByIDForWorkspace(id, workspaceIDParam(c)) {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "chat not found"})
+	}
+	h.broadcast(workspaceIDParam(c), "chat_deleted", id)
+	return c.NoContent(http.StatusNoContent)
 }
 
-// HandleClearAll removes all in-memory messages for this workspace.
 func (h *PortalInboxHandler) HandleClearAll(c echo.Context) error {
-	h.store.ClearWorkspace(workspaceIDParam(c))
+	h.reader.ClearWorkspace(workspaceIDParam(c))
 	h.broadcast(workspaceIDParam(c), "messages_cleared", nil)
 	return c.NoContent(http.StatusNoContent)
 }
 
-// HandleIngestEmail receives an email for a workspace (internal automation).
 func (h *PortalInboxHandler) HandleIngestEmail(c echo.Context) error {
 	w := workspaceIDParam(c)
 	var email contracts.Email
 	if err := json.NewDecoder(c.Request().Body).Decode(&email); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid email payload: " + err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid email payload"})
 	}
 
-	emailProvider := memory.NewEmailProviderForWorkspace(h.store, w)
-	result, err := emailProvider.Send(c.Request().Context(), &email)
+	id, err := h.writer.WriteEmail(c.Request().Context(), w, email)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store email: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store email"})
 	}
 
-	h.broadcast(w, "email_received", map[string]string{"id": result.ID})
-	return c.JSON(http.StatusCreated, map[string]string{"id": result.ID})
+	h.broadcast(w, "email_received", map[string]string{"id": id})
+	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
-// HandleIngestSMS stores SMS for a workspace.
-// NOTE: The SMS memory store is not yet workspace-scoped; messages are stored globally.
 func (h *PortalInboxHandler) HandleIngestSMS(c echo.Context) error {
 	var sms contracts.SMS
 	if err := json.NewDecoder(c.Request().Body).Decode(&sms); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid sms payload: " + err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid sms payload"})
 	}
 
-	smsProvider := memory.NewSMSProvider(h.store)
-	result, err := smsProvider.Send(c.Request().Context(), &sms)
+	id, err := h.writer.WriteSMS(c.Request().Context(), workspaceIDParam(c), sms)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store sms: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store sms"})
 	}
 
-	h.broadcast(workspaceIDParam(c), "sms_received", map[string]string{"id": result.ID})
-	return c.JSON(http.StatusCreated, map[string]string{"id": result.ID})
+	h.broadcast(workspaceIDParam(c), "sms_received", map[string]string{"id": id})
+	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
-// HandleIngestPush stores a push notification for a workspace.
-// NOTE: The push memory store is not yet workspace-scoped.
 func (h *PortalInboxHandler) HandleIngestPush(c echo.Context) error {
 	var push contracts.PushNotification
 	if err := json.NewDecoder(c.Request().Body).Decode(&push); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid push payload: " + err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid push payload"})
 	}
 
-	pushProvider := memory.NewPushProvider(h.store)
-	result, err := pushProvider.Send(c.Request().Context(), &push)
+	id, err := h.writer.WritePush(c.Request().Context(), workspaceIDParam(c), push)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store push: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store push"})
 	}
 
-	h.broadcast(workspaceIDParam(c), "push_received", map[string]string{"id": result.ID})
-	return c.JSON(http.StatusCreated, map[string]string{"id": result.ID})
+	h.broadcast(workspaceIDParam(c), "push_received", map[string]string{"id": id})
+	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
-// HandleIngestChat stores a chat message for a workspace.
-// NOTE: The chat memory store is not yet workspace-scoped.
 func (h *PortalInboxHandler) HandleIngestChat(c echo.Context) error {
 	var chat contracts.ChatMessage
 	if err := json.NewDecoder(c.Request().Body).Decode(&chat); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid chat payload: " + err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid chat payload"})
 	}
 
-	chatProvider := memory.NewChatProvider(h.store)
-	result, err := chatProvider.Send(c.Request().Context(), &chat)
+	id, err := h.writer.WriteChat(c.Request().Context(), workspaceIDParam(c), chat)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store chat: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store chat"})
 	}
 
-	h.broadcast(workspaceIDParam(c), "chat_received", map[string]string{"id": result.ID})
-	return c.JSON(http.StatusCreated, map[string]string{"id": result.ID})
+	h.broadcast(workspaceIDParam(c), "chat_received", map[string]string{"id": id})
+	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
 // HandleSSE streams Server-Sent Events for the workspace inbox (one connection per workspace).
-// Clients should reconnect on disconnect. Requires JWT + workspace API key (see middleware).
 func (h *PortalInboxHandler) HandleSSE(c echo.Context) error {
 	w := workspaceIDParam(c)
 	wr := c.Response().Writer

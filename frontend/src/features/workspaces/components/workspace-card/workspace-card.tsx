@@ -27,12 +27,12 @@ export function WorkspaceCard({ workspace, isSelected, onSelect }: WorkspaceCard
         }
       }}
     >
-      <div className="bg-secondary border border-border rounded-full size-12 flex items-center justify-center shrink-0">
+      <div className="bg-secondary-button flex size-12 shrink-0 items-center justify-center rounded-full border border-border">
         <Icon name={resolveWorkspaceIconName(workspace.icon_key)} size="sm" className="text-text-secondary" />
       </div>
 
-      <div className="flex-1 flex flex-col gap-1 min-w-0">
-        <p className="text-base font-semibold leading-none text-foreground truncate">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="truncate text-[17px] font-semibold leading-none text-foreground">
           {workspace.name}
         </p>
         <span className="text-xs text-text-secondary font-mono truncate">

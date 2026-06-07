@@ -27,6 +27,6 @@ describe("WorkspaceLayout Component", () => {
     )
     expect(screen.getByText("Message Gateway")).toBeInTheDocument()
     expect(screen.getByText("Demo Workspace")).toBeInTheDocument()
-    expect(screen.getByText("Channels")).toBeInTheDocument()
+    expect(screen.getByText("Navigation")).toBeInTheDocument()
   })
 })

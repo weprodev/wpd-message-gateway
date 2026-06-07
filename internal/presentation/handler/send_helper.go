@@ -10,19 +10,19 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
-	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
 // SendHelper coordinates decoding, dispatching, and logging for message sends.
 type SendHelper struct {
-	logs port.MessageRequestLogRepository
+	svc *service.GatewayService
 }
 
 // NewSendHelper creates a SendHelper.
-func NewSendHelper(logs port.MessageRequestLogRepository) *SendHelper {
-	return &SendHelper{logs: logs}
+func NewSendHelper(svc *service.GatewayService) *SendHelper {
+	return &SendHelper{svc: svc}
 }
 
 // DispatchAndLog handles decoding, invoking the send function, and logging the result.
@@ -63,6 +63,9 @@ func (sh *SendHelper) DispatchAndLog(
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "send failed"})
 	}
 
+	if provider := providerFromMeta(result); provider != "" {
+		ctx = logger.WithProvider(ctx, provider)
+	}
 	slog.InfoContext(ctx, "send ok", "duration_ms", time.Since(start).Milliseconds())
 	sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
 		http.StatusOK, endpoint, start, "", providerFromMeta(result))
@@ -78,7 +81,7 @@ func (sh *SendHelper) RecordLog(
 	start time.Time,
 	errMsg, providerName string,
 ) {
-	if sh.logs == nil || workspaceID == "" {
+	if sh.svc == nil || workspaceID == "" {
 		return
 	}
 	entry := &domain.MessageRequestLog{
@@ -93,7 +96,7 @@ func (sh *SendHelper) RecordLog(
 		DurationMs:   int(time.Since(start).Milliseconds()),
 		ErrorMessage: errMsg,
 	}
-	if err := sh.logs.Create(ctx, entry); err != nil {
+	if err := sh.svc.RecordLog(ctx, entry); err != nil {
 		slog.ErrorContext(ctx, "message_request_log insert failed", "error", err)
 	}
 }

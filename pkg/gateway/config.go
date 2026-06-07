@@ -3,7 +3,7 @@ package gateway
 import (
 	"fmt"
 
-	"github.com/weprodev/wpd-message-gateway/internal/registry"
+	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // CommonConfig holds credential fields shared across all provider channels.

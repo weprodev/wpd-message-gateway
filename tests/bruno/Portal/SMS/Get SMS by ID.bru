@@ -22,8 +22,13 @@ tests {
     expect(res.status).to.equal(200);
   });
 
-  test("should return SMS object", function() {
+  test("should return sms object", function() {
     expect(res.body).to.have.property("id");
     expect(res.body).to.have.property("sms");
+  });
+
+  test("should have sms content", function() {
+    expect(res.body.sms).to.have.property("to");
+    expect(res.body.sms).to.have.property("message");
   });
 }

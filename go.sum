@@ -62,8 +62,8 @@ github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6Kllzaw
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasttemplate v1.2.2 h1:lxLXG0uE3Qnshl9QyaK6XJxMXlQZELvChBOCmQD0Loo=
 github.com/valyala/fasttemplate v1.2.2/go.mod h1:KHLXt3tVN2HBp8eijSv/kGJopbvo7S+qRAEEKiv+SiQ=
-github.com/weprodev/go-pkg v1.1.0 h1:nnH5NEryxSCELdLYysM5QM7xJT9kA2MRkBiISpbWrck=
-github.com/weprodev/go-pkg v1.1.0/go.mod h1:hVsr/LOIeKp8Uoy1gn4/ppwxMDX2KHpbTu35tIjVG8o=
+github.com/weprodev/go-pkg v1.1.1 h1:MRPlbL9dqfXxMYFwGrJ/5VJRC2EKDzTnpdGB3ysh5uM=
+github.com/weprodev/go-pkg v1.1.1/go.mod h1:RGbd3fdphre+JNBJy8q9zRr57ygYqK2M5wrKzpd57qI=
 github.com/weprodev/wpd-gogate v1.0.0 h1:dWjL/5mpk6VzvpSOnbZ2CsitTV8214AFqXHDB152Nfg=
 github.com/weprodev/wpd-gogate v1.0.0/go.mod h1:kqlgrYRXVpaTEWwOqH1bsliVdfpH2ylIGicNd98p4PI=
 golang.org/x/crypto v0.52.0 h1:RMs7fP2rXdep0CftQlK8Uf+kibLm7qkCcradZWYz988=

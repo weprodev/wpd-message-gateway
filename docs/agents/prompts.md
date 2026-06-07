@@ -41,3 +41,39 @@ After applying review fixes, repeat `/smell develop` and `make audit`.
 Follow docs/agents/delivery-agent.md
 End with: /smell develop → fix BLOCKER/HIGH → make audit (repo root)
 ```
+
+## Backend Go (golang-pro + software-architecture)
+
+```
+Read .cursor/skills/software-architecture/SKILL.md
+Read .agents/skills/software-architecture/references/wpd-message-gateway.md
+Read .cursor/skills/golang-pro/SKILL.md
+Read .agents/skills/golang-pro/references/wpd-message-gateway.md
+Follow docs/agents/delivery-agent.md
+go test -race ./cmd/... ./internal/... ./pkg/...
+/smell develop → make audit
+```
+
+## Frontend Portal (react reviewer + advanced types + software-architecture)
+
+```
+Read .cursor/skills/software-architecture/SKILL.md
+Read .agents/skills/software-architecture/references/wpd-message-gateway.md
+Read .cursor/skills/typescript-react-reviewer/SKILL.md
+Read .agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md
+Read .cursor/skills/typescript-advanced-types/SKILL.md
+Read .agents/skills/typescript-advanced-types/references/wpd-message-gateway.md
+Follow docs/agents/delivery-agent.md
+cd frontend && npm run lint && npm run test
+/smell develop → make audit
+```
+
+## Architecture / refactor (software-architecture)
+
+```
+Read .cursor/skills/software-architecture/SKILL.md
+Read .agents/skills/software-architecture/references/wpd-message-gateway.md
+Read docs/backend/architecture.md and/or docs/frontend/architecture.md
+Follow docs/agents/delivery-agent.md or review-agent.md
+/smell develop → make audit
+```

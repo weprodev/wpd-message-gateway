@@ -22,7 +22,7 @@ No Portal pages yet for: workspace create, integrations, API keys, templates, me
 | Feature | Portal UI | Description |
 |---------|:---------:|-------------|
 | **Inbox capture** | | Messages stored in RAM (`memory_only` / `memory_and_provider`) — [Inbox API](#inbox-api-reference) |
-| **Internal ingest** | | Automation writes to inbox without portal JWT |
+| **Internal ingest** | | Automation writes to inbox (requires Portal auth) |
 | **Workspace provisioning** | | Create workspace, API keys, settings, integrations — curl/Bruno/CI only; see [E2E bootstrap](./e2e-testing.md) |
 
 Provider credentials and dispatch mode are stored in PostgreSQL and configured via **REST** (encrypted at rest). There is no Integrations or Settings screen in the Portal UI yet.
@@ -161,7 +161,7 @@ Required headers: `Authorization: Bearer <portal-jwt>`, `X-Api-Client-Id`, `X-Ap
 
 ## Internal Ingest (Automation)
 
-For writing into the inbox without Portal JWT (e.g. from CI automation or background jobs):
+For writing directly into the inbox via external automation (e.g. from CI or background jobs):
 
 ```
 POST /api/v1/workspaces/{workspaceId}/internal/email
@@ -170,8 +170,7 @@ POST /api/v1/workspaces/{workspaceId}/internal/push
 POST /api/v1/workspaces/{workspaceId}/internal/chat
 ```
 
-Protected by `X-Internal-Secret` when `MESSAGE_INTERNAL_INGEST_SECRET` is set.  
-Local dev: set `MESSAGE_INTERNAL_INGEST_ALLOW_OPEN=true` only when no secret is configured (never in production).
+These endpoints are protected by the standard Portal authentication mechanisms. They require a valid **Portal JWT** (or API Key) and the authenticated user must be a member of the workspace.
 
 ---
 

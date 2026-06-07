@@ -11,5 +11,7 @@ export const ROUTES = {
     sms: (workspaceId: string) => `/workspaces/${workspaceId}/sms`,
     push: (workspaceId: string) => `/workspaces/${workspaceId}/push`,
     chat: (workspaceId: string) => `/workspaces/${workspaceId}/chat`,
+    integrations: (workspaceId: string) => `/workspaces/${workspaceId}/integrations`,
+    settings: (workspaceId: string) => `/workspaces/${workspaceId}/settings`,
   },
 } as const

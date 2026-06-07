@@ -17,7 +17,7 @@ import (
 // AuthService provides user authentication services.
 type AuthService struct {
 	userRepo                  port.UserRepository
-	emailSender               port.EmailSender
+	emailSender               contracts.EmailSender
 	secret                    string
 	emailVerificationEnabled  bool
 	sessionTTL                time.Duration
@@ -29,7 +29,7 @@ type AuthService struct {
 // NewAuthService creates a new AuthService.
 func NewAuthService(
 	userRepo port.UserRepository,
-	emailSender port.EmailSender,
+	emailSender contracts.EmailSender,
 	secret string,
 	emailVerificationEnabled bool,
 	sessionTTL time.Duration,
@@ -97,7 +97,7 @@ func (s *AuthService) sendVerificationEmail(ctx context.Context, user *domain.Us
 
 	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", s.verificationBaseURL, token)
 
-	_, err = s.emailSender.Send(ctx, &contracts.Email{
+	_, err = s.emailSender.Send(ctx, contracts.Email{
 		To:      []string{user.Email},
 		Subject: "Verify your email address",
 		HTML:    fmt.Sprintf("Please click the following link to verify your email address: %s", verificationURL),

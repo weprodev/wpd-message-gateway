@@ -59,6 +59,11 @@ export default {
         "divider": "var(--color-divider)",
         "secondary-button": "var(--color-secondary-button)",
         "secondary-button-hover": "var(--color-secondary-button-hover)",
+        "success-bg": "var(--color-success-bg)",
+        "warning-bg": "var(--color-warning-bg)",
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
       },
       borderRadius: {
         lg: "var(--radius)",

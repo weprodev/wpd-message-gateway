@@ -5,56 +5,42 @@
 //  1. Static config (no server, no DB) — call New() with provider credentials
 //     declared in code. Providers must be imported to trigger self-registration:
 //
-//     import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
-//
-//  2. DB-backed (server mode) — call NewWithService() with an already-wired
-//     GatewayService. This is used internally by the HTTP server.
+//     import _ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
 package gateway
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
-// Gateway sends messages. Construct via New() or NewWithService().
+// Gateway sends messages. Construct via New().
 type Gateway struct {
-	// DB-backed mode — set by NewWithService.
-	svc         *service.GatewayService
-	workspaceID string
 
 	// Static config mode — set by New().
-	emailSenders map[string]port.EmailSender
-	smsSenders   map[string]port.SMSSender
-	pushSenders  map[string]port.PushSender
-	chatSenders  map[string]port.ChatSender
+	emailSenders map[string]contracts.EmailSender
+	smsSenders   map[string]contracts.SMSSender
+	pushSenders  map[string]contracts.PushSender
+	chatSenders  map[string]contracts.ChatSender
 	defaultEmail string
 	defaultSMS   string
 	defaultPush  string
 	defaultChat  string
 }
 
-// NewWithService creates a Gateway scoped to a workspace using a wired
-// GatewayService (database-backed integrations). Used internally by the server.
-func NewWithService(svc *service.GatewayService, workspaceID string) *Gateway {
-	return &Gateway{svc: svc, workspaceID: workspaceID}
-}
-
 // New constructs a Gateway from static config without a database or HTTP server.
 // Providers must have been registered via init() before New() is called —
 // import the provider packages with a blank import in your main package:
 //
-//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/mailgun"
-//	import _ "github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+//	import _ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
+//	import _ "github.com/weprodev/wpd-message-gateway/pkg/provider/memory"
 func New(cfg Config) (*Gateway, error) {
 	g := &Gateway{
-		emailSenders: make(map[string]port.EmailSender),
-		smsSenders:   make(map[string]port.SMSSender),
-		pushSenders:  make(map[string]port.PushSender),
-		chatSenders:  make(map[string]port.ChatSender),
+		emailSenders: make(map[string]contracts.EmailSender),
+		smsSenders:   make(map[string]contracts.SMSSender),
+		pushSenders:  make(map[string]contracts.PushSender),
+		chatSenders:  make(map[string]contracts.ChatSender),
 		defaultEmail: cfg.DefaultEmailProvider,
 		defaultSMS:   cfg.DefaultSMSProvider,
 		defaultPush:  cfg.DefaultPushProvider,
@@ -75,12 +61,8 @@ func New(cfg Config) (*Gateway, error) {
 	return g, nil
 }
 
-// SendEmail sends an email. In static mode, uses the default email provider.
-// In server mode, delegates to the workspace's active integration.
-func (g *Gateway) SendEmail(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
-	if g.svc != nil {
-		return g.svc.SendEmail(ctx, g.workspaceID, email)
-	}
+// SendEmail sends an email using the configured default email provider.
+func (g *Gateway) SendEmail(ctx context.Context, email contracts.Email) (*contracts.SendResult, error) {
 	sender, err := g.emailSender()
 	if err != nil {
 		return nil, err
@@ -88,11 +70,8 @@ func (g *Gateway) SendEmail(ctx context.Context, email *contracts.Email) (*contr
 	return sender.Send(ctx, email)
 }
 
-// SendSMS sends an SMS. In static mode, uses the default SMS provider.
-func (g *Gateway) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.SendResult, error) {
-	if g.svc != nil {
-		return g.svc.SendSMS(ctx, g.workspaceID, sms)
-	}
+// SendSMS sends an SMS using the configured default SMS provider.
+func (g *Gateway) SendSMS(ctx context.Context, sms contracts.SMS) (*contracts.SendResult, error) {
 	sender, err := g.smsSender()
 	if err != nil {
 		return nil, err
@@ -100,11 +79,8 @@ func (g *Gateway) SendSMS(ctx context.Context, sms *contracts.SMS) (*contracts.S
 	return sender.Send(ctx, sms)
 }
 
-// SendPush sends a push notification. In static mode, uses the default push provider.
-func (g *Gateway) SendPush(ctx context.Context, push *contracts.PushNotification) (*contracts.SendResult, error) {
-	if g.svc != nil {
-		return g.svc.SendPush(ctx, g.workspaceID, push)
-	}
+// SendPush sends a push notification using the configured default push provider.
+func (g *Gateway) SendPush(ctx context.Context, push contracts.PushNotification) (*contracts.SendResult, error) {
 	sender, err := g.pushSender()
 	if err != nil {
 		return nil, err
@@ -112,11 +88,8 @@ func (g *Gateway) SendPush(ctx context.Context, push *contracts.PushNotification
 	return sender.Send(ctx, push)
 }
 
-// SendChat sends a chat message. In static mode, uses the default chat provider.
-func (g *Gateway) SendChat(ctx context.Context, chat *contracts.ChatMessage) (*contracts.SendResult, error) {
-	if g.svc != nil {
-		return g.svc.SendChat(ctx, g.workspaceID, chat)
-	}
+// SendChat sends a chat message using the configured default chat provider.
+func (g *Gateway) SendChat(ctx context.Context, chat contracts.ChatMessage) (*contracts.SendResult, error) {
 	sender, err := g.chatSender()
 	if err != nil {
 		return nil, err
@@ -124,7 +97,7 @@ func (g *Gateway) SendChat(ctx context.Context, chat *contracts.ChatMessage) (*c
 	return sender.Send(ctx, chat)
 }
 
-func (g *Gateway) emailSender() (port.EmailSender, error) {
+func (g *Gateway) emailSender() (contracts.EmailSender, error) {
 	s, ok := g.emailSenders[g.defaultEmail]
 	if !ok {
 		return nil, fmt.Errorf("gateway: email provider %q not configured", g.defaultEmail)
@@ -132,7 +105,7 @@ func (g *Gateway) emailSender() (port.EmailSender, error) {
 	return s, nil
 }
 
-func (g *Gateway) smsSender() (port.SMSSender, error) {
+func (g *Gateway) smsSender() (contracts.SMSSender, error) {
 	s, ok := g.smsSenders[g.defaultSMS]
 	if !ok {
 		return nil, fmt.Errorf("gateway: SMS provider %q not configured", g.defaultSMS)
@@ -140,7 +113,7 @@ func (g *Gateway) smsSender() (port.SMSSender, error) {
 	return s, nil
 }
 
-func (g *Gateway) pushSender() (port.PushSender, error) {
+func (g *Gateway) pushSender() (contracts.PushSender, error) {
 	s, ok := g.pushSenders[g.defaultPush]
 	if !ok {
 		return nil, fmt.Errorf("gateway: push provider %q not configured", g.defaultPush)
@@ -148,7 +121,7 @@ func (g *Gateway) pushSender() (port.PushSender, error) {
 	return s, nil
 }
 
-func (g *Gateway) chatSender() (port.ChatSender, error) {
+func (g *Gateway) chatSender() (contracts.ChatSender, error) {
 	s, ok := g.chatSenders[g.defaultChat]
 	if !ok {
 		return nil, fmt.Errorf("gateway: chat provider %q not configured", g.defaultChat)

@@ -8,7 +8,7 @@ import (
 
 	pkgconfig "github.com/weprodev/go-pkg/config"
 
-	"github.com/weprodev/wpd-message-gateway/internal/registry"
+	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
 // ValidateConfig validates required configuration.

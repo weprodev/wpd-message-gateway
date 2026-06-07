@@ -42,7 +42,7 @@ func (f *fakeUserRepo) SetEmailVerified(ctx context.Context, id string) error {
 
 type fakeEmailSender struct{}
 
-func (f *fakeEmailSender) Send(ctx context.Context, email *contracts.Email) (*contracts.SendResult, error) {
+func (f *fakeEmailSender) Send(ctx context.Context, email contracts.Email) (*contracts.SendResult, error) {
 	return &contracts.SendResult{ID: "test-id"}, nil
 }
 

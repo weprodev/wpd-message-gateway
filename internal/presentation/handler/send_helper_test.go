@@ -12,6 +12,7 @@ import (
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
@@ -44,7 +45,8 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c.SetRequest(req.WithContext(ctx))
 
 		repo := &mockLogRepo{}
-		helper := NewSendHelper(repo)
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
 
 		var dst contracts.Email
 		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
@@ -92,7 +94,8 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		repo := &mockLogRepo{createErr: errors.New("db error")}
-		helper := NewSendHelper(repo)
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
 
 		var dst contracts.Email
 		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {

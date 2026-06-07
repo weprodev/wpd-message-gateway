@@ -23,22 +23,22 @@ func (h *PortalHandler) SendTest(c echo.Context) error {
 	case "email":
 		var req contracts.Email
 		return h.helper.DispatchAndLog(c, channel, wid, "", endpoint, &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-			return h.gateway.SendEmail(sendCtx, wid, &req)
+			return h.gateway.SendEmail(sendCtx, wid, req)
 		})
 	case "sms":
 		var req contracts.SMS
 		return h.helper.DispatchAndLog(c, channel, wid, "", endpoint, &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-			return h.gateway.SendSMS(sendCtx, wid, &req)
+			return h.gateway.SendSMS(sendCtx, wid, req)
 		})
 	case "push":
 		var req contracts.PushNotification
 		return h.helper.DispatchAndLog(c, channel, wid, "", endpoint, &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-			return h.gateway.SendPush(sendCtx, wid, &req)
+			return h.gateway.SendPush(sendCtx, wid, req)
 		})
 	case "chat":
 		var req contracts.ChatMessage
 		return h.helper.DispatchAndLog(c, channel, wid, "", endpoint, &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-			return h.gateway.SendChat(sendCtx, wid, &req)
+			return h.gateway.SendChat(sendCtx, wid, req)
 		})
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, "unsupported channel")

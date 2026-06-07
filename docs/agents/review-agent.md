@@ -23,6 +23,14 @@ If you apply fixes from this review, **re-run the verification chain** before cl
 
 Then apply the checklists below for gaps smell does not cover (UX, a11y, doc sync).
 
+For **Go diffs**, also load **golang-pro**: `.cursor/skills/golang-pro/SKILL.md` and `.agents/skills/golang-pro/references/wpd-message-gateway.md`.
+
+For **frontend diffs** (`frontend/`), also load **typescript-react-reviewer**: `.cursor/skills/typescript-react-reviewer/SKILL.md` and `.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md`.
+
+For **frontend type safety** (`*.types.ts`, `*.api.ts`, hooks narrowing unions), also load **typescript-advanced-types**: `.cursor/skills/typescript-advanced-types/SKILL.md` and `.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md`.
+
+For **architecture and layer violations** (refactors, new modules, cross-boundary imports), also load **software-architecture**: `.cursor/skills/software-architecture/SKILL.md` and `.agents/skills/software-architecture/references/wpd-message-gateway.md`.
+
 ## 1. Advanced Prompt & Safety Hygiene
 
 When assessing a prompt or commit from a contributor, verify it against the **AI Prompt Engineering & Safety** dimensions:

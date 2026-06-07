@@ -15,6 +15,7 @@ import {
 import { SendTestModal } from "../components/send-test-modal"
 import { useInboxLogs } from "../hooks/use-inbox-logs.hook"
 import type { MessageChannel, LogRow } from "../inbox.types"
+import { PageHeader } from "@/shared/components/page-header"
 
 interface OverviewPageProps {
   channel?: MessageChannel
@@ -98,15 +99,11 @@ export function OverviewPage({ channel }: OverviewPageProps) {
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground capitalize">
-            {channel ? `${channel} logs` : "Message logs"}
-          </h1>
-          <p className="text-sm text-text-secondary">
-            Monitor API requests across communication channels.
-          </p>
-        </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          title={channel ? `${channel} logs` : "Message logs"}
+          description="Monitor API requests across communication channels."
+        />
 
         <div className="flex items-center gap-3 shrink-0">
           <SearchInput
@@ -128,7 +125,7 @@ export function OverviewPage({ channel }: OverviewPageProps) {
         </div>
       </div>
 
-      <div className="bg-card rounded-[16px] border border-border shadow-xs overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
         <div className="grid grid-cols-12 bg-muted/30 px-6 py-3 border-b border-border text-xs font-semibold uppercase tracking-wider text-text-secondary">
           <div className="col-span-2">Time</div>
           <div className="col-span-2">Channel</div>

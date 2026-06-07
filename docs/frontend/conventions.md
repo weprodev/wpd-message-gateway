@@ -32,3 +32,5 @@ Use `@/` for cross-layer imports; **relative paths within the same feature**.
 ## Quality gate
 
 From repo root: **[verification chain](../agents/verification.md)** (`/smell develop` → `make audit`). See [frontend/README.md](../../frontend/README.md) for scripts.
+
+**Agent skills:** [typescript-react-reviewer](../../.cursor/skills/typescript-react-reviewer/SKILL.md) + [overlay](../../.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md); [typescript-advanced-types](../../.cursor/skills/typescript-advanced-types/SKILL.md) + [overlay](../../.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md); [software-architecture](../../.cursor/skills/software-architecture/SKILL.md) + [overlay](../../.agents/skills/software-architecture/references/wpd-message-gateway.md).

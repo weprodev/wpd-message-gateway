@@ -9,6 +9,12 @@ This document is both a **team playbook** and an **operational contract** for an
 
 It complements **[conventions.md](./conventions.md)**, **[frontend/README.md](../../frontend/README.md)**, and **[shadcn/SKILL.md](./shadcn/SKILL.md)**.
 
+**Agent skills (load both for frontend work):**
+
+- [typescript-react-reviewer](../../.cursor/skills/typescript-react-reviewer/SKILL.md) — React 19 + component review + [overlay](../../.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md) — [skills.sh/dotneet/claude-code-marketplace/typescript-react-reviewer](https://www.skills.sh/dotneet/claude-code-marketplace/typescript-react-reviewer)
+- [typescript-advanced-types](../../.cursor/skills/typescript-advanced-types/SKILL.md) — API unions, DTOs, generics + [overlay](../../.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md) — [skills.sh/wshobson/agents/typescript-advanced-types](https://www.skills.sh/wshobson/agents/typescript-advanced-types)
+- [software-architecture](../../.cursor/skills/software-architecture/SKILL.md) — feature-sliced boundaries + [overlay](../../.agents/skills/software-architecture/references/wpd-message-gateway.md) — [skills.sh/sickn33/antigravity-awesome-skills/software-architecture](https://www.skills.sh/sickn33/antigravity-awesome-skills/software-architecture)
+
 ---
 
 ## 1. Execution model (use for substantive work)

@@ -17,8 +17,12 @@ This design aligns with agent-system best practices: **Plan-and-Execute**, **cur
 | --------- | ----------- | ------------- |
 | **[delivery-agent](./delivery-agent.md)** | Implementing or fixing: new feature, improvement, bugfix, refactor that changes behavior or adds code | Features, layers, TDD, [verification chain](./verification.md) |
 | **[review-agent](./review-agent.md)** | Evaluating existing work: PR review, diff review, design critique before merge | `/smell` first, then checklists |
+| **golang-pro** (`.cursor/skills/golang-pro/`) | Go changes in `cmd/`, `internal/`, `pkg/` | Idiomatic Go + [WPD layer overlay](../../.agents/skills/golang-pro/references/wpd-message-gateway.md) |
+| **typescript-react-reviewer** (`.cursor/skills/typescript-react-reviewer/`) | Frontend changes in `frontend/` | React 19 + TS + [WPD portal overlay](../../.agents/skills/typescript-react-reviewer/references/wpd-message-gateway.md) |
+| **typescript-advanced-types** (`.cursor/skills/typescript-advanced-types/`) | Frontend types/APIs in `frontend/` | Discriminated unions, DTOs + [WPD types overlay](../../.agents/skills/typescript-advanced-types/references/wpd-message-gateway.md) |
+| **software-architecture** (`.cursor/skills/software-architecture/`) | Cross-cutting design, refactors, layer moves | Clean Architecture + DDD + [WPD architecture overlay](../../.agents/skills/software-architecture/references/wpd-message-gateway.md) |
 
-**Rule:** After routing, **load and follow** the matching specialist doc for procedures and checklists. The master agent’s job is **routing + plan + coherence**, not rewriting those contracts.
+**Rule:** After routing, **load and follow** the matching specialist doc for procedures and checklists. For structural work, also load **software-architecture** alongside the domain skill. The master agent’s job is **routing + plan + coherence**, not rewriting those contracts.
 
 ## 2. Routing: detect intent from the prompt
 
@@ -73,7 +77,24 @@ Do **not** spin unbounded reason-act loops. Use a **short plan**, execute, then 
 - **Constraints**: Telling me what *not* to do (e.g., "don't rewrite the database schema") keeps my autonomy fully bounded.
 - **Testable End State**: Telling me how to prove it works ("Run `bru test...`" or "Make sure `make audit` passes if I run it") allows my Plan-and-Execute engine to verify safely.
 
-## 6. References
+## 6. Skills registry
+
+| Skill | Path | Load when |
+| ----- | ---- | --------- |
+| **golang-pro** | `.cursor/skills/golang-pro/SKILL.md` | Backend Go: implement, review, refactor, providers, SDK |
+| **typescript-react-reviewer** | `.cursor/skills/typescript-react-reviewer/SKILL.md` | Portal frontend: implement, review, refactor, components, hooks |
+| **typescript-advanced-types** | `.cursor/skills/typescript-advanced-types/SKILL.md` | Portal types: `*.types.ts`, `*.api.ts`, unions, generics (load with react reviewer) |
+| **software-architecture** | `.cursor/skills/software-architecture/SKILL.md` | Layer boundaries, refactors, new features (load with domain skills) |
+
+**golang-pro** upstream: [`.agents/skills/golang-pro/`](../../.agents/skills/golang-pro/) — [jeffallan/claude-skills/golang-pro](https://www.skills.sh/jeffallan/claude-skills/golang-pro)
+
+**typescript-react-reviewer** upstream: [`.agents/skills/typescript-react-reviewer/`](../../.agents/skills/typescript-react-reviewer/) — [dotneet/claude-code-marketplace/typescript-react-reviewer](https://www.skills.sh/dotneet/claude-code-marketplace/typescript-react-reviewer)
+
+**typescript-advanced-types** upstream: [`.agents/skills/typescript-advanced-types/`](../../.agents/skills/typescript-advanced-types/) — [wshobson/agents/typescript-advanced-types](https://www.skills.sh/wshobson/agents/typescript-advanced-types)
+
+**software-architecture** upstream: [`.agents/skills/software-architecture/`](../../.agents/skills/software-architecture/) — [sickn33/antigravity-awesome-skills/software-architecture](https://www.skills.sh/sickn33/antigravity-awesome-skills/software-architecture)
+
+## 7. References
 
 - Agents: [AGENTS.md](../../AGENTS.md), [verification.md](./verification.md), [prompts.md](./prompts.md), **`/smell`** (`.claude/commands/smell.md`)
 - Backend: [backend-engineer.md](../backend/backend-engineer.md), [architecture.md](../backend/architecture.md)

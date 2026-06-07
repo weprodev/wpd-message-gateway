@@ -18,20 +18,20 @@ export function WorkspacesPage() {
   const { workspaces, isLoading, error, reload } = useWorkspaces()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
-  
+
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [successModalOpen, setSuccessModalOpen] = useState(false)
   const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [newWorkspace, setNewWorkspace] = useState<{ id: string; name: string } | null>(null)
 
-  const filteredWorkspaces = workspaces.filter((workspace) =>
-    workspace.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    workspace.unique_key.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredWorkspaces = workspaces.filter(
+    (workspace) =>
+      workspace.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      workspace.unique_key.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   const handleSelectWorkspace = (workspace: Workspace) => {
     setSelectedWorkspaceId(workspace.id)
-    // Directly navigate to the workspace overview
     navigate(ROUTES.workspace.overview(workspace.id))
   }
 
@@ -62,7 +62,7 @@ export function WorkspacesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 py-16">
         <Spinner size="lg" />
         <span className="text-sm text-text-secondary">Loading workspaces...</span>
       </div>
@@ -71,12 +71,12 @@ export function WorkspacesPage() {
 
   if (workspaces.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center py-12">
+      <div className="flex flex-1 items-center justify-center px-6 py-16">
         <EmptyState
           onCreateWorkspace={handleCreateWorkspace}
           onJoinWorkspace={handleJoinWorkspace}
         />
-        
+
         <CreateWorkspaceModal
           isOpen={createModalOpen}
           onClose={() => setCreateModalOpen(false)}
@@ -93,18 +93,15 @@ export function WorkspacesPage() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-10 py-6 max-w-2xl mx-auto w-full">
-      <div className="flex flex-col gap-2 items-center text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          Your Workspaces
-        </h1>
-        <p className="text-sm text-text-secondary">
-          Select a workspace to view logs and manage integrations.
-        </p>
+    <div className="flex w-full max-w-[720px] flex-col items-center gap-12 px-6 py-16">
+      <div className="flex w-full max-w-[640px] flex-col items-center gap-2 text-center">
+        <h1 className="text-4xl font-bold leading-tight text-foreground">Your Workspaces</h1>
+        <p className="text-base leading-normal text-text-secondary">Select a workspace to continue</p>
+        <p className="text-xs leading-4 text-text-tertiary">Connecting your world seamlessly!</p>
       </div>
 
       {error ? (
-        <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3 w-full text-center font-medium">
+        <p className="w-full rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-center text-sm font-medium text-destructive">
           {error}
         </p>
       ) : null}
@@ -119,9 +116,10 @@ export function WorkspacesPage() {
         placeholder="Search workspaces..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full max-w-[560px]"
       />
 
-      <div className="flex flex-col gap-3 w-full">
+      <div className="flex w-full flex-col gap-3">
         {filteredWorkspaces.map((workspace) => (
           <WorkspaceCard
             key={workspace.id}
@@ -130,11 +128,11 @@ export function WorkspacesPage() {
             onSelect={handleSelectWorkspace}
           />
         ))}
-        {filteredWorkspaces.length === 0 && (
-          <p className="text-sm text-text-tertiary text-center py-6">
+        {filteredWorkspaces.length === 0 ? (
+          <p className="py-6 text-center text-sm text-text-tertiary">
             No workspaces matched your search.
           </p>
-        )}
+        ) : null}
       </div>
 
       <CreateWorkspaceModal

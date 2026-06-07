@@ -1,5 +1,7 @@
 package contracts
 
+import "context"
+
 // ChatMessage represents a message to be sent via chat/social platforms.
 type ChatMessage struct {
 	From           string            `json:"from,omitempty"`
@@ -21,4 +23,10 @@ type ChatButton struct {
 	Text  string `json:"text"`
 	URL   string `json:"url,omitempty"`
 	Phone string `json:"phone,omitempty"`
+}
+
+// ChatSender defines the contract for sending chat messages.
+type ChatSender interface {
+	Send(ctx context.Context, chat ChatMessage) (*SendResult, error)
+	Name() string
 }

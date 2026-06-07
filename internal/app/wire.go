@@ -18,10 +18,11 @@ import (
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/authgate"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/provider/memory"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/inbox"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
+	"github.com/weprodev/wpd-message-gateway/pkg/provider/memory"
 )
 
 // Application holds all wired dependencies produced by Wire().
@@ -30,6 +31,7 @@ type Application struct {
 	AuthService    *service.AuthService
 	GatewayService *service.GatewayService
 	MemoryStore    *memory.Store
+	InboxStore     *inbox.Store
 	PgClient       *pgsql.PgClient
 	Echo           *echo.Echo
 }
@@ -116,10 +118,14 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		Gate:         authGate,
 	})
 
+	// ── Memory store & inbox writer ─────────────────────────────────────────
+	inboxStore := inbox.NewStore()
+	memoryStore := memory.GetStore()
+
 	// ── Auth service ──────────────────────────────────────────────────────
 	authService := service.NewAuthService(
 		userRepo,
-		memory.NewEmailProvider(memory.GetStore()),
+		inbox.NewInboxEmailSender(inboxStore, memory.NewEmailProvider(memoryStore)),
 		jwtSecret,
 		true,
 		jwtTTL,
@@ -127,23 +133,24 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		cfg.Portal.BaseURL,
 	)
 
-	// ── Memory store & inbox writer ─────────────────────────────────────────
-	memoryStore := memory.GetStore()
-	inboxWriter := memory.NewInboxWriter(memoryStore)
-
 	// ── Gateway service ─────────────────────────────────────────────────────
-	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxWriter)
+	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxStore, logRepo)
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
-	portalHandler := handler.NewPortalHandler(portalSvc, authService, gatewaySvc, logRepo)
-	portalInboxHandler := handler.NewPortalInboxHandler(memoryStore)
-	gatewayHandler := handler.NewGatewayHandler(gatewaySvc, logRepo)
+	portalHandler := handler.NewPortalHandler(portalSvc, gatewaySvc, logRepo)
+	portalAuthHandler := handler.NewPortalAuthHandler(portalSvc, authService)
+	portalWorkspaceHandler := handler.NewPortalWorkspaceHandler(portalSvc)
+	portalIntegrationHandler := handler.NewPortalIntegrationHandler(portalSvc)
+	portalTemplateHandler := handler.NewPortalTemplateHandler(portalSvc)
+	portalInboxHandler := handler.NewPortalInboxHandler(inboxStore, inboxStore)
+	gatewayHandler := handler.NewGatewayHandler(gatewaySvc)
 
 	// ── Router ──────────────────────────────────────────────────────────────
 	router := presentation.NewRouter(
 		gatewayHandler, portalInboxHandler,
 		apiKeyRepo, workspaceRepo, memberRepo,
+		portalAuthHandler, portalWorkspaceHandler, portalIntegrationHandler, portalTemplateHandler,
 		portalHandler, jwtSecret, sysLogger,
 		gateEngine,
 	)
@@ -153,6 +160,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		AuthService:    authService,
 		GatewayService: gatewaySvc,
 		MemoryStore:    memoryStore,
+		InboxStore:     inboxStore,
 		PgClient:       pgClient,
 		Echo:           router.Setup(),
 	}, nil

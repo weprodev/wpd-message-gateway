@@ -5,7 +5,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
@@ -16,16 +15,14 @@ import (
 // request log, and returns a uniform JSON response.
 type GatewayHandler struct {
 	service *service.GatewayService
-	logs    port.MessageRequestLogRepository
 	helper  *SendHelper
 }
 
 // NewGatewayHandler creates a GatewayHandler.
-func NewGatewayHandler(svc *service.GatewayService, logs port.MessageRequestLogRepository) *GatewayHandler {
+func NewGatewayHandler(svc *service.GatewayService) *GatewayHandler {
 	return &GatewayHandler{
 		service: svc,
-		logs:    logs,
-		helper:  NewSendHelper(logs),
+		helper:  NewSendHelper(svc),
 	}
 }
 
@@ -36,7 +33,7 @@ func (h *GatewayHandler) HandleSendEmail(c echo.Context) error {
 	workspaceID := middleware.GetWorkspaceID(ctx)
 	apiKeyID := middleware.GetAPIKeyID(ctx)
 	return h.helper.DispatchAndLog(c, "email", workspaceID, apiKeyID, c.Path(), &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-		return h.service.SendEmail(sendCtx, workspaceID, &req)
+		return h.service.SendEmail(sendCtx, workspaceID, req)
 	})
 }
 
@@ -47,7 +44,7 @@ func (h *GatewayHandler) HandleSendSMS(c echo.Context) error {
 	workspaceID := middleware.GetWorkspaceID(ctx)
 	apiKeyID := middleware.GetAPIKeyID(ctx)
 	return h.helper.DispatchAndLog(c, "sms", workspaceID, apiKeyID, c.Path(), &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-		return h.service.SendSMS(sendCtx, workspaceID, &req)
+		return h.service.SendSMS(sendCtx, workspaceID, req)
 	})
 }
 
@@ -58,7 +55,7 @@ func (h *GatewayHandler) HandleSendPush(c echo.Context) error {
 	workspaceID := middleware.GetWorkspaceID(ctx)
 	apiKeyID := middleware.GetAPIKeyID(ctx)
 	return h.helper.DispatchAndLog(c, "push", workspaceID, apiKeyID, c.Path(), &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-		return h.service.SendPush(sendCtx, workspaceID, &req)
+		return h.service.SendPush(sendCtx, workspaceID, req)
 	})
 }
 
@@ -69,6 +66,6 @@ func (h *GatewayHandler) HandleSendChat(c echo.Context) error {
 	workspaceID := middleware.GetWorkspaceID(ctx)
 	apiKeyID := middleware.GetAPIKeyID(ctx)
 	return h.helper.DispatchAndLog(c, "chat", workspaceID, apiKeyID, c.Path(), &req, func(sendCtx context.Context) (*contracts.SendResult, error) {
-		return h.service.SendChat(sendCtx, workspaceID, &req)
+		return h.service.SendChat(sendCtx, workspaceID, req)
 	})
 }
