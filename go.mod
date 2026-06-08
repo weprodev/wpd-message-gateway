@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/mailgun/mailgun-go/v4 v4.23.0
-	github.com/weprodev/wpd-gogate v1.0.0
+	github.com/weprodev/wpd-gogate v1.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
 )
 
 require (
@@ -36,9 +36,9 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/weprodev/go-pkg v1.1.1
+	github.com/weprodev/go-pkg v1.1.2
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 )
