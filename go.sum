@@ -64,8 +64,8 @@ github.com/valyala/fasttemplate v1.2.2 h1:lxLXG0uE3Qnshl9QyaK6XJxMXlQZELvChBOCmQ
 github.com/valyala/fasttemplate v1.2.2/go.mod h1:KHLXt3tVN2HBp8eijSv/kGJopbvo7S+qRAEEKiv+SiQ=
 github.com/weprodev/go-pkg v1.1.2 h1:hJeur+RdOF2V3J/I4UVgU1MYzvS2yLrv5LwtgSFEVQ0=
 github.com/weprodev/go-pkg v1.1.2/go.mod h1:Ss7+njNjzZfuXmqyxDtdP2UDMPSGKSWhcDwj4Ff5Ku4=
-github.com/weprodev/wpd-gogate v1.2.0 h1:crFTw+ZEoDATaNi7hGsG5lRxTz8hqqDfyn29p51j2sM=
-github.com/weprodev/wpd-gogate v1.2.0/go.mod h1:Qj0XfD795g1ZW7X9pSaspBujiyhHrBA9ok41YhjrCdA=
+github.com/weprodev/wpd-gogate v1.2.1 h1:ZVXi3BkNuh/tUlcPzJGI+XpuolloD2f7E8RPsnIMHc0=
+github.com/weprodev/wpd-gogate v1.2.1/go.mod h1:Qj0XfD795g1ZW7X9pSaspBujiyhHrBA9ok41YhjrCdA=
 golang.org/x/crypto v0.53.0 h1:QZ4Muo8THX6CizN2vPPd5fBGHyogrdK9fG4wLPFUsto=
 golang.org/x/crypto v0.53.0/go.mod h1:DNLU434OwVakk9PzuwV8w62mAJpRJL3vsgcfp4Qnsio=
 golang.org/x/net v0.55.0 h1:bcvxaJn3e1U6InsFWt1JUq1aSjnRxLzT2rtD2KfkDF8=

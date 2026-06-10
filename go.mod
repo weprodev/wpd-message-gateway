@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/mailgun/mailgun-go/v4 v4.23.0
-	github.com/weprodev/wpd-gogate v1.2.0
+	github.com/weprodev/wpd-gogate v1.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
