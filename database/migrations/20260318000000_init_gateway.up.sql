@@ -397,12 +397,13 @@ CREATE TABLE role_has_permissions (
 -- ==============================================================================
 
 CREATE TABLE model_has_roles (
-    role_id    UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    model_type TEXT NOT NULL,
-    model_id   UUID NOT NULL,
-    team_id    UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    role_id    UUID        NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    model_type TEXT        NOT NULL,
+    model_id   UUID        NOT NULL,
+    team_id    UUID        REFERENCES workspaces(id) ON DELETE CASCADE,
 
-    PRIMARY KEY (role_id, model_id, model_type, team_id)
+    CONSTRAINT model_has_roles_unique UNIQUE NULLS NOT DISTINCT (role_id, model_id, model_type, team_id)
 );
 
 CREATE INDEX idx_model_has_roles_lookup ON model_has_roles (model_id, model_type, team_id);
@@ -412,12 +413,13 @@ CREATE INDEX idx_model_has_roles_lookup ON model_has_roles (model_id, model_type
 -- ==============================================================================
 
 CREATE TABLE model_has_permissions (
-    permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-    model_type    TEXT NOT NULL,
-    model_id      UUID NOT NULL,
-    team_id       UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    permission_id UUID        NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+    model_type    TEXT        NOT NULL,
+    model_id      UUID        NOT NULL,
+    team_id       UUID        REFERENCES workspaces(id) ON DELETE CASCADE,
 
-    PRIMARY KEY (permission_id, model_id, model_type, team_id)
+    CONSTRAINT model_has_permissions_unique UNIQUE NULLS NOT DISTINCT (permission_id, model_id, model_type, team_id)
 );
 
 CREATE INDEX idx_model_has_permissions_lookup ON model_has_permissions (model_id, model_type, team_id);

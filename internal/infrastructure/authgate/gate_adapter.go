@@ -17,11 +17,11 @@ func NewGoGateAdapter(gate *gogate.Gate) port.AuthorizationGate {
 }
 
 func (a *GoGateAdapter) AssignRole(ctx context.Context, modelType, modelID, teamID, roleName string) error {
-	return a.gate.Model(modelType, modelID, teamID).AssignRole(ctx, roleName)
+	return a.gate.Model(modelType, modelID, teamID).AssignRole(ctx, roleName, "")
 }
 
 func (a *GoGateAdapter) RemoveRole(ctx context.Context, modelType, modelID, teamID, roleName string) error {
-	return a.gate.Model(modelType, modelID, teamID).RemoveRole(ctx, roleName)
+	return a.gate.Model(modelType, modelID, teamID).RemoveRole(ctx, roleName, "")
 }
 
 func (a *GoGateAdapter) GetRoleNames(ctx context.Context, modelType, modelID, teamID string) ([]string, error) {

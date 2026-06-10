@@ -69,6 +69,27 @@ func TestGatewayNew(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "mailgun provider registered and built",
+			cfg: Config{
+				DefaultEmailProvider: "mailgun",
+				EmailProviders: map[string]EmailConfig{
+					"mailgun": {
+						CommonConfig: CommonConfig{APIKey: "key"},
+						Domain:       "domain.com",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "memory provider registered and built",
+			cfg: Config{
+				DefaultEmailProvider: "memory",
+				EmailProviders:       map[string]EmailConfig{"memory": {}},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

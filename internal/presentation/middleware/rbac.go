@@ -41,7 +41,7 @@ func RequirePermission(gate *gogate.Gate, workspaceRepo port.WorkspaceRepository
 			}
 
 			// Otherwise, proceed with the standard permission check via gogate
-			allowed, err := gate.Check(c.Request().Context(), "users", uid, permissionName, wid)
+			allowed, err := gate.Check(c.Request().Context(), "users", uid, permissionName, "", wid)
 			if err != nil {
 				slog.ErrorContext(c.Request().Context(), "RBAC check failed: gate check error", "error", err, "user_id", uid, "workspace_id", wid, "permission", permissionName)
 				return echo.NewHTTPError(http.StatusInternalServerError, "Internal Server Error: authorization check failed")
