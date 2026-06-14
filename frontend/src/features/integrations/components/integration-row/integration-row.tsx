@@ -2,16 +2,18 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+import { IntegrationProviderIcon } from "../integration-provider-icon"
 import type { IntegrationViewModel } from "../../hooks/use-integrations.hook"
 
 interface IntegrationRowProps {
   provider: IntegrationViewModel
   onConnect: (provider: IntegrationViewModel) => void
+  onActivate: (provider: IntegrationViewModel) => void
   onDisconnect: (provider: IntegrationViewModel) => void
   isBusy?: boolean
 }
 
-export function IntegrationRow({ provider, onConnect, onDisconnect, isBusy }: IntegrationRowProps) {
+export function IntegrationRow({ provider, onConnect, onActivate, onDisconnect, isBusy }: IntegrationRowProps) {
   const isDisabled = !provider.isAvailable || isBusy
 
   return (
@@ -22,13 +24,11 @@ export function IntegrationRow({ provider, onConnect, onDisconnect, isBusy }: In
       )}
     >
       <div className="flex flex-1 items-center gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-input text-2xl overflow-hidden p-2.5">
-          {provider.icon.startsWith("/") || provider.icon.startsWith("http") ? (
-            <img src={provider.icon} alt={`${provider.name} logo`} className="size-full object-contain" />
-          ) : (
-            <span>{provider.icon}</span>
-          )}
-        </div>
+        <IntegrationProviderIcon
+          icon={provider.icon}
+          name={provider.name}
+          className="size-12 p-2.5 text-2xl"
+        />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">{provider.name}</p>
           <p className="mt-1 text-[13px] text-text-secondary">{provider.description}</p>
@@ -49,6 +49,19 @@ export function IntegrationRow({ provider, onConnect, onDisconnect, isBusy }: In
               onClick={() => onDisconnect(provider)}
             >
               Disconnect
+            </Button>
+          </>
+        ) : provider.isDeactivated ? (
+          <>
+            <Badge variant="secondary">Deactivated</Badge>
+            <Button
+              type="button"
+              size="sm"
+              disabled={isDisabled}
+              className="bg-primary-brand hover:bg-primary-brand-hover"
+              onClick={() => onActivate(provider)}
+            >
+              Activate
             </Button>
           </>
         ) : (

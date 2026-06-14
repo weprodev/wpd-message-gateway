@@ -14,6 +14,7 @@ export interface IntegrationViewModel {
   isComingSoon?: boolean
   integration?: Integration
   isConnected: boolean
+  isDeactivated: boolean
 }
 
 function mergeCatalogWithIntegrations(providers: BackendProvider[], integrations: Integration[]): IntegrationViewModel[] {
@@ -32,6 +33,7 @@ function mergeCatalogWithIntegrations(providers: BackendProvider[], integrations
       isComingSoon: provider.status === "not_supported",
       integration,
       isConnected: integration?.status === "connected",
+      isDeactivated: integration?.status === "disconnected",
     }
   })
 }
@@ -80,14 +82,40 @@ export function useIntegrations(workspaceId: string) {
     reload()
   }
 
-  async function disconnect(provider: IntegrationViewModel) {
+  async function activate(provider: IntegrationViewModel) {
+    if (!provider.integration) return
+
+    await upsertIntegration(workspaceId, {
+      channel_type: provider.category,
+      provider_name: provider.id,
+      status: "connected",
+      config: provider.integration.config,
+      is_default: provider.integration.is_default,
+    })
+    reload()
+  }
+
+  async function deactivate(provider: IntegrationViewModel) {
+    if (!provider.integration) return
+
+    await upsertIntegration(workspaceId, {
+      channel_type: provider.category,
+      provider_name: provider.id,
+      status: "disconnected",
+      config: provider.integration.config,
+      is_default: provider.integration.is_default,
+    })
+    reload()
+  }
+
+  async function removeIntegration(provider: IntegrationViewModel) {
     if (provider.integration?.id) {
       await deleteIntegration(workspaceId, provider.integration.id)
     }
     reload()
   }
 
-  return { items, isLoading, error, reload, connect, disconnect }
+  return { items, isLoading, error, reload, connect, activate, deactivate, removeIntegration }
 }
 
 export function filterIntegrationsByTab(
@@ -95,7 +123,7 @@ export function filterIntegrationsByTab(
   tab: "all" | "connected" | "available",
 ): IntegrationViewModel[] {
   if (tab === "connected") return items.filter((item) => item.isConnected)
-  if (tab === "available") return items.filter((item) => item.isAvailable && !item.isConnected)
+  if (tab === "available") return items.filter((item) => item.isAvailable && !item.integration)
   return items
 }
 

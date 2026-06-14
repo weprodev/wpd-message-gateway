@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 
 import { IntegrationRow } from "../components/integration-row"
 import { ConnectModal } from "../components/connect-modal"
+import { DisconnectModal } from "../components/disconnect-modal"
 import {
   filterIntegrationsByTab,
   groupByCategory,
@@ -28,16 +29,20 @@ export function IntegrationsPage() {
   const [activeTab, setActiveTab] = useState<"all" | "connected" | "available">("all")
   const [busyId, setBusyId] = useState<string | null>(null)
   const [connectProvider, setConnectProvider] = useState<(typeof items)[number] | null>(null)
-  const { items, isLoading, error, connect, disconnect } = useIntegrations(wid)
+  const [disconnectProvider, setDisconnectProvider] = useState<(typeof items)[number] | null>(null)
+  const { items, isLoading, error, connect, activate, deactivate, removeIntegration } = useIntegrations(wid)
 
   async function handleConnect(provider: (typeof items)[number], config: Record<string, unknown>) {
     await connect(provider, config)
   }
 
-  async function handleDisconnect(provider: (typeof items)[number]) {
+  async function runProviderAction(
+    provider: (typeof items)[number],
+    action: (provider: (typeof items)[number]) => Promise<void>,
+  ) {
     setBusyId(provider.id)
     try {
-      await disconnect(provider)
+      await action(provider)
     } finally {
       setBusyId(null)
     }
@@ -133,7 +138,8 @@ export function IntegrationsPage() {
                             provider={provider}
                             isBusy={busyId === provider.id}
                             onConnect={setConnectProvider}
-                            onDisconnect={handleDisconnect}
+                            onActivate={(provider) => runProviderAction(provider, activate)}
+                            onDisconnect={setDisconnectProvider}
                           />
                         ))}
                       </div>
@@ -152,6 +158,14 @@ export function IntegrationsPage() {
         workspaceId={wid}
         provider={connectProvider}
         onConnect={handleConnect}
+      />
+
+      <DisconnectModal
+        isOpen={disconnectProvider !== null}
+        onClose={() => setDisconnectProvider(null)}
+        provider={disconnectProvider}
+        onDeactivate={(provider) => runProviderAction(provider, deactivate)}
+        onRemove={(provider) => runProviderAction(provider, removeIntegration)}
       />
     </div>
   )

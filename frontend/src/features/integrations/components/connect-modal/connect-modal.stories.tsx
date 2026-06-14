@@ -110,6 +110,7 @@ function ConnectModalDemo() {
           category: "email",
           isAvailable: true,
           isConnected: false,
+          isDeactivated: false,
         }}
         onConnect={async (provider, config) => {
           console.log("Connect called with:", provider, config)
@@ -134,6 +135,7 @@ export const MailgunConnection: Story = {
       category: "email",
       isAvailable: true,
       isConnected: false,
+      isDeactivated: false,
     },
     onConnect: async () => undefined,
   },
