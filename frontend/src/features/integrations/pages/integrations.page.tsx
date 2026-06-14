@@ -28,6 +28,7 @@ export function IntegrationsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
   const [activeTab, setActiveTab] = useState<"all" | "connected" | "available">("all")
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [connectProvider, setConnectProvider] = useState<(typeof items)[number] | null>(null)
   const [disconnectProvider, setDisconnectProvider] = useState<(typeof items)[number] | null>(null)
   const { items, isLoading, error, connect, activate, deactivate, removeIntegration } = useIntegrations(wid)
@@ -39,10 +40,18 @@ export function IntegrationsPage() {
   async function runProviderAction(
     provider: (typeof items)[number],
     action: (provider: (typeof items)[number]) => Promise<void>,
+    options?: { surfaceErrors?: boolean },
   ) {
     setBusyId(provider.id)
+    if (options?.surfaceErrors) setActionError(null)
     try {
       await action(provider)
+    } catch (err) {
+      if (options?.surfaceErrors) {
+        setActionError(err instanceof Error ? err.message : "Failed to update provider")
+        return
+      }
+      throw err
     } finally {
       setBusyId(null)
     }
@@ -66,6 +75,12 @@ export function IntegrationsPage() {
       {error ? (
         <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
+        </p>
+      ) : null}
+
+      {actionError ? (
+        <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {actionError}
         </p>
       ) : null}
 
@@ -138,7 +153,9 @@ export function IntegrationsPage() {
                             provider={provider}
                             isBusy={busyId === provider.id}
                             onConnect={setConnectProvider}
-                            onActivate={(provider) => runProviderAction(provider, activate)}
+                            onActivate={(provider) =>
+                              runProviderAction(provider, activate, { surfaceErrors: true })
+                            }
                             onDisconnect={setDisconnectProvider}
                           />
                         ))}
