@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { IntegrationViewModel } from "../../hooks/use-integrations.hook"
+import type { IntegrationActionResult } from "../../integrations.types"
 import type { ProviderConfigField } from "../../integrations.api"
 import { fetchProviderConfigFields } from "../../integrations.api"
 
@@ -15,7 +16,7 @@ interface ConnectModalProps {
   onClose: () => void
   workspaceId: string
   provider: IntegrationViewModel | null
-  onConnect: (provider: IntegrationViewModel, config: Record<string, unknown>) => Promise<void>
+  onConnect: (provider: IntegrationViewModel, config: Record<string, unknown>) => Promise<IntegrationActionResult>
 }
 
 export function ConnectModal({ isOpen, onClose, workspaceId, provider, onConnect }: ConnectModalProps) {
@@ -36,7 +37,7 @@ export function ConnectModal({ isOpen, onClose, workspaceId, provider, onConnect
 interface ConnectFormProps {
   workspaceId: string
   provider: IntegrationViewModel
-  onConnect: (provider: IntegrationViewModel, config: Record<string, unknown>) => Promise<void>
+  onConnect: (provider: IntegrationViewModel, config: Record<string, unknown>) => Promise<IntegrationActionResult>
   onClose: () => void
 }
 
@@ -80,8 +81,12 @@ function ConnectForm({ workspaceId, provider, onConnect, onClose }: ConnectFormP
     setIsSubmitting(true)
     setError(null)
     try {
-      await onConnect(provider, formData)
-      onClose()
+      const result = await onConnect(provider, formData)
+      if (!result.ok) {
+        setError(result.message ?? "Failed to connect provider")
+      } else {
+        onClose()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect provider")
     } finally {

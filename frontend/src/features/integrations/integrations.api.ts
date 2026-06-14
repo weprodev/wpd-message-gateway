@@ -1,6 +1,6 @@
 import { apiFetch } from "@/core/api/client"
 
-import type { Integration, IntegrationChannel } from "./integrations.types"
+import type { Integration, IntegrationActionResult, IntegrationChannel } from "./integrations.types"
 
 export async function listIntegrations(workspaceId: string): Promise<Integration[]> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations`)
@@ -19,24 +19,45 @@ export async function upsertIntegration(
     status?: string
     is_default?: boolean
   },
-): Promise<Integration> {
-  const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    throw new Error("Failed to save integration")
+): Promise<{ ok: true; integration: Integration } | { ok: false; message?: string }> {
+  try {
+    const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { message?: string }
+      return { ok: false, message: err.message ?? "Failed to save integration" }
+    }
+    const integration = (await res.json()) as Integration
+    return { ok: true, integration }
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Failed to save integration",
+    }
   }
-  return (await res.json()) as Integration
 }
 
-export async function deleteIntegration(workspaceId: string, integrationId: string): Promise<void> {
-  const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations/${integrationId}`, {
-    method: "DELETE",
-  })
-  if (!res.ok) {
-    throw new Error("Failed to delete integration")
+export async function deleteIntegration(
+  workspaceId: string,
+  integrationId: string,
+): Promise<IntegrationActionResult> {
+  try {
+    const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations/${integrationId}`, {
+      method: "DELETE",
+    })
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { message?: string }
+      return { ok: false, message: err.message ?? "Failed to delete integration" }
+    }
+    return { ok: true }
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Failed to delete integration",
+    }
   }
 }
 

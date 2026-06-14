@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 
 import { deleteIntegration, listIntegrations, upsertIntegration, fetchProviders } from "../integrations.api"
 import type { BackendProvider } from "../integrations.api"
-import type { Integration, IntegrationChannel } from "../integrations.types"
+import type { Integration, IntegrationActionResult, IntegrationChannel } from "../integrations.types"
 
 export interface IntegrationViewModel {
   id: string
@@ -72,47 +72,67 @@ export function useIntegrations(workspaceId: string) {
     }
   }, [workspaceId, trigger])
 
-  async function connect(provider: IntegrationViewModel, config: Record<string, unknown> = {}) {
-    await upsertIntegration(workspaceId, {
+  async function connect(
+    provider: IntegrationViewModel,
+    config: Record<string, unknown> = {},
+  ): Promise<IntegrationActionResult> {
+    const result = await upsertIntegration(workspaceId, {
       channel_type: provider.category,
       provider_name: provider.id,
       status: "connected",
       config: config,
     })
+    if (!result.ok) return result
     reload()
+    return { ok: true }
   }
 
-  async function activate(provider: IntegrationViewModel) {
-    if (!provider.integration) return
+  async function activate(provider: IntegrationViewModel): Promise<IntegrationActionResult> {
+    if (!provider.integration) {
+      return { ok: false, message: `No integration found for ${provider.name}` }
+    }
 
-    await upsertIntegration(workspaceId, {
+    const result = await upsertIntegration(workspaceId, {
       channel_type: provider.category,
       provider_name: provider.id,
       status: "connected",
       config: provider.integration.config,
       is_default: provider.integration.is_default,
     })
+    if (!result.ok) return result
     reload()
+    return { ok: true }
   }
 
-  async function deactivate(provider: IntegrationViewModel) {
-    if (!provider.integration) return
+  async function deactivate(provider: IntegrationViewModel): Promise<IntegrationActionResult> {
+    if (!provider.integration) {
+      return { ok: false, message: `No integration found for ${provider.name}` }
+    }
 
-    await upsertIntegration(workspaceId, {
+    const result = await upsertIntegration(workspaceId, {
       channel_type: provider.category,
       provider_name: provider.id,
       status: "disconnected",
       config: provider.integration.config,
       is_default: provider.integration.is_default,
     })
+    if (!result.ok) return result
     reload()
+    return { ok: true }
   }
 
-  async function removeIntegration(provider: IntegrationViewModel) {
-    if (provider.integration?.id) {
-      await deleteIntegration(workspaceId, provider.integration.id)
+  async function removeIntegration(provider: IntegrationViewModel): Promise<IntegrationActionResult> {
+    if (!provider.integration) {
+      return { ok: false, message: `No integration found for ${provider.name}` }
     }
+    if (!provider.integration.id) {
+      return { ok: false, message: `Cannot remove ${provider.name}: integration id is missing` }
+    }
+
+    const result = await deleteIntegration(workspaceId, provider.integration.id)
+    if (!result.ok) return result
     reload()
+    return { ok: true }
   }
 
   return { items, isLoading, error, reload, connect, activate, deactivate, removeIntegration }

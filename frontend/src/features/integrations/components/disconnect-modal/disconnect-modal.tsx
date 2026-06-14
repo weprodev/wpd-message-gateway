@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/spinner"
 
 import { IntegrationProviderIcon } from "../integration-provider-icon"
 import type { IntegrationViewModel } from "../../hooks/use-integrations.hook"
+import type { IntegrationActionResult } from "../../integrations.types"
 import { DisconnectOptionCard } from "./disconnect-option-card"
 
 type SubmittingAction = "deactivate" | "remove" | null
@@ -15,8 +16,8 @@ interface DisconnectModalProps {
   isOpen: boolean
   onClose: () => void
   provider: IntegrationViewModel | null
-  onDeactivate: (provider: IntegrationViewModel) => Promise<void>
-  onRemove: (provider: IntegrationViewModel) => Promise<void>
+  onDeactivate: (provider: IntegrationViewModel) => Promise<IntegrationActionResult>
+  onRemove: (provider: IntegrationViewModel) => Promise<IntegrationActionResult>
 }
 
 export function DisconnectModal({
@@ -31,14 +32,21 @@ export function DisconnectModal({
 
   const isSubmitting = submittingAction !== null
 
-  const runAction = async (action: SubmittingAction, handler: (provider: IntegrationViewModel) => Promise<void>) => {
+  const runAction = async (
+    action: SubmittingAction,
+    handler: (provider: IntegrationViewModel) => Promise<IntegrationActionResult>,
+  ) => {
     if (!provider || !action) return
 
     setSubmittingAction(action)
     setError(null)
     try {
-      await handler(provider)
-      onClose()
+      const result = await handler(provider)
+      if (!result.ok) {
+        setError(result.message ?? "Failed to update provider")
+      } else {
+        onClose()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update provider")
     } finally {

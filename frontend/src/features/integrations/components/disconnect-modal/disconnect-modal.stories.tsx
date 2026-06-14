@@ -50,9 +50,11 @@ function DisconnectModalDemo() {
         provider={mailgunProvider}
         onDeactivate={async () => {
           await new Promise((resolve) => setTimeout(resolve, 1000))
+          return { ok: true as const }
         }}
         onRemove={async () => {
           await new Promise((resolve) => setTimeout(resolve, 1000))
+          return { ok: true as const }
         }}
       />
     </>
@@ -65,7 +67,7 @@ export const MailgunDisconnect: Story = {
     isOpen: true,
     onClose: () => undefined,
     provider: mailgunProvider,
-    onDeactivate: async () => undefined,
-    onRemove: async () => undefined,
+    onDeactivate: async () => ({ ok: true as const }),
+    onRemove: async () => ({ ok: true as const }),
   },
 }

@@ -15,7 +15,7 @@ import {
   groupByCategory,
   useIntegrations,
 } from "../hooks/use-integrations.hook"
-import type { IntegrationChannel } from "../integrations.types"
+import type { IntegrationChannel, IntegrationActionResult } from "../integrations.types"
 
 const CATEGORY_LABELS: Record<IntegrationChannel, string> = {
   email: "Email",
@@ -33,23 +33,31 @@ export function IntegrationsPage() {
   const [disconnectProvider, setDisconnectProvider] = useState<(typeof items)[number] | null>(null)
   const { items, isLoading, error, connect, activate, deactivate, removeIntegration } = useIntegrations(wid)
 
-  async function handleConnect(provider: (typeof items)[number], config: Record<string, unknown>) {
-    await connect(provider, config)
+  async function handleConnect(
+    provider: (typeof items)[number],
+    config: Record<string, unknown>,
+  ): Promise<IntegrationActionResult> {
+    return connect(provider, config)
   }
 
   async function runProviderAction(
     provider: (typeof items)[number],
-    action: (provider: (typeof items)[number]) => Promise<void>,
+    action: (provider: (typeof items)[number]) => Promise<IntegrationActionResult>,
     options?: { surfaceErrors?: boolean },
-  ) {
+  ): Promise<IntegrationActionResult> {
     setBusyId(provider.id)
     if (options?.surfaceErrors) setActionError(null)
     try {
-      await action(provider)
+      const result = await action(provider)
+      if (!result.ok && options?.surfaceErrors) {
+        setActionError(result.message ?? "Failed to update provider")
+      }
+      return result
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update provider"
       if (options?.surfaceErrors) {
-        setActionError(err instanceof Error ? err.message : "Failed to update provider")
-        return
+        setActionError(message)
+        return { ok: false, message }
       }
       throw err
     } finally {

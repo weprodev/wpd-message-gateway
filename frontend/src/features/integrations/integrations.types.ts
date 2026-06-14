@@ -1,5 +1,9 @@
 export type IntegrationChannel = "email" | "sms" | "push" | "chat"
 
+export type IntegrationActionResult =
+  | { ok: true }
+  | { ok: false; message?: string }
+
 export interface Integration {
   id: string
   workspace_id: string

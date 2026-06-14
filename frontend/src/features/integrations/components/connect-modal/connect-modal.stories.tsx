@@ -115,6 +115,7 @@ function ConnectModalDemo() {
         onConnect={async (provider, config) => {
           console.log("Connect called with:", provider, config)
           await new Promise((resolve) => setTimeout(resolve, 1000))
+          return { ok: true as const }
         }}
       />
     </>
@@ -137,6 +138,6 @@ export const MailgunConnection: Story = {
       isConnected: false,
       isDeactivated: false,
     },
-    onConnect: async () => undefined,
+    onConnect: async () => ({ ok: true as const }),
   },
 }
