@@ -39,4 +39,18 @@ describe("ApiKeyDeleteModal", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }))
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
+
+  it("blocks dismissal while delete is in progress", () => {
+    render(
+      <ApiKeyDeleteModal
+        isOpen
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        isDeleting
+      />,
+    )
+
+    expect(screen.getByText("Deleting…")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument()
+  })
 })

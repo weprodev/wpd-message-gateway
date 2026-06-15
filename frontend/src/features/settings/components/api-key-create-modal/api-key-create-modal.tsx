@@ -1,17 +1,21 @@
-import { useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Modal } from "@/components/ui/modal"
 import { Spinner } from "@/components/ui/spinner"
 
+import { toUserMessage } from "@/lib/errors"
+
 import { ApiKeyCredentialsView } from "../api-key-credentials-view"
 import type { ApiKeyCredentials } from "../../settings.types"
+
+const CREATE_FAILED_MESSAGE = "Could not create the API key. Please try again."
 
 interface ApiKeyCreateModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreate: (name: string) => Promise<ApiKeyCredentials | null>
+  onCreate: (name: string) => Promise<ApiKeyCredentials>
 }
 
 type CreateStep = "form" | "credentials"
@@ -22,12 +26,36 @@ export function ApiKeyCreateModal({ isOpen, onClose, onCreate }: ApiKeyCreateMod
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [credentials, setCredentials] = useState<ApiKeyCredentials | null>(null)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  const [session, setSession] = useState(0)
+  const sessionRef = useRef(session)
 
-  function resetAndClose() {
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    setSession((current) => current + 1)
+    if (isOpen) {
+      setStep("form")
+      setName("")
+      setError(null)
+      setIsCreating(false)
+      setCredentials(null)
+    }
+  }
+
+  function resetForm() {
     setStep("form")
     setName("")
     setError(null)
+    setIsCreating(false)
     setCredentials(null)
+  }
+
+  function resetAndClose() {
+    resetForm()
     onClose()
   }
 
@@ -38,16 +66,21 @@ export function ApiKeyCreateModal({ isOpen, onClose, onCreate }: ApiKeyCreateMod
       setError("API key name is required")
       return
     }
+    const session = sessionRef.current
     setError(null)
     setIsCreating(true)
     try {
       const result = await onCreate(trimmed)
-      if (result) {
-        setCredentials(result)
-        setStep("credentials")
-      }
+      if (session !== sessionRef.current) return
+      setCredentials(result)
+      setStep("credentials")
+    } catch (err) {
+      if (session !== sessionRef.current) return
+      setError(toUserMessage(err, CREATE_FAILED_MESSAGE))
     } finally {
-      setIsCreating(false)
+      if (session === sessionRef.current) {
+        setIsCreating(false)
+      }
     }
   }
 
@@ -58,7 +91,7 @@ export function ApiKeyCreateModal({ isOpen, onClose, onCreate }: ApiKeyCreateMod
       isOpen={isOpen}
       onClose={resetAndClose}
       title={title}
-      preventDismiss={step === "credentials"}
+      preventDismiss={step === "credentials" || isCreating}
     >
       {step === "form" ? (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">

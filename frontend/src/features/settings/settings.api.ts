@@ -1,6 +1,13 @@
 import { apiFetch } from "@/core/api/client"
+import { httpError, requireClientSecret } from "@/lib/errors"
 
 import type { ApiKey, WorkspaceSettings } from "./settings.types"
+
+async function ensureOk(response: Response, fallback: string): Promise<void> {
+  if (!response.ok) {
+    throw await httpError(response, fallback)
+  }
+}
 
 export async function getSettings(workspaceId: string): Promise<WorkspaceSettings> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`)
@@ -35,16 +42,17 @@ export async function listApiKeys(workspaceId: string): Promise<ApiKey[]> {
 export async function createApiKey(
   workspaceId: string,
   name: string,
-): Promise<ApiKey & { client_secret?: string }> {
+): Promise<ApiKey & { client_secret: string }> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   })
-  if (!res.ok) {
-    throw new Error("Failed to create API key")
-  }
-  return (await res.json()) as ApiKey & { client_secret?: string }
+  await ensureOk(res, "Failed to create API key")
+
+  const created = (await res.json()) as ApiKey & { client_secret?: string }
+
+  return { ...created, client_secret: requireClientSecret(created) }
 }
 
 export async function deleteApiKey(workspaceId: string, keyId: string): Promise<void> {
@@ -63,8 +71,9 @@ export async function regenerateApiKey(
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys/${keyId}/regenerate`, {
     method: "POST",
   })
-  if (!res.ok) {
-    throw new Error("Failed to regenerate API key")
-  }
-  return (await res.json()) as { client_secret: string }
+  await ensureOk(res, "Failed to regenerate API key")
+
+  const regenerated = (await res.json()) as { client_secret?: string }
+
+  return { client_secret: requireClientSecret(regenerated) }
 }

@@ -11,7 +11,7 @@ interface ApiKeyDeleteModalProps {
 
 export function ApiKeyDeleteModal({ isOpen, onCancel, onDelete, isDeleting = false }: ApiKeyDeleteModalProps) {
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} title="Delete API key">
+    <Modal isOpen={isOpen} onClose={onCancel} title="Delete API key" preventDismiss={isDeleting}>
       <div className="flex flex-col gap-6">
         <p className="text-sm text-text-secondary leading-relaxed">
           Are you sure you want to delete this API key?

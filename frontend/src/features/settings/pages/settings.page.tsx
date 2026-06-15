@@ -146,9 +146,8 @@ export function SettingsPage() {
   const { settings, apiKeys, retentionMode, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
     useSettings(wid)
 
-  async function handleCreateApiKey(name: string): Promise<ApiKeyCredentials | null> {
+  async function handleCreateApiKey(name: string): Promise<ApiKeyCredentials> {
     const created = await addApiKey(name)
-    if (!created.client_secret) return null
     return {
       clientId: created.client_id,
       clientSecret: created.client_secret,
@@ -161,11 +160,17 @@ export function SettingsPage() {
     setPendingRegenerateKeyId(keyId)
   }
 
-  async function handleRegenerateApiKey(): Promise<ApiKeyCredentials | null> {
-    if (!pendingRegenerateKeyId) return null
+  async function handleRegenerateApiKey(): Promise<ApiKeyCredentials> {
+    if (!pendingRegenerateKeyId) {
+      throw new Error("No API key selected for regeneration.")
+    }
+
     const key = apiKeys.find((item) => item.id === pendingRegenerateKeyId)
+    if (!key) {
+      throw new Error("This API key could not be found. Refresh the page and try again.")
+    }
+
     const { client_secret: clientSecret } = await rotateApiKey(pendingRegenerateKeyId)
-    if (!key || !clientSecret) return null
     return {
       clientId: key.client_id,
       clientSecret,
