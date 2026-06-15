@@ -16,5 +16,14 @@ export interface ApiKey {
   expires_at?: string | null
 }
 
+export type ApiKeyCredentialsMode = "created" | "regenerated"
+
+export interface ApiKeyCredentials {
+  clientId: string
+  clientSecret: string
+  keyName: string
+  mode: ApiKeyCredentialsMode
+}
+
 export type SettingsTab = "general" | "developer" | "team" | "retention"
 export type RetentionMode = "memory" | "both" | "providers"

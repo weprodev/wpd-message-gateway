@@ -10,9 +10,12 @@ import { PageHeader } from "@/shared/components/page-header"
 import { cn } from "@/lib/utils"
 
 import { ApiKeyRow } from "../components/api-key-row"
+import { ApiKeyCreateModal } from "../components/api-key-create-modal"
+import { ApiKeyDeleteModal } from "../components/api-key-delete-modal"
+import { ApiKeyRegenerateModal } from "../components/api-key-regenerate-modal"
 import { RadioOption } from "../components/radio-option"
 import { useSettings } from "../hooks/use-settings.hook"
-import type { RetentionMode, SettingsTab, WorkspaceSettings } from "../settings.types"
+import type { ApiKeyCredentials, RetentionMode, SettingsTab, WorkspaceSettings } from "../settings.types"
 
 interface GeneralSettingsPanelProps {
   settings: WorkspaceSettings
@@ -136,30 +139,55 @@ export function SettingsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
   const [activeTab, setActiveTab] = useState<SettingsTab>("general")
   const [busyKeyId, setBusyKeyId] = useState<string | null>(null)
+  const [pendingDeleteKeyId, setPendingDeleteKeyId] = useState<string | null>(null)
+  const [pendingRegenerateKeyId, setPendingRegenerateKeyId] = useState<string | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   const { settings, apiKeys, retentionMode, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
     useSettings(wid)
 
-  async function handleCreateApiKey() {
-    const name = window.prompt("API key name")
-    if (!name?.trim()) return
-    await addApiKey(name.trim())
-  }
-
-  async function handleRegenerate(keyId: string) {
-    setBusyKeyId(keyId)
-    try {
-      await rotateApiKey(keyId)
-    } finally {
-      setBusyKeyId(null)
+  async function handleCreateApiKey(name: string): Promise<ApiKeyCredentials | null> {
+    const created = await addApiKey(name)
+    if (!created.client_secret) return null
+    return {
+      clientId: created.client_id,
+      clientSecret: created.client_secret,
+      keyName: created.name,
+      mode: "created",
     }
   }
 
-  async function handleDeleteKey(keyId: string) {
-    if (!window.confirm("Delete this API key?")) return
-    setBusyKeyId(keyId)
+  function handleRequestRegenerate(keyId: string) {
+    setPendingRegenerateKeyId(keyId)
+  }
+
+  async function handleRegenerateApiKey(): Promise<ApiKeyCredentials | null> {
+    if (!pendingRegenerateKeyId) return null
+    const key = apiKeys.find((item) => item.id === pendingRegenerateKeyId)
+    const { client_secret: clientSecret } = await rotateApiKey(pendingRegenerateKeyId)
+    if (!key || !clientSecret) return null
+    return {
+      clientId: key.client_id,
+      clientSecret,
+      keyName: key.name,
+      mode: "regenerated",
+    }
+  }
+
+  function handleRequestDelete(keyId: string) {
+    setPendingDeleteKeyId(keyId)
+  }
+
+  function handleCancelDelete() {
+    setPendingDeleteKeyId(null)
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDeleteKeyId) return
+    setBusyKeyId(pendingDeleteKeyId)
     try {
-      await removeApiKey(keyId)
+      await removeApiKey(pendingDeleteKeyId)
+      setPendingDeleteKeyId(null)
     } finally {
       setBusyKeyId(null)
     }
@@ -223,7 +251,7 @@ export function SettingsPage() {
                 Manage keys used to authenticate gateway requests.
               </p>
             </div>
-            <Button type="button" onClick={handleCreateApiKey}>
+            <Button type="button" onClick={() => setIsCreateModalOpen(true)}>
               <Icon name="add" size="sm" />
               Create key
             </Button>
@@ -240,8 +268,8 @@ export function SettingsPage() {
                   key={key.id}
                   apiKey={key}
                   isBusy={busyKeyId === key.id}
-                  onRegenerate={handleRegenerate}
-                  onDelete={handleDeleteKey}
+                  onRegenerate={handleRequestRegenerate}
+                  onDelete={handleRequestDelete}
                 />
               ))
             )}
@@ -260,6 +288,25 @@ export function SettingsPage() {
           <RetentionSettingsPanel key={`${wid}-${retentionMode}`} initialMode={retentionMode} onSave={saveSettings} />
         </Tabs.Content>
       </Tabs.Root>
+
+      <ApiKeyCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={handleCreateApiKey}
+      />
+
+      <ApiKeyDeleteModal
+        isOpen={pendingDeleteKeyId !== null}
+        onCancel={handleCancelDelete}
+        onDelete={handleConfirmDelete}
+        isDeleting={pendingDeleteKeyId !== null && busyKeyId === pendingDeleteKeyId}
+      />
+
+      <ApiKeyRegenerateModal
+        isOpen={pendingRegenerateKeyId !== null}
+        onClose={() => setPendingRegenerateKeyId(null)}
+        onRegenerate={handleRegenerateApiKey}
+      />
 
       <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
         <h2 className="text-base font-semibold text-destructive">Danger zone</h2>

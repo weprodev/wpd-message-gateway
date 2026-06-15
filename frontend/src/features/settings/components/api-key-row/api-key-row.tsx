@@ -42,7 +42,7 @@ export function ApiKeyRow({ apiKey, onRegenerate, onDelete, isBusy }: ApiKeyRowP
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="destructive"
           size="sm"
           disabled={isBusy}
           onClick={() => onDelete(apiKey.id)}

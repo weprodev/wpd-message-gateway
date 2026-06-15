@@ -147,7 +147,7 @@ function ConnectForm({ workspaceId, provider, onConnect, onClose }: ConnectFormP
         <Button type="submit" disabled={isSubmitting} className="bg-primary-brand hover:bg-primary-brand-hover">
           {isSubmitting ? (
             <div className="flex items-center gap-2">
-              <Spinner size="sm" />
+              <Spinner size="sm" variant="onSolid" />
               <span>Connecting...</span>
             </div>
           ) : (

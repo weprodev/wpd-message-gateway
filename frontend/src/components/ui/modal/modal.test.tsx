@@ -22,4 +22,14 @@ describe("Modal Component", () => {
     closeButton.click()
     expect(handleClose).toHaveBeenCalledTimes(1)
   })
+
+  it("does not call onClose from the close button when preventDismiss is enabled", () => {
+    const handleClose = vi.fn()
+    render(
+      <Modal isOpen={true} onClose={handleClose} title="Modal Title" preventDismiss>
+        Content
+      </Modal>,
+    )
+    expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument()
+  })
 })
