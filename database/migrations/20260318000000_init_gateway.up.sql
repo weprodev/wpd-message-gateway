@@ -277,11 +277,17 @@ CREATE INDEX idx_message_request_logs_workspace_api_created
 -- ==============================================================================
 
 CREATE TABLE stored_messages (
-    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id  UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    channel_type  TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
-    payload       JSONB       NOT NULL,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id          UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    channel_type          TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+    payload               JSONB       NOT NULL,
+    dispatch_status       TEXT        NOT NULL DEFAULT 'pending'
+                                      CHECK (dispatch_status IN ('pending', 'sent', 'failed')),
+    provider_message_id   TEXT,
+    provider_status_code  SMALLINT,
+    dispatch_error        TEXT,
+    dispatched_at         TIMESTAMPTZ,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_stored_messages_workspace_created
@@ -289,6 +295,9 @@ CREATE INDEX idx_stored_messages_workspace_created
 
 CREATE INDEX idx_stored_messages_workspace_channel_created
     ON stored_messages (workspace_id, channel_type, created_at DESC);
+
+CREATE INDEX idx_stored_messages_workspace_dispatch_status
+    ON stored_messages (workspace_id, dispatch_status, created_at DESC);
 
 -- ==============================================================================
 -- 13. TEMPLATES TABLE

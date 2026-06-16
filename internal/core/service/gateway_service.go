@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
@@ -22,6 +24,8 @@ const (
 	// memoryProviderName is the sentinel name stored in the integrations table
 	// when a workspace uses memory dispatch. Checked here to skip DB lookup.
 	memoryProviderName = "memory"
+
+	maxStoredDispatchErrorLen = 1024
 )
 
 // GatewayService orchestrates message dispatch for a single workspace.
@@ -186,9 +190,7 @@ func (s *GatewayService) dispatch(
 	}
 }
 
-// sendViaActiveProvider resolves the workspace integration and sends through it.
-// When persist is non-nil, it runs first (non-fatal) and its ID is attached to the result meta.
-// Memory integrations fall back to writeToInbox only.
+// sendViaActiveProvider sends via the workspace integration; persist failure aborts provider_and_database only.
 func (s *GatewayService) sendViaActiveProvider(
 	ctx context.Context,
 	workspaceID string,
@@ -205,7 +207,7 @@ func (s *GatewayService) sendViaActiveProvider(
 		slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 		return nil, err
 	}
-	if intg.ProviderName == memoryProviderName {
+	if intg.ProviderName == memoryProviderName && mode != domain.DispatchProviderAndDatabase {
 		r, err := writeToInbox()
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
@@ -217,14 +219,19 @@ func (s *GatewayService) sendViaActiveProvider(
 	}
 
 	if persist != nil {
-		var persistResult *contracts.SendResult
-		if pr, err := persist(); err != nil {
+		persistResult, err := persist()
+		if err != nil {
+			if mode == domain.DispatchProviderAndDatabase {
+				slog.ErrorContext(ctx, "archive persist failed", "error", err, "workspace_id", workspaceID, "channel", channel, "dispatch_mode", mode)
+				return nil, err
+			}
 			slog.WarnContext(ctx, "persist failed (non-fatal)", "error", err, "workspace_id", workspaceID, "channel", channel, "dispatch_mode", mode)
-		} else {
-			persistResult = pr
 		}
 		providerCtx := applogger.WithProvider(ctx, intg.ProviderName)
 		provResult, err := sendViaProvider(providerCtx, intg)
+		if persistMetaKey == "stored_message_id" && persistResult != nil {
+			s.recordStoredMessageOutcome(ctx, persistResult.ID, provResult, err)
+		}
 		if err != nil {
 			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
 			return nil, err
@@ -256,14 +263,24 @@ func (s *GatewayService) resolveDispatchMode(ctx context.Context, workspaceID st
 	if s.settings == nil {
 		return domain.DefaultMessageDispatchMode()
 	}
-	v, err := s.settings.Get(ctx, workspaceID, domain.SettingKeyMessageDispatchMode)
-	if err != nil || v == "" {
-		return domain.DefaultMessageDispatchMode()
+	if mode := s.dispatchModeFromSetting(ctx, workspaceID, domain.SettingKeyDataRetention); mode != "" {
+		return mode
 	}
-	if m, ok := domain.ParseMessageDispatchMode(v); ok {
-		return m
+	if mode := s.dispatchModeFromSetting(ctx, workspaceID, domain.SettingKeyMessageDispatchMode); mode != "" {
+		return mode
 	}
 	return domain.DefaultMessageDispatchMode()
+}
+
+func (s *GatewayService) dispatchModeFromSetting(ctx context.Context, workspaceID, key string) domain.MessageDispatchMode {
+	v, err := s.settings.Get(ctx, workspaceID, key)
+	if err != nil || v == "" {
+		return ""
+	}
+	if m, ok := domain.DataRetentionValueToDispatchMode(v); ok {
+		return m
+	}
+	return ""
 }
 
 // activeIntegration fetches the active (connected) integration for a workspace+channel.
@@ -363,6 +380,41 @@ func (s *GatewayService) writeChatToArchive(ctx context.Context, workspaceID str
 		return nil, fmt.Errorf("write chat to archive: %w", err)
 	}
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "stored in database"}, nil
+}
+
+func (s *GatewayService) recordStoredMessageOutcome(
+	ctx context.Context,
+	storedMessageID string,
+	provResult *contracts.SendResult,
+	sendErr error,
+) {
+	if s.storedMessages == nil || storedMessageID == "" {
+		return
+	}
+	outcome := domain.StoredMessageDispatchOutcome{
+		DispatchedAt: time.Now().UTC(),
+	}
+	if sendErr != nil {
+		outcome.Status = domain.StoredMessageDispatchFailed
+		outcome.DispatchError = truncateStoredDispatchError(sendErr.Error())
+	} else {
+		outcome.Status = domain.StoredMessageDispatchSent
+		if provResult != nil {
+			outcome.ProviderMessageID = provResult.ID
+			outcome.ProviderStatusCode = provResult.StatusCode
+		}
+	}
+	if err := s.storedMessages.RecordDispatchOutcome(ctx, storedMessageID, outcome); err != nil {
+		slog.WarnContext(ctx, "stored message dispatch outcome update failed (non-fatal)",
+			"error", err, "stored_message_id", storedMessageID, "dispatch_status", outcome.Status)
+	}
+}
+
+func truncateStoredDispatchError(msg string) string {
+	if len(msg) <= maxStoredDispatchErrorLen {
+		return msg
+	}
+	return strings.TrimSpace(msg[:maxStoredDispatchErrorLen])
 }
 
 // attachMeta stamps standard dispatch metadata onto a result without allocating

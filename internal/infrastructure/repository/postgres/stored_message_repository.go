@@ -7,6 +7,7 @@ import (
 
 	"github.com/weprodev/go-pkg/pgsql"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
@@ -43,8 +44,8 @@ func (r *StoredMessageRepository) write(ctx context.Context, workspaceID, channe
 
 	var id string
 	err = r.client.GetDB(ctx).QueryRowContext(ctx, `
-		INSERT INTO stored_messages (workspace_id, channel_type, payload)
-		VALUES ($1, $2, $3)
+		INSERT INTO stored_messages (workspace_id, channel_type, payload, dispatch_status)
+		VALUES ($1, $2, $3, 'pending')
 		RETURNING id
 	`, workspaceID, channelType, raw).Scan(&id)
 	if err != nil {
@@ -53,3 +54,35 @@ func (r *StoredMessageRepository) write(ctx context.Context, workspaceID, channe
 	}
 	return id, err
 }
+
+func (r *StoredMessageRepository) RecordDispatchOutcome(ctx context.Context, storedMessageID string, outcome domain.StoredMessageDispatchOutcome) error {
+	var providerMessageID interface{}
+	if outcome.ProviderMessageID != "" {
+		providerMessageID = outcome.ProviderMessageID
+	}
+	var providerStatusCode interface{}
+	if outcome.ProviderStatusCode > 0 {
+		providerStatusCode = outcome.ProviderStatusCode
+	}
+	var dispatchError interface{}
+	if outcome.DispatchError != "" {
+		dispatchError = outcome.DispatchError
+	}
+
+	_, err := r.client.GetDB(ctx).ExecContext(ctx, `
+		UPDATE stored_messages
+		SET dispatch_status = $2,
+		    provider_message_id = $3,
+		    provider_status_code = $4,
+		    dispatch_error = $5,
+		    dispatched_at = $6
+		WHERE id = $1
+	`, storedMessageID, string(outcome.Status), providerMessageID, providerStatusCode, dispatchError, outcome.DispatchedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to record stored message dispatch outcome",
+			"error", err, "stored_message_id", storedMessageID, "dispatch_status", outcome.Status)
+	}
+	return err
+}
+
+var _ port.StoredMessageWriter = (*StoredMessageRepository)(nil)

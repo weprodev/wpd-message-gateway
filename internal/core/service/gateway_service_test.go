@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
+	_ "github.com/weprodev/wpd-message-gateway/pkg/provider/memory"
 )
 
 type stubSettingsRepo struct {
@@ -93,7 +95,9 @@ func (s *stubInbox) WriteChat(ctx context.Context, workspaceID string, chat cont
 }
 
 type stubStoredMessages struct {
-	emailID string
+	emailID        string
+	lastOutcome    *domain.StoredMessageDispatchOutcome
+	lastOutcomeFor string
 }
 
 func (s *stubStoredMessages) WriteEmail(ctx context.Context, workspaceID string, email contracts.Email) (string, error) {
@@ -113,6 +117,13 @@ func (s *stubStoredMessages) WritePush(ctx context.Context, workspaceID string, 
 
 func (s *stubStoredMessages) WriteChat(ctx context.Context, workspaceID string, chat contracts.ChatMessage) (string, error) {
 	return "stored-chat-1", nil
+}
+
+func (s *stubStoredMessages) RecordDispatchOutcome(ctx context.Context, storedMessageID string, outcome domain.StoredMessageDispatchOutcome) error {
+	s.lastOutcomeFor = storedMessageID
+	copy := outcome
+	s.lastOutcome = &copy
+	return nil
 }
 
 func TestGatewayService_SendEmail_memoryOnly(t *testing.T) {
@@ -163,7 +174,7 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
+		domain.SettingKeyDataRetention: "providers",
 	}}
 	inbox := &stubInbox{emailID: "cap-1"}
 	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil, nil)
@@ -198,10 +209,11 @@ func TestGatewayService_SendEmail_providerAndDatabase_memoryIntegration(t *testi
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderAndDatabase),
+		domain.SettingKeyDataRetention: "provider_database",
 	}}
 	inbox := &stubInbox{emailID: "cap-1"}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, &stubStoredMessages{}, nil)
+	stored := &stubStoredMessages{}
+	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, stored, nil)
 
 	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
 		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
@@ -209,10 +221,74 @@ func TestGatewayService_SendEmail_providerAndDatabase_memoryIntegration(t *testi
 	if err != nil {
 		t.Fatalf("SendEmail: %v", err)
 	}
-	if res.ID != "cap-1" {
-		t.Fatalf("got ID %q", res.ID)
+	if res.ID == "cap-1" {
+		t.Fatalf("expected provider send ID, got RAM inbox ID %q", res.ID)
+	}
+	if res.Meta["stored_message_id"] != "stored-msg-1" {
+		t.Fatalf("stored_message_id: %v", res.Meta["stored_message_id"])
 	}
 	if res.Meta["dispatch_mode"] != string(domain.DispatchProviderAndDatabase) {
 		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
+	}
+	if stored.lastOutcomeFor != "stored-msg-1" {
+		t.Fatalf("outcome stored_message_id: %q", stored.lastOutcomeFor)
+	}
+	if stored.lastOutcome == nil {
+		t.Fatal("expected dispatch outcome to be recorded")
+	}
+	if stored.lastOutcome.Status != domain.StoredMessageDispatchSent {
+		t.Fatalf("dispatch status: %q", stored.lastOutcome.Status)
+	}
+	if stored.lastOutcome.ProviderMessageID != res.ID {
+		t.Fatalf("provider_message_id: %q", stored.lastOutcome.ProviderMessageID)
+	}
+	if stored.lastOutcome.ProviderStatusCode != res.StatusCode {
+		t.Fatalf("provider_status_code: %d", stored.lastOutcome.ProviderStatusCode)
+	}
+}
+
+func TestGatewayService_SendEmail_providerAndDatabase_recordsFailedOutcome(t *testing.T) {
+	ts := time.Now()
+	intg := &domain.Integration{
+		ID:           "int-1",
+		WorkspaceID:  "ws-1",
+		ChannelType:  "email",
+		ProviderName: "nonexistent-provider",
+		Config:       []byte(`{}`),
+		Status:       "connected",
+		CreatedAt:    ts,
+		UpdatedAt:    ts,
+	}
+	settings := &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyDataRetention: "provider_database",
+	}}
+	stored := &stubStoredMessages{}
+	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, nil, stored, nil)
+
+	_, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
+		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
+	})
+	if err == nil {
+		t.Fatal("expected provider send error")
+	}
+	if stored.lastOutcomeFor != "stored-msg-1" {
+		t.Fatalf("outcome stored_message_id: %q", stored.lastOutcomeFor)
+	}
+	if stored.lastOutcome == nil {
+		t.Fatal("expected failed dispatch outcome to be recorded")
+	}
+	if stored.lastOutcome.Status != domain.StoredMessageDispatchFailed {
+		t.Fatalf("dispatch status: %q", stored.lastOutcome.Status)
+	}
+	if stored.lastOutcome.DispatchError == "" {
+		t.Fatal("expected dispatch error message")
+	}
+}
+
+func TestTruncateStoredDispatchError(t *testing.T) {
+	long := strings.Repeat("x", maxStoredDispatchErrorLen+10)
+	got := truncateStoredDispatchError(long)
+	if len(got) != maxStoredDispatchErrorLen {
+		t.Fatalf("got len %d, want %d", len(got), maxStoredDispatchErrorLen)
 	}
 }
