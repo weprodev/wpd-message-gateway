@@ -127,6 +127,14 @@ function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelP
         checked={retentionMode === "providers"}
         onChange={() => setRetentionMode("providers")}
       />
+      <RadioOption
+        id="retention-provider-database"
+        name="retention"
+        label="Provider + Database"
+        description="Send through providers and persist the full payload in PostgreSQL."
+        checked={retentionMode === "provider_database"}
+        onChange={() => setRetentionMode("provider_database")}
+      />
 
       <Button type="button" onClick={handleSave} disabled={isSaving} className="mt-2 w-fit">
         {isSaving ? "Saving…" : "Save retention policy"}

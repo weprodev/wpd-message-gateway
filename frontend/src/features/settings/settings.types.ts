@@ -1,7 +1,9 @@
+export type RetentionMode = "memory" | "both" | "providers" | "provider_database"
+
 export interface WorkspaceSettings {
   owner_email?: string
   pin_code?: string
-  data_retention?: "memory" | "both" | "providers"
+  data_retention?: RetentionMode
   [key: string]: string | undefined
 }
 
@@ -26,4 +28,3 @@ export interface ApiKeyCredentials {
 }
 
 export type SettingsTab = "general" | "developer" | "team" | "retention"
-export type RetentionMode = "memory" | "both" | "providers"

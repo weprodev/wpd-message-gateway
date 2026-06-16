@@ -1,7 +1,43 @@
 import { apiFetch } from "@/core/api/client"
 import { httpError, requireClientSecret } from "@/lib/errors"
 
-import type { ApiKey, WorkspaceSettings } from "./settings.types"
+import type { ApiKey, RetentionMode, WorkspaceSettings } from "./settings.types"
+
+const RETENTION_TO_DISPATCH: Record<RetentionMode, string> = {
+  memory: "memory_only",
+  both: "memory_and_provider",
+  providers: "provider_only",
+  provider_database: "provider_and_database",
+}
+
+const DISPATCH_TO_RETENTION: Record<string, RetentionMode> = {
+  memory_only: "memory",
+  memory_and_provider: "both",
+  provider_only: "providers",
+  provider_and_database: "provider_database",
+}
+
+function mapSettingsFromApi(raw: Record<string, string>): WorkspaceSettings {
+  const dispatchMode = raw.message_dispatch_mode
+  const dataRetention = dispatchMode ? DISPATCH_TO_RETENTION[dispatchMode] : raw.data_retention
+
+  return {
+    ...raw,
+    data_retention: (dataRetention as RetentionMode | undefined) ?? "memory",
+  }
+}
+
+function mapSettingsPatchToApi(patch: Record<string, string>): Record<string, string> {
+  const { data_retention: dataRetention, ...rest } = patch
+  if (!dataRetention) {
+    return rest
+  }
+
+  return {
+    ...rest,
+    message_dispatch_mode: RETENTION_TO_DISPATCH[dataRetention as RetentionMode],
+  }
+}
 
 async function ensureOk(response: Response, fallback: string): Promise<void> {
   if (!response.ok) {
@@ -14,7 +50,7 @@ export async function getSettings(workspaceId: string): Promise<WorkspaceSetting
   if (!res.ok) {
     throw new Error("Failed to load settings")
   }
-  return (await res.json()) as WorkspaceSettings
+  return mapSettingsFromApi((await res.json()) as Record<string, string>)
 }
 
 export async function patchSettings(
@@ -24,7 +60,7 @@ export async function patchSettings(
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(mapSettingsPatchToApi(body)),
   })
   if (!res.ok) {
     throw new Error("Failed to save settings")
