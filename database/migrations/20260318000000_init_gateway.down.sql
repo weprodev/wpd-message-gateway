@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS workspace_access_audits CASCADE;
 DROP TABLE IF EXISTS workspace_settings CASCADE;
 DROP TABLE IF EXISTS template_components CASCADE;
 DROP TABLE IF EXISTS templates CASCADE;
+DROP TABLE IF EXISTS stored_messages CASCADE;
 DROP TABLE IF EXISTS message_request_logs CASCADE;
 DROP TABLE IF EXISTS api_keys CASCADE;
 DROP TABLE IF EXISTS integrations CASCADE;

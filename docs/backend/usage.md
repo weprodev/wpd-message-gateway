@@ -422,6 +422,7 @@ Authorization: Bearer <portal-jwt>
 Content-Type: application/json
 
 { "message_dispatch_mode": "provider_only" }
+// or: "memory_only" | "memory_and_provider" | "provider_and_database"
 ```
 
 See [Portal inbox](./portal-inbox.md) for mode behavior.
@@ -430,7 +431,8 @@ See [Portal inbox](./portal-inbox.md) for mode behavior.
 |------|----------|----------|
 | `memory_only` | In-process RAM only, **not sent** | Development, testing |
 | `provider_only` | Sent to real provider, no local copy | Production |
-| `memory_and_provider` | Both — local copy + real send | Staging, debugging |
+| `provider_and_database` | Sent to real provider **and** payload stored in PostgreSQL | Production with durable retention |
+| `memory_and_provider` | Both — local RAM copy + real send | Staging, debugging |
 
 ---
 
