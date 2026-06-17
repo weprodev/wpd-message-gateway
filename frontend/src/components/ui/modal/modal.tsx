@@ -11,11 +11,19 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   title?: string
+  description?: ReactNode
   /** When true, blocks overlay, escape, and close-button dismissal until the caller closes the modal. */
   preventDismiss?: boolean
 }
 
-export function Modal({ isOpen, onClose, children, title, preventDismiss = false }: ModalProps) {
+export function Modal({
+  isOpen,
+  onClose,
+  children,
+  title,
+  description,
+  preventDismiss = false,
+}: ModalProps) {
   return (
     <Dialog
       open={isOpen}
@@ -29,14 +37,16 @@ export function Modal({ isOpen, onClose, children, title, preventDismiss = false
         onInteractOutside={preventDismiss ? (event) => event.preventDefault() : undefined}
         onEscapeKeyDown={preventDismiss ? (event) => event.preventDefault() : undefined}
       >
-        {title && (
-          <div className="flex items-center justify-between w-full">
+        {title ? (
+          <div className="flex w-full flex-col gap-2">
             <DialogTitle className="text-xl font-semibold text-foreground">
               {title}
             </DialogTitle>
+            {description ? (
+              <div className="text-sm leading-relaxed text-text-secondary">{description}</div>
+            ) : null}
           </div>
-        )}
-        {!title && (
+        ) : (
           <DialogPrimitive.Title className="sr-only">
             Modal Dialog
           </DialogPrimitive.Title>

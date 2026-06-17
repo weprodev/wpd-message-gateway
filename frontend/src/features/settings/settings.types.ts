@@ -1,4 +1,4 @@
-export type RetentionMode = "memory" | "both" | "providers" | "provider_database"
+export type RetentionMode = "memory" | "memory_database" | "providers" | "provider_database"
 
 export interface WorkspaceSettings {
   owner_email?: string

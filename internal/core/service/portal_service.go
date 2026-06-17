@@ -558,6 +558,11 @@ func normalizeSettingsForAPI(raw map[string]string) map[string]string {
 			}
 		}
 	}
+	if retention, ok := out[domain.SettingKeyDataRetention]; ok {
+		if canonical, ok := domain.DispatchModeToDataRetentionValue(retention); ok {
+			out[domain.SettingKeyDataRetention] = canonical
+		}
+	}
 	return out
 }
 

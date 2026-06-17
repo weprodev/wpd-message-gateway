@@ -23,6 +23,15 @@ describe("Modal Component", () => {
     expect(handleClose).toHaveBeenCalledTimes(1)
   })
 
+  it("renders description below the title", () => {
+    render(
+      <Modal isOpen={true} onClose={vi.fn()} title="Modal Title" description="Supporting copy">
+        Content
+      </Modal>,
+    )
+    expect(screen.getByText("Supporting copy")).toBeInTheDocument()
+  })
+
   it("does not call onClose from the close button when preventDismiss is enabled", () => {
     const handleClose = vi.fn()
     render(

@@ -5,19 +5,31 @@ import type { ApiKey, RetentionMode, WorkspaceSettings } from "./settings.types"
 
 const DISPATCH_TO_RETENTION: Record<string, RetentionMode> = {
   memory_only: "memory",
-  memory_and_provider: "both",
+  memory_and_provider: "memory_database",
   provider_only: "providers",
   provider_and_database: "provider_database",
 }
 
+const RETENTION_MODES: RetentionMode[] = ["memory", "memory_database", "providers", "provider_database"]
+
+function normalizeRetentionMode(value: string | undefined): RetentionMode {
+  if (value === "both") {
+    return "memory_database"
+  }
+  if (value && RETENTION_MODES.includes(value as RetentionMode)) {
+    return value as RetentionMode
+  }
+  return "memory"
+}
+
 function mapSettingsFromApi(raw: Record<string, string>): WorkspaceSettings {
-  const dataRetention =
-    (raw.data_retention as RetentionMode | undefined) ??
+  const rawRetention =
+    raw.data_retention ??
     (raw.message_dispatch_mode ? DISPATCH_TO_RETENTION[raw.message_dispatch_mode] : undefined)
 
   return {
     ...raw,
-    data_retention: dataRetention ?? "memory",
+    data_retention: normalizeRetentionMode(rawRetention),
   }
 }
 

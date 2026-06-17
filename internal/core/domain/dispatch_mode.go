@@ -6,6 +6,16 @@ const SettingKeyDataRetention = "data_retention"
 // SettingKeyMessageDispatchMode is a legacy key; kept for reading old workspace rows.
 const SettingKeyMessageDispatchMode = "message_dispatch_mode"
 
+// Portal data_retention values (stored in workspace_settings).
+const (
+	RetentionMemory           = "memory"
+	RetentionMemoryDatabase   = "memory_database"
+	RetentionProviders        = "providers"
+	RetentionProviderDatabase = "provider_database"
+
+	retentionLegacyBoth = "both" // legacy portal value; read-only compatibility
+)
+
 // MessageDispatchMode controls memory capture vs integration dispatch for each workspace.
 // Provider configs live in DB (integrations); memory is always available as a capture path.
 type MessageDispatchMode string
@@ -36,38 +46,44 @@ func ParseMessageDispatchMode(s string) (MessageDispatchMode, bool) {
 	}
 }
 
+func retentionValueForMode(mode MessageDispatchMode) (string, bool) {
+	switch mode {
+	case DispatchMemoryOnly:
+		return RetentionMemory, true
+	case DispatchMemoryAndProvider:
+		return RetentionMemoryDatabase, true
+	case DispatchProviderOnly:
+		return RetentionProviders, true
+	case DispatchProviderAndDatabase:
+		return RetentionProviderDatabase, true
+	default:
+		return "", false
+	}
+}
+
 // DataRetentionValueToDispatchMode maps portal data_retention values to dispatch modes.
 func DataRetentionValueToDispatchMode(value string) (MessageDispatchMode, bool) {
 	switch value {
-	case "memory":
+	case RetentionMemory:
 		return DispatchMemoryOnly, true
-	case "both":
+	case RetentionMemoryDatabase, retentionLegacyBoth:
 		return DispatchMemoryAndProvider, true
-	case "providers":
+	case RetentionProviders:
 		return DispatchProviderOnly, true
-	case "provider_database":
+	case RetentionProviderDatabase:
 		return DispatchProviderAndDatabase, true
 	default:
 		return ParseMessageDispatchMode(value)
 	}
 }
 
-// DispatchModeToDataRetentionValue maps dispatch modes to portal data_retention values.
+// DispatchModeToDataRetentionValue maps dispatch modes or retention values to the canonical portal key.
 func DispatchModeToDataRetentionValue(value string) (string, bool) {
 	if m, ok := ParseMessageDispatchMode(value); ok {
-		switch m {
-		case DispatchMemoryOnly:
-			return "memory", true
-		case DispatchMemoryAndProvider:
-			return "both", true
-		case DispatchProviderOnly:
-			return "providers", true
-		case DispatchProviderAndDatabase:
-			return "provider_database", true
-		}
+		return retentionValueForMode(m)
 	}
-	if _, ok := DataRetentionValueToDispatchMode(value); ok {
-		return value, true
+	if m, ok := DataRetentionValueToDispatchMode(value); ok {
+		return retentionValueForMode(m)
 	}
 	return "", false
 }
