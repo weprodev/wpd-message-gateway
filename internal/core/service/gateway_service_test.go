@@ -174,7 +174,7 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyDataRetention: "providers",
+		domain.SettingKeyDataRetention: domain.RetentionProviders,
 	}}
 	inbox := &stubInbox{emailID: "cap-1"}
 	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil, nil)
@@ -209,7 +209,7 @@ func TestGatewayService_SendEmail_providerAndDatabase_memoryIntegration(t *testi
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyDataRetention: "provider_database",
+		domain.SettingKeyDataRetention: domain.RetentionProviderDatabase,
 	}}
 	inbox := &stubInbox{emailID: "cap-1"}
 	stored := &stubStoredMessages{}
@@ -260,7 +260,7 @@ func TestGatewayService_SendEmail_providerAndDatabase_recordsFailedOutcome(t *te
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyDataRetention: "provider_database",
+		domain.SettingKeyDataRetention: domain.RetentionProviderDatabase,
 	}}
 	stored := &stubStoredMessages{}
 	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, nil, stored, nil)

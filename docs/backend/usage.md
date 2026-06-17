@@ -423,7 +423,7 @@ Content-Type: application/json
 
 { "data_retention": "providers" }
 // or: "memory" | "memory_database" | "providers" | "provider_database"
-// legacy: "message_dispatch_mode" and data_retention "both" are still accepted on read
+// legacy aliases (accepted on read/PATCH, normalized on response): "provider", "memory_and_database", "provider_and_database", "both", "message_dispatch_mode"
 ```
 
 See [Portal inbox](./portal-inbox.md) for mode behavior.

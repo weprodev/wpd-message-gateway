@@ -6,14 +6,12 @@ const SettingKeyDataRetention = "data_retention"
 // SettingKeyMessageDispatchMode is a legacy key; kept for reading old workspace rows.
 const SettingKeyMessageDispatchMode = "message_dispatch_mode"
 
-// Portal data_retention values (stored in workspace_settings).
+// Canonical portal data_retention values (aligned with the Portal UI / frontend).
 const (
 	RetentionMemory           = "memory"
 	RetentionMemoryDatabase   = "memory_database"
 	RetentionProviders        = "providers"
 	RetentionProviderDatabase = "provider_database"
-
-	retentionLegacyBoth = "both" // legacy portal value; read-only compatibility
 )
 
 // MessageDispatchMode controls memory capture vs integration dispatch for each workspace.
@@ -61,12 +59,31 @@ func retentionValueForMode(mode MessageDispatchMode) (string, bool) {
 	}
 }
 
+// normalizeRetentionValue maps data_retention inputs (including legacy aliases) to canonical portal values.
+func normalizeRetentionValue(value string) (string, bool) {
+	switch value {
+	case RetentionMemory:
+		return RetentionMemory, true
+	case RetentionProviders, "provider":
+		return RetentionProviders, true
+	case RetentionMemoryDatabase, "memory_and_database", "both":
+		return RetentionMemoryDatabase, true
+	case RetentionProviderDatabase, "provider_and_database":
+		return RetentionProviderDatabase, true
+	default:
+		return "", false
+	}
+}
+
 // DataRetentionValueToDispatchMode maps portal data_retention values to dispatch modes.
 func DataRetentionValueToDispatchMode(value string) (MessageDispatchMode, bool) {
+	if normalized, ok := normalizeRetentionValue(value); ok {
+		value = normalized
+	}
 	switch value {
 	case RetentionMemory:
 		return DispatchMemoryOnly, true
-	case RetentionMemoryDatabase, retentionLegacyBoth:
+	case RetentionMemoryDatabase:
 		return DispatchMemoryAndProvider, true
 	case RetentionProviders:
 		return DispatchProviderOnly, true
@@ -82,8 +99,10 @@ func DispatchModeToDataRetentionValue(value string) (string, bool) {
 	if m, ok := ParseMessageDispatchMode(value); ok {
 		return retentionValueForMode(m)
 	}
-	if m, ok := DataRetentionValueToDispatchMode(value); ok {
-		return retentionValueForMode(m)
+	if normalized, ok := normalizeRetentionValue(value); ok {
+		if m, ok := DataRetentionValueToDispatchMode(normalized); ok {
+			return retentionValueForMode(m)
+		}
 	}
 	return "", false
 }
