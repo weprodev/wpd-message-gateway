@@ -24,6 +24,7 @@ type createWorkspaceBody struct {
 	Name    string `json:"name"`
 	Slug    string `json:"slug"`
 	IconKey string `json:"icon_key"`
+	PIN     string `json:"pin"`
 }
 
 type joinBody struct {
@@ -59,7 +60,7 @@ func (h *PortalWorkspaceHandler) CreateWorkspace(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to bind workspace create body", "error", err, "user_id", uid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	w, err := h.svc.CreateWorkspace(c.Request().Context(), uid, body.Name, body.Slug, body.IconKey)
+	w, err := h.svc.CreateWorkspace(c.Request().Context(), uid, body.Name, body.Slug, body.IconKey, body.PIN)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create workspace", "error", err, "user_id", uid, "name", body.Name)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create workspace")

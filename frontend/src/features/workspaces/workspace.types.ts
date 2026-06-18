@@ -16,6 +16,7 @@ export interface CreateWorkspaceData {
   name: string
   slug: string
   icon_key: string
+  pin: string
 }
 
 export interface WorkspaceCreatedResponse {

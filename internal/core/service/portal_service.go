@@ -110,14 +110,24 @@ func (s *PortalService) RequireAdmin(ctx context.Context, workspaceID, userID st
 }
 
 // CreateWorkspace creates a new workspace owned by userID, adds userID as admin, and assigns
-// the admin role in the RBAC gate. Returns port.ErrInvalidInput if name or slug is empty.
-func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug, iconKey string) (*domain.Workspace, error) {
+// the admin role in the RBAC gate. Returns port.ErrInvalidInput if name, slug, or pin is invalid.
+func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug, iconKey, pin string) (*domain.Workspace, error) {
 	slog.InfoContext(ctx, "creating workspace", "user_id", userID, "name", name, "slug", slug)
 	name = strings.TrimSpace(name)
 	slug = strings.TrimSpace(strings.ToLower(slug))
+	pin = strings.TrimSpace(pin)
 	if name == "" || slug == "" {
 		slog.WarnContext(ctx, "workspace creation failed: invalid input", "user_id", userID)
 		return nil, fmt.Errorf("name and slug required: %w", port.ErrInvalidInput)
+	}
+	if !isSixDigitPIN(pin) {
+		slog.WarnContext(ctx, "workspace creation failed: invalid PIN", "user_id", userID)
+		return nil, fmt.Errorf("pin must be exactly 6 digits: %w", port.ErrInvalidInput)
+	}
+	hashedPin, err := crypto.HashSecret(pin)
+	if err != nil {
+		slog.ErrorContext(ctx, "workspace creation failed: PIN hash error", "error", err, "user_id", userID)
+		return nil, err
 	}
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
@@ -130,6 +140,7 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug,
 		AdminEmail: u.Email,
 		Status:     "active",
 		Visibility: "private",
+		HashedPin:  hashedPin,
 		IconKey:    strings.TrimSpace(iconKey),
 	}
 	if err := s.workspaces.Create(ctx, w); err != nil {
@@ -146,6 +157,18 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug,
 	}
 	slog.InfoContext(ctx, "workspace created successfully", "workspace_id", w.ID, "user_id", userID)
 	return w, nil
+}
+
+func isSixDigitPIN(pin string) bool {
+	if len(pin) != 6 {
+		return false
+	}
+	for _, r := range pin {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, slug, pin string) error {

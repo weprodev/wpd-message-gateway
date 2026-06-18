@@ -14,6 +14,8 @@ interface CreateWorkspaceModalProps {
 export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorkspaceModalProps) {
   const [name, setName] = useState("")
   const [slug, setSlug] = useState("")
+  const [pin, setPin] = useState("")
+  const [showPin, setShowPin] = useState(false)
   const [iconKey, setIconKey] = useState("package")
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
@@ -39,6 +41,11 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
     } else if (!/^[a-z0-9-]+$/.test(slug)) {
       errors.slug = "Workspace slug must only contain lowercase letters, numbers, and dashes"
     }
+    if (!pin.trim()) {
+      errors.pin = "Pin code is required"
+    } else if (!/^\d{6}$/.test(pin)) {
+      errors.pin = "Pin must be exactly 6 digits"
+    }
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -52,6 +59,7 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
         name: name.trim(),
         slug: slug.trim(),
         icon_key: iconKey,
+        pin: pin.trim(),
       })
       onSuccess(workspace.id, workspace.name)
       handleClose()
@@ -63,6 +71,8 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
   const handleClose = () => {
     setName("")
     setSlug("")
+    setPin("")
+    setShowPin(false)
     setIconKey("package")
     setValidationErrors({})
     onClose()
@@ -106,6 +116,40 @@ export function CreateWorkspaceModal({ isOpen, onClose, onSuccess }: CreateWorks
           />
           {validationErrors.slug && (
             <p className="text-xs text-destructive font-medium mt-0.5">{validationErrors.slug}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="ws-pin" className="text-xs font-semibold text-text-secondary uppercase">
+            Pin Code
+          </label>
+          <div className="relative">
+            <Input
+              id="ws-pin"
+              type={showPin ? "text" : "password"}
+              inputMode="numeric"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => {
+                const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 6)
+                setPin(digitsOnly)
+                setValidationErrors((prev) => ({ ...prev, pin: "" }))
+              }}
+              placeholder="Enter 6-digit Pin"
+              className="w-full bg-secondary border-border h-11 px-4 pr-10 font-mono tracking-widest"
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPin((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-placeholder"
+              aria-label={showPin ? "Hide PIN" : "Show PIN"}
+            >
+              <Icon name={showPin ? "visibility_off" : "visibility"} size="sm" />
+            </button>
+          </div>
+          {validationErrors.pin && (
+            <p className="text-xs text-destructive font-medium mt-0.5">{validationErrors.pin}</p>
           )}
         </div>
 

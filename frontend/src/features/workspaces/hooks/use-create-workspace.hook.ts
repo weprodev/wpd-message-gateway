@@ -17,6 +17,7 @@ export function useCreateWorkspace() {
           name: data.name,
           slug: data.slug,
           icon_key: data.icon_key,
+          pin: data.pin,
         }),
       })
 
