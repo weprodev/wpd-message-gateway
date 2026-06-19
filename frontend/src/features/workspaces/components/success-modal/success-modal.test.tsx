@@ -10,6 +10,19 @@ describe("SuccessModal Component", () => {
     expect(screen.getByText(/My Workspace/)).toBeInTheDocument()
   })
 
+  it("renders joined variant copy", () => {
+    render(
+      <SuccessModal
+        isOpen={true}
+        workspaceName="Design Team"
+        variant="joined"
+        onContinue={vi.fn()}
+      />,
+    )
+    expect(screen.getByText("Workspace Joined!")).toBeInTheDocument()
+    expect(screen.getByText(/Design Team/)).toBeInTheDocument()
+  })
+
   it("calls onContinue when button is clicked", () => {
     const handleContinue = vi.fn()
     render(<SuccessModal isOpen={true} workspaceName="My Workspace" onContinue={handleContinue} />)

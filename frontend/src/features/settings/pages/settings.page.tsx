@@ -21,14 +21,20 @@ interface GeneralSettingsPanelProps {
 
 function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
   const [ownerEmail, setOwnerEmail] = useState(settings.owner_email ?? "")
-  const [pinCode, setPinCode] = useState(settings.pin_code ?? "")
+  const [newPin, setNewPin] = useState("")
   const [showPin, setShowPin] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const pinConfigured = settings.pin_configured === "true"
 
   async function handleSave() {
     setIsSaving(true)
     try {
-      await onSave({ owner_email: ownerEmail, pin_code: pinCode })
+      const patch: Record<string, string> = { owner_email: ownerEmail }
+      if (newPin.trim()) {
+        patch.pin_code = newPin.trim()
+      }
+      await onSave(patch)
+      setNewPin("")
     } finally {
       setIsSaving(false)
     }
@@ -53,13 +59,21 @@ function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
         <label htmlFor="pin-code" className="text-sm font-medium text-text-secondary">
           Workspace PIN
         </label>
+        {pinConfigured ? (
+          <p className="text-xs text-text-secondary">
+            A join PIN is configured. Enter a new 6-digit PIN below to change it.
+          </p>
+        ) : null}
         <div className="relative">
           <Input
             id="pin-code"
             type={showPin ? "text" : "password"}
-            value={pinCode}
-            onChange={(ev) => setPinCode(ev.target.value)}
-            placeholder="••••••"
+            value={newPin}
+            onChange={(ev) => setNewPin(ev.target.value)}
+            placeholder={pinConfigured ? "New 6-digit PIN" : "••••••"}
+            maxLength={6}
+            inputMode="numeric"
+            pattern="\d{6}"
             className="pr-10"
           />
           <button

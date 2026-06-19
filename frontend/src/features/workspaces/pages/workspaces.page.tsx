@@ -8,9 +8,10 @@ import { WorkspaceCard } from "../components/workspace-card"
 import { WorkspaceActions } from "../components/workspace-actions"
 import { EmptyState } from "../components/empty-state"
 import { CreateWorkspaceModal } from "../components/create-workspace-modal"
-import { SuccessModal } from "../components/success-modal"
+import { SuccessModal, type SuccessModalVariant } from "../components/success-modal"
 import { JoinWorkspaceModal } from "../components/join-workspace-modal"
 import { useWorkspaces } from "../hooks/use-workspaces.hook"
+import { fetchWorkspaces } from "../workspaces.api"
 import type { Workspace } from "../workspace.types"
 
 export function WorkspacesPage() {
@@ -21,6 +22,7 @@ export function WorkspacesPage() {
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [successModalOpen, setSuccessModalOpen] = useState(false)
+  const [successVariant, setSuccessVariant] = useState<SuccessModalVariant>("created")
   const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [newWorkspace, setNewWorkspace] = useState<{ id: string; name: string } | null>(null)
 
@@ -45,20 +47,43 @@ export function WorkspacesPage() {
 
   const handleWorkspaceCreated = (workspaceId: string, workspaceName: string) => {
     setNewWorkspace({ id: workspaceId, name: workspaceName })
+    setSuccessVariant("created")
     setSuccessModalOpen(true)
     reload()
   }
 
-  const handleWorkspaceJoined = () => {
+  const handleWorkspaceJoined = async (slug: string) => {
+    const normalizedSlug = slug.trim().toLowerCase()
+    const result = await fetchWorkspaces()
+    const joined =
+      result.ok
+        ? result.workspaces.find((workspace) => workspace.slug.toLowerCase() === normalizedSlug)
+        : undefined
+
+    setNewWorkspace({
+      id: joined?.id ?? "",
+      name: joined?.name ?? slug.trim(),
+    })
+    setSuccessVariant("joined")
+    setSuccessModalOpen(true)
     reload()
   }
 
   const handleContinueToDashboard = () => {
-    if (newWorkspace) {
+    if (newWorkspace?.id) {
       navigate(ROUTES.workspace.overview(newWorkspace.id))
     }
     setSuccessModalOpen(false)
   }
+
+  const successModal = (
+    <SuccessModal
+      isOpen={successModalOpen}
+      workspaceName={newWorkspace?.name ?? ""}
+      variant={successVariant}
+      onContinue={handleContinueToDashboard}
+    />
+  )
 
   if (isLoading) {
     return (
@@ -88,6 +113,8 @@ export function WorkspacesPage() {
           onClose={() => setJoinModalOpen(false)}
           onSuccess={handleWorkspaceJoined}
         />
+
+        {successModal}
       </div>
     )
   }
@@ -141,11 +168,7 @@ export function WorkspacesPage() {
         onSuccess={handleWorkspaceCreated}
       />
 
-      <SuccessModal
-        isOpen={successModalOpen}
-        workspaceName={newWorkspace?.name || ""}
-        onContinue={handleContinueToDashboard}
-      />
+      {successModal}
 
       <JoinWorkspaceModal
         isOpen={joinModalOpen}

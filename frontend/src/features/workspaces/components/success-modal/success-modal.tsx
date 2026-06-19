@@ -2,13 +2,39 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Modal } from "@/components/ui/modal"
 
+export type SuccessModalVariant = "created" | "joined"
+
 interface SuccessModalProps {
   isOpen: boolean
   workspaceName: string
+  variant?: SuccessModalVariant
   onContinue: () => void
 }
 
-export function SuccessModal({ isOpen, workspaceName, onContinue }: SuccessModalProps) {
+const copy: Record<
+  SuccessModalVariant,
+  { title: string; prefix: string; suffix: string }
+> = {
+  created: {
+    title: "Workspace Created!",
+    prefix: "Your workspace",
+    suffix: " has been created successfully.",
+  },
+  joined: {
+    title: "Workspace Joined!",
+    prefix: "You have successfully joined",
+    suffix: ".",
+  },
+}
+
+export function SuccessModal({
+  isOpen,
+  workspaceName,
+  variant = "created",
+  onContinue,
+}: SuccessModalProps) {
+  const { title, prefix, suffix } = copy[variant]
+
   return (
     <Modal isOpen={isOpen} onClose={onContinue} title="">
       <div className="flex flex-col gap-6 items-center text-center py-4">
@@ -17,11 +43,11 @@ export function SuccessModal({ isOpen, workspaceName, onContinue }: SuccessModal
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-2xl font-bold text-foreground">
-            Workspace Created!
-          </h2>
+          <h2 className="text-2xl font-bold text-foreground">{title}</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
-            Your workspace <span className="font-semibold text-foreground">&quot;{workspaceName}&quot;</span> has been created successfully.
+            {prefix}{" "}
+            <span className="font-semibold text-foreground">&quot;{workspaceName}&quot;</span>
+            {suffix}
           </p>
         </div>
 

@@ -35,6 +35,7 @@ type MessageLogQuery struct {
 type WorkspaceSettingsRepository interface {
 	Get(ctx context.Context, workspaceID, key string) (string, error)
 	Set(ctx context.Context, workspaceID, key, value string) error
+	Delete(ctx context.Context, workspaceID, key string) error
 	GetAll(ctx context.Context, workspaceID string) (map[string]string, error)
 }
 

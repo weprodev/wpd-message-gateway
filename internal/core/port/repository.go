@@ -11,6 +11,7 @@ type WorkspaceRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.Workspace, error)
 	GetBySlug(ctx context.Context, slug string) (*domain.Workspace, error)
 	Update(ctx context.Context, workspace *domain.Workspace) error
+	UpdateHashedPin(ctx context.Context, workspaceID, hashedPin string) error
 	SetStatus(ctx context.Context, id, status string) error
 	ListForUser(ctx context.Context, userID string) ([]domain.Workspace, error)
 }

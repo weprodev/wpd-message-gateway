@@ -23,6 +23,11 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
+const (
+	settingKeyPinCode       = "pin_code"
+	settingKeyPinConfigured = "pin_configured"
+)
+
 // PortalDeps groups all dependencies for PortalService.
 // Using a struct prevents mis-ordering of arguments and makes it obvious
 // which dependency is which at the call site.
@@ -178,6 +183,10 @@ func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, slug, 
 	if err != nil || ws == nil {
 		slog.WarnContext(ctx, "join workspace with PIN failed: workspace not found", "slug", slug)
 		return errors.New("workspace not found")
+	}
+	if err := s.migrateLegacyWorkspacePIN(ctx, ws); err != nil {
+		slog.ErrorContext(ctx, "join workspace with PIN failed: legacy PIN migration error", "error", err, "workspace_id", ws.ID)
+		return err
 	}
 	if ws.HashedPin == "" {
 		slog.WarnContext(ctx, "join workspace with PIN failed: PIN join not configured", "workspace_id", ws.ID)
@@ -529,16 +538,85 @@ func (s *PortalService) DeleteTemplate(ctx context.Context, workspaceID, templat
 }
 
 func (s *PortalService) GetSettings(ctx context.Context, workspaceID string) (map[string]string, error) {
-	return s.settings.GetAll(ctx, workspaceID)
+	ws, err := s.workspaces.GetByID(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.migrateLegacyWorkspacePIN(ctx, ws); err != nil {
+		return nil, err
+	}
+	if ws.HashedPin != "" {
+		if err := s.settings.Delete(ctx, workspaceID, settingKeyPinCode); err != nil {
+			return nil, err
+		}
+	}
+
+	m, err := s.settings.GetAll(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	delete(m, settingKeyPinCode)
+	if ws.HashedPin != "" {
+		m[settingKeyPinConfigured] = "true"
+	} else {
+		m[settingKeyPinConfigured] = "false"
+	}
+	return m, nil
 }
 
 func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, kv map[string]string) error {
 	for k, v := range kv {
+		if k == settingKeyPinCode {
+			pin := strings.TrimSpace(v)
+			if pin == "" {
+				continue
+			}
+			if !isSixDigitPIN(pin) {
+				return fmt.Errorf("pin must be exactly 6 digits: %w", port.ErrInvalidInput)
+			}
+			hashedPin, err := crypto.HashSecret(pin)
+			if err != nil {
+				return err
+			}
+			if err := s.workspaces.UpdateHashedPin(ctx, workspaceID, hashedPin); err != nil {
+				return err
+			}
+			if err := s.settings.Delete(ctx, workspaceID, settingKeyPinCode); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := s.settings.Set(ctx, workspaceID, k, v); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (s *PortalService) migrateLegacyWorkspacePIN(ctx context.Context, ws *domain.Workspace) error {
+	if ws == nil || ws.HashedPin != "" {
+		return nil
+	}
+	pin, err := s.settings.Get(ctx, ws.ID, settingKeyPinCode)
+	if err != nil {
+		return err
+	}
+	pin = strings.TrimSpace(pin)
+	if pin == "" {
+		return nil
+	}
+	if !isSixDigitPIN(pin) {
+		return s.settings.Delete(ctx, ws.ID, settingKeyPinCode)
+	}
+	hashedPin, err := crypto.HashSecret(pin)
+	if err != nil {
+		return err
+	}
+	if err := s.workspaces.UpdateHashedPin(ctx, ws.ID, hashedPin); err != nil {
+		return err
+	}
+	ws.HashedPin = hashedPin
+	return s.settings.Delete(ctx, ws.ID, settingKeyPinCode)
 }
 
 // ListInvitations returns all pending invitations for a workspace.

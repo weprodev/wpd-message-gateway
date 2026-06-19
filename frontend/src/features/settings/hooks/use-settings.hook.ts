@@ -48,7 +48,14 @@ export function useSettings(workspaceId: string) {
 
   async function saveSettings(patch: Record<string, string>) {
     await patchSettings(workspaceId, patch)
-    setSettings((prev) => ({ ...prev, ...patch }))
+    setSettings((prev) => {
+      const next = { ...prev, ...patch }
+      delete next.pin_code
+      if (patch.pin_code) {
+        next.pin_configured = "true"
+      }
+      return next
+    })
   }
 
   async function addApiKey(name: string) {

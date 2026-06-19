@@ -25,6 +25,10 @@ func (s *stubSettingsRepo) Set(ctx context.Context, workspaceID, key, value stri
 	return nil
 }
 
+func (s *stubSettingsRepo) Delete(ctx context.Context, workspaceID, key string) error {
+	return nil
+}
+
 func (s *stubSettingsRepo) GetAll(ctx context.Context, workspaceID string) (map[string]string, error) {
 	return nil, nil
 }

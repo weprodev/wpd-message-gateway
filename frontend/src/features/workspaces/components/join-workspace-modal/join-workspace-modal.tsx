@@ -8,7 +8,7 @@ import { apiFetch } from "@/core/api/client"
 interface JoinWorkspaceModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: (workspaceName: string) => void
+  onSuccess: (slug: string) => void
 }
 
 export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspaceModalProps) {
@@ -53,7 +53,7 @@ export function JoinWorkspaceModal({ isOpen, onClose, onSuccess }: JoinWorkspace
         throw new Error(err.message ?? "Failed to join workspace. Please check the slug and PIN.")
       }
 
-      onSuccess(slug.trim())
+      onSuccess(slug.trim().toLowerCase())
       handleClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join workspace")

@@ -33,6 +33,17 @@ func (r *WorkspaceSettingsRepository) Get(ctx context.Context, workspaceID, key 
 	return v, err
 }
 
+func (r *WorkspaceSettingsRepository) Delete(ctx context.Context, workspaceID, key string) error {
+	_, err := r.client.GetDB(ctx).ExecContext(ctx,
+		`DELETE FROM workspace_settings WHERE workspace_id = $1 AND key = $2`,
+		workspaceID, key,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to delete workspace setting", "error", err, "workspace_id", workspaceID, "key", key)
+	}
+	return err
+}
+
 func (r *WorkspaceSettingsRepository) Set(ctx context.Context, workspaceID, key, value string) error {
 	_, err := r.client.GetDB(ctx).ExecContext(ctx, `
 		INSERT INTO workspace_settings (workspace_id, key, value)

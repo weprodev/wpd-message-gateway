@@ -102,6 +102,17 @@ func (r *WorkspaceRepository) GetBySlug(ctx context.Context, slug string) (*doma
 	return &w, nil
 }
 
+func (r *WorkspaceRepository) UpdateHashedPin(ctx context.Context, workspaceID, hashedPin string) error {
+	_, err := r.client.GetDB(ctx).ExecContext(ctx,
+		`UPDATE workspaces SET hashed_pin_code = $2, updated_at = NOW() WHERE id = $1`,
+		workspaceID, hashedPin,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to update workspace PIN", "error", err, "id", workspaceID)
+	}
+	return err
+}
+
 func (r *WorkspaceRepository) Update(ctx context.Context, workspace *domain.Workspace) error {
 	query := `
 		UPDATE workspaces SET

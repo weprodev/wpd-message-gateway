@@ -1,6 +1,6 @@
 export interface WorkspaceSettings {
   owner_email?: string
-  pin_code?: string
+  pin_configured?: string
   data_retention?: "memory" | "both" | "providers"
   [key: string]: string | undefined
 }

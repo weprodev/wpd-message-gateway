@@ -13,10 +13,20 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
+export const Joined: Story = {
   args: {
     isOpen: true,
     workspaceName: "Design Team",
+    variant: "joined",
+    onContinue: () => {},
+  },
+}
+
+export const Created: Story = {
+  args: {
+    isOpen: true,
+    workspaceName: "Design Team",
+    variant: "created",
     onContinue: () => {},
   },
 }
