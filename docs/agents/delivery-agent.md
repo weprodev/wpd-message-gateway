@@ -16,6 +16,8 @@ Orchestration note: the **[master-agent](./master-agent.md)** classifies request
 - **Traceability:** Before multi-file edits, state a **short plan** (files/areas + verification). After edits, summarize **what changed** and **how it was verified**.
 - **Bounded retries:** If [verification](./verification.md) fails twice for the **same** mistake class, **stop**, re-read output, and **narrow scope** instead of looping.
 - **No secret material (Data Exposure limits):** Do not echo or commit API keys, JWTs, or pasted credentials. **Hard requirement:** Any code generating secrets must use crypto-safe `crypto/rand`, and secrets must exclusively live in ENV or hashed in Postgres.
+- **Engineering principles (implement time):** Apply **KISS** (smallest correct diff), **DRY** (extract on second duplication), **DDD** (domain constants/types in `internal/core/domain/` + FE `*.types.ts`), **SOLID** (thin handlers, services orchestrate, ports for I/O). Remove dead code and stale comments/docs you touch — do not leave refactor debris.
+- **Comments:** Add only when behavior is non-obvious; delete comments that restate code or became wrong after your edit.
 
 ## 1. Safety & Robustness Pre-Check
 
@@ -57,23 +59,25 @@ Determine **surface area** before coding:
 
 ### 4.1 Understand & Enforce Boundaries
 - Map **API intent**, **data flow**, and **layer boundaries**.
-- **Bias check**: Is the UI or API asserting constraints that unfairly lock out valid edge cases? (e.g., Assuming mobile numbers always fit a specific local length). Accommodate gracefully.
+- **DDD:** Put domain vocabulary and invariants in `domain/`; mirror wire enums in frontend `*.types.ts` — not scattered string literals.
+- **KISS:** Prefer extending existing components/functions over new layers; do not add config, seeds, or docs “for later” without a caller.
+- **Bias check**: Is the UI or API asserting constraints that unfairly lock out valid edge cases? Accommodate gracefully.
 
 ### 4.2 Test first (when feasible)
 - **RED**: failing test that encodes the requirement or bug. Keep in mind "Edge Case Testing".
 - **GREEN**: smallest change that passes.
-- **REFACTOR**: clarity without changing behavior. Ensure **Token Efficiency** (do not generate massively redundant code).
+- **REFACTOR**: clarity without changing behavior. No drive-by rewrites; delete dead code introduced or orphaned by your change.
 
 ### 4.3 Implement
-- **Backend**: `context.Context` first parameter; wrap errors with `%w`; `slog` via infrastructure logger; no secrets in logs; migrations additive.
-- **Frontend**: semantic tokens, shadcn patterns; auth tokens never logged; accessibility (`aria-*`) natively supported everywhere.
+- **Backend**: `context.Context` first parameter; wrap errors with `%w`; `slog` via infrastructure logger; no secrets in logs; migrations additive; domain status/constants in `domain/` package.
+- **Frontend**: semantic tokens, shadcn from `@/components/ui`; `@/features/<name>/` imports (no deep `../../`); auth tokens never logged; accessibility (`aria-*`); extract modals/forms from pages; React 19 — derive during render, effects for side effects only; Storybook for new/changed UI.
 
 ### 4.4 Verify & Document (Reliability & Sync)
 
 Run the mandatory [verification chain](./verification.md) after implementation:
 
 1. Fast lint on touched paths
-2. **`/smell develop`** — fix all BLOCKER and HIGH findings
+2. **`/smell develop`** — engineering principles pass + architecture; fix all **BLOCKER** and **HIGH** (`MGW.*`, `CC.*`, `DDD.*`, `SOLID.*`, `GO.*`, `TS.*`)
 3. **`make audit`** — exit code 0 from repo root
 
 Agents execute this chain themselves; do not ask the user to run it.
@@ -91,4 +95,4 @@ See [prompts.md](./prompts.md).
 
 ---
 
-**Summary:** Classify work → safety pre-check → TDD / minimal diffs → implement per layer rules → **verification chain** (`/smell` + `make audit`) → ship.
+**Summary:** Classify work → safety pre-check → principles (KISS/DRY/DDD/SOLID) → TDD / minimal diffs → implement per layer rules → **verification chain** (`/smell` + `make audit`) → ship.

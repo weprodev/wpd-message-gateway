@@ -22,4 +22,16 @@ describe("Modal Component", () => {
     closeButton.click()
     expect(handleClose).toHaveBeenCalledTimes(1)
   })
+
+  it("does not call onClose when preventClose is true", () => {
+    const handleClose = vi.fn()
+    render(
+      <Modal isOpen={true} onClose={handleClose} preventClose title="Modal Title">
+        Content
+      </Modal>,
+    )
+    const closeButton = screen.getByRole("button", { name: /close/i })
+    closeButton.click()
+    expect(handleClose).not.toHaveBeenCalled()
+  })
 })

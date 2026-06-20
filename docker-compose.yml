@@ -30,6 +30,7 @@ services:
       - APP_ENVIRONMENT=local
       - CONFIG_PATH=configs/local.example.yml
       - DATABASE_URL=postgres://gateway:secret@db:5432/gateway?sslmode=disable
+      - GOWORK=off
       - MESSAGE_JWT_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       - MESSAGE_CONFIG_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
       - MESSAGE_PORTAL_BASE_URL=http://localhost:10104

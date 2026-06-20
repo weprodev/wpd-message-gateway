@@ -27,40 +27,18 @@ const mockFields = [
     default_value: "",
     sort_order: 2,
   },
-  {
-    id: "f3",
-    provider_id: "mailgun",
-    key: "base_url",
-    label: "Base URL",
-    description: "Mailgun API Base URL",
-    field_type: "text",
-    required: false,
-    default_value: "https://api.mailgun.net/v3",
-    sort_order: 3,
-  },
-  {
-    id: "f4",
-    provider_id: "mailgun",
-    key: "from_email",
-    label: "From Email",
-    description: "Default sender email address",
-    field_type: "email",
-    required: true,
-    default_value: "",
-    sort_order: 4,
-  },
-  {
-    id: "f5",
-    provider_id: "mailgun",
-    key: "from_name",
-    label: "From Name",
-    description: "Default sender name",
-    field_type: "text",
-    required: false,
-    default_value: "",
-    sort_order: 5,
-  },
 ]
+
+const mailgunProvider = {
+  id: "mailgun",
+  name: "Mailgun",
+  description: "Reliable transactional email sending service.",
+  icon: "📧",
+  category: "email" as const,
+  isAvailable: true,
+  isConnected: false,
+  isDeactivated: false,
+}
 
 const meta = {
   title: "Features/Integrations/ConnectModal",
@@ -69,10 +47,14 @@ const meta = {
   parameters: { layout: "centered" },
   decorators: [
     (Story) => {
-      // Mock window.fetch for loading the provider configuration fields
       const originalFetch = window.fetch
       window.fetch = async (input, init) => {
-        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url
+        const urlStr =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url
         if (urlStr.includes("/providers/mailgun/config")) {
           return {
             ok: true,
@@ -102,18 +84,10 @@ function ConnectModalDemo() {
         isOpen={open}
         onClose={() => setOpen(false)}
         workspaceId="demo-wid"
-        provider={{
-          id: "mailgun",
-          name: "Mailgun",
-          description: "Reliable transactional email sending service.",
-          icon: "📧",
-          category: "email",
-          isAvailable: true,
-          isConnected: false,
-        }}
-        onConnect={async (provider, config) => {
-          console.log("Connect called with:", provider, config)
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+        provider={mailgunProvider}
+        onConnect={async () => {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          return { ok: true }
         }}
       />
     </>
@@ -126,15 +100,7 @@ export const MailgunConnection: Story = {
     isOpen: true,
     onClose: () => undefined,
     workspaceId: "demo-wid",
-    provider: {
-      id: "mailgun",
-      name: "Mailgun",
-      description: "Reliable transactional email sending service.",
-      icon: "📧",
-      category: "email",
-      isAvailable: true,
-      isConnected: false,
-    },
-    onConnect: async () => undefined,
+    provider: mailgunProvider,
+    onConnect: async () => ({ ok: true }),
   },
 }

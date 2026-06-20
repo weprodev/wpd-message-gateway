@@ -20,10 +20,10 @@ src/
 
 | Layer | May import | Must not import |
 | ----- | ---------- | --------------- |
-| `features/*` | `@/core/*`, `@/shared/*`, `@/components/*`, `@/lib/*`, relative same-feature | `@/features/*` |
+| `features/*` | `@/core/*`, `@/shared/*`, `@/components/*`, `@/lib/*`, `@/features/<same>/*` | **Any** `@/features/<other>/*` or relative import into another feature folder |
 | `shared/*` | `@/core/*`, `@/components/*`, `@/lib/*` | `@/features/*` |
 | `core/*` except `router/` | `@/lib/*` | `@/features/*` |
-| `core/router` | feature barrels | — |
+| `core/router` | feature barrels (`@/features/<name>`) | — |
 
 Route composition lives in **`core/router/router.tsx`** only.
 
@@ -39,7 +39,13 @@ features/workspaces/
 └── *.types.ts
 ```
 
-Use **relative imports** inside a feature. Other layers import from `@/features/<name>`.
+Use **`@/features/<name>/…`** for imports inside a feature (not `../../`). Only **`core/router`** imports feature barrels.
+
+## UI composition (Atomic + shadcn)
+
+- **Atoms:** `components/ui/` — shadcn only; never duplicate Button/Input/Dialog in features.
+- **Feature components:** `features/<name>/components/` — compose shadcn; domain-specific only.
+- **Pages:** orchestrate hooks + feature components; React 19 — no redundant derived state.
 
 ## Routing
 
