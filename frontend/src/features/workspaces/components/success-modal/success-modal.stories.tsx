@@ -18,6 +18,7 @@ export const Joined: Story = {
     isOpen: true,
     workspaceName: "Design Team",
     variant: "joined",
+    onClose: () => {},
     onContinue: () => {},
   },
 }
@@ -27,6 +28,7 @@ export const Created: Story = {
     isOpen: true,
     workspaceName: "Design Team",
     variant: "created",
+    onClose: () => {},
     onContinue: () => {},
   },
 }

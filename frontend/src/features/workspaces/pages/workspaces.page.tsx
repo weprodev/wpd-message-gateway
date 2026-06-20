@@ -69,6 +69,10 @@ export function WorkspacesPage() {
     reload()
   }
 
+  const handleCloseSuccessModal = () => {
+    setSuccessModalOpen(false)
+  }
+
   const handleContinueToDashboard = () => {
     if (newWorkspace?.id) {
       navigate(ROUTES.workspace.overview(newWorkspace.id))
@@ -81,6 +85,7 @@ export function WorkspacesPage() {
       isOpen={successModalOpen}
       workspaceName={newWorkspace?.name ?? ""}
       variant={successVariant}
+      onClose={handleCloseSuccessModal}
       onContinue={handleContinueToDashboard}
     />
   )

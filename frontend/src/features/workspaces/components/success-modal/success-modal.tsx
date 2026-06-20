@@ -8,6 +8,7 @@ interface SuccessModalProps {
   isOpen: boolean
   workspaceName: string
   variant?: SuccessModalVariant
+  onClose: () => void
   onContinue: () => void
 }
 
@@ -31,12 +32,13 @@ export function SuccessModal({
   isOpen,
   workspaceName,
   variant = "created",
+  onClose,
   onContinue,
 }: SuccessModalProps) {
   const { title, prefix, suffix } = copy[variant]
 
   return (
-    <Modal isOpen={isOpen} onClose={onContinue} title="">
+    <Modal isOpen={isOpen} onClose={onClose} title="">
       <div className="flex flex-col gap-6 items-center text-center py-4">
         <div className="bg-emerald-500/10 dark:bg-emerald-500/20 rounded-full size-16 flex items-center justify-center border border-emerald-500/30">
           <Icon name="check_circle" size="lg" className="text-emerald-600 dark:text-emerald-400" />
