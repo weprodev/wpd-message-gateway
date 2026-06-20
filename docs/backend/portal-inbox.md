@@ -12,10 +12,11 @@ The Portal is the web UI and REST surface for the WPD Message Gateway when runni
 |---------|-------------|
 | **Authentication** | Register and sign in (email + password → JWT) |
 | **Workspaces** | List workspaces you belong to; open a workspace dashboard |
+| **Integrations** | Connect, activate, deactivate, or remove messaging providers |
 | **Message logs** | Outbound send **request audit trail** (not memory inbox capture) |
 | **Send test** | Send a test message per channel from the dashboard |
 
-No Portal pages yet for: workspace create, integrations, API keys, templates, members, settings, or memory inbox browsing.
+No Portal pages yet for: workspace create, API keys, templates, members, settings, or memory inbox browsing.
 
 ### REST API (server)
 
@@ -23,9 +24,9 @@ No Portal pages yet for: workspace create, integrations, API keys, templates, me
 |---------|:---------:|-------------|
 | **Inbox capture** | | Messages stored in RAM (`memory_only` / `memory_and_provider`) — [Inbox API](#inbox-api-reference) |
 | **Internal ingest** | | Automation writes to inbox (requires Portal auth) |
-| **Workspace provisioning** | | Create workspace, API keys, settings, integrations — curl/Bruno/CI only; see [E2E bootstrap](./e2e-testing.md) |
+| **Workspace provisioning** | | Create workspace, API keys, settings — curl/Bruno/CI only; see [E2E bootstrap](./e2e-testing.md) |
 
-Provider credentials and dispatch mode are stored in PostgreSQL and configured via **REST** (encrypted at rest). There is no Integrations or Settings screen in the Portal UI yet.
+Provider credentials are stored in PostgreSQL (encrypted at rest) and managed via the Portal **Integrations** page. Dispatch mode is REST-only (`PATCH /api/v1/workspaces/:wid/settings`).
 
 ---
 

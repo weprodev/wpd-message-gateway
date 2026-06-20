@@ -20,7 +20,33 @@ Rules for [`frontend/src/`](../../frontend/src/). **Structure & layers:** [archi
 | Hook | `hooks/use-*.hook.ts` | `use-inbox-logs.hook.ts` |
 | API / types | `*.api.ts`, `*.types.ts` | `inbox.api.ts` |
 
-Use `@/` for cross-layer imports; **relative paths within the same feature**.
+Use `@/` for all imports — one alias covers everything:
+
+| Target | Import as |
+| ------ | --------- |
+| shadcn / atoms | `@/components/ui/<component>` |
+| lib, shared, core | `@/lib/*`, `@/shared/*`, `@/core/*` |
+| Same feature | `@/features/<feature>/…` — **not** `../../` |
+| Router (barrels) | `@/features/<feature>` |
+
+**Do not** import another feature — not via `@/features/<other>`, not via relative paths into another slice. ESLint enforces this in `eslint.config.js`. Route composition stays in `core/router` only.
+
+## Atomic design + shadcn
+
+| Layer | Path | Rule |
+| ----- | ---- | ---- |
+| Atoms | `components/ui/` | shadcn primitives — add via `npx shadcn@latest add` in `frontend/` |
+| Feature UI | `features/<name>/components/` | Compose atoms; business-specific layout only |
+| Pages | `features/<name>/pages/` | Orchestration; no raw HTML form controls |
+
+Follow [shadcn/SKILL.md](./shadcn/SKILL.md): semantic tokens, `flex`+`gap-*`, `DialogTitle`, `cn()`.
+
+## React 19
+
+- Derive values during render — do not `useState` + `useEffect` to mirror props or hook data.
+- Side effects in `useEffect` only; include cleanup for subscriptions/fetches; respect dependency arrays.
+- Colocate data fetching in hooks (`use-*.hook.ts`); pages stay thin.
+- React Compiler–friendly code: no conditional hooks; stable keys in lists.
 
 ## shadcn / styling
 

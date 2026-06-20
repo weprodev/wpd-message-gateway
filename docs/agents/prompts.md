@@ -11,7 +11,7 @@ Agents must run both — do not ask the user:
 make audit
 ```
 
-Follow `.claude/commands/smell.md` and fix BLOCKER/HIGH before `make audit`.
+Follow `.claude/commands/smell.md` (architecture + Clean Code, KISS, DRY, DDD, SOLID) and fix BLOCKER/HIGH before `make audit`.
 
 ## Lint after Go changes (fast feedback)
 

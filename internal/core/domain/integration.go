@@ -2,6 +2,12 @@ package domain
 
 import "time"
 
+// Integration lifecycle statuses (integrations.status column).
+const (
+	IntegrationStatusConnected    = "connected"
+	IntegrationStatusDisconnected = "disconnected"
+)
+
 // Integration holds provider credentials for a workspace channel.
 type Integration struct {
 	ID           string    `json:"id"`

@@ -115,6 +115,8 @@ After **any** code change, run the full chain in **`docs/agents/verification.md`
 lint → /smell develop → fix BLOCKER/HIGH → make audit
 ```
 
+`/smell` includes an **engineering principles pass** (Clean Code, KISS, DRY, DDD, SOLID) — see `.claude/commands/smell.md`.
+
 | Surface | Fast checks |
 | ------- | ----------- |
 | Go | `golangci-lint run ./cmd/... ./internal/... ./pkg/...` · `go test -race ./cmd/... ./internal/... ./pkg/...` |
