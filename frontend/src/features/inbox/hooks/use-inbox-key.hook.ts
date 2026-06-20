@@ -1,13 +1,27 @@
-import { useEffect, useState } from "react"
-import { apiFetch } from "@/core/api/client"
+import { useCallback, useEffect, useState } from "react"
+
+import {
+  clearInboxCredentialsCache,
+  provisionInboxCredentials,
+  readInboxCredentialsCache,
+  saveInboxCredentialsCache,
+  validateInboxCredentials,
+} from "../inbox.api"
 import type { InboxCredentials } from "../inbox.types"
 
-interface APIKeyItem {
-  id: string
-  workspace_id: string
-  client_id: string
-  name: string
-  is_active: boolean
+async function resolveInboxCredentials(workspaceId: string): Promise<InboxCredentials> {
+  const cached = readInboxCredentialsCache(workspaceId)
+  if (cached) {
+    const validation = await validateInboxCredentials(workspaceId, cached)
+    if (validation.ok) {
+      return cached
+    }
+    clearInboxCredentialsCache(workspaceId)
+  }
+
+  const creds = await provisionInboxCredentials(workspaceId)
+  saveInboxCredentialsCache(workspaceId, creds)
+  return creds
 }
 
 export function useInboxKey(workspaceId: string | undefined) {
@@ -15,8 +29,29 @@ export function useInboxKey(workspaceId: string | undefined) {
   const [isLoading, setIsLoading] = useState(() => !!workspaceId)
   const [error, setError] = useState<string | null>(null)
 
+  const refreshCreds = useCallback(async (): Promise<InboxCredentials | null> => {
+    if (!workspaceId) return null
+
+    setIsLoading(true)
+    setError(null)
+    setCreds(null)
+    clearInboxCredentialsCache(workspaceId)
+
+    try {
+      const nextCreds = await resolveInboxCredentials(workspaceId)
+      setCreds(nextCreds)
+      return nextCreds
+    } catch {
+      setError("Could not set up inbox access. Try again.")
+      return null
+    } finally {
+      setIsLoading(false)
+    }
+  }, [workspaceId])
+
   useEffect(() => {
     let cancelled = false
+
     if (!workspaceId) {
       Promise.resolve().then(() => {
         if (!cancelled) {
@@ -28,80 +63,19 @@ export function useInboxKey(workspaceId: string | undefined) {
       return
     }
 
-    const cacheKey = `wpd_inbox_creds_${workspaceId}`
-
     const bootstrap = async () => {
-      await Promise.resolve() // yield to avoid synchronous state update in effect
+      await Promise.resolve()
       setIsLoading(true)
       setError(null)
 
       try {
-        // 1. Check local storage cache
-        const cached = localStorage.getItem(cacheKey)
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached) as InboxCredentials
-            if (parsed.clientId && parsed.clientSecret) {
-              if (!cancelled) {
-                setCreds(parsed)
-                setIsLoading(false)
-              }
-              return
-            }
-          } catch {
-            localStorage.removeItem(cacheKey)
-          }
-        }
-
-        // 2. Fetch keys list from backend
-        const listRes = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys`)
-        if (!listRes.ok) {
-          throw new Error("Failed to retrieve workspace API keys")
-        }
-        const keys = (await listRes.json()) as APIKeyItem[]
-
-        const portalKey = keys.find((k) => k.name === "Portal UI" && k.is_active)
-
-        let finalCreds: InboxCredentials
-
-        if (portalKey) {
-          // Key exists but secret is hidden; regenerate to get new plaintext secret
-          const regenRes = await apiFetch(
-            `/api/v1/workspaces/${workspaceId}/api-keys/${portalKey.id}/regenerate`,
-            { method: "POST" }
-          )
-          if (!regenRes.ok) {
-            throw new Error("Failed to regenerate Portal UI API credentials")
-          }
-          const data = (await regenRes.json()) as { client_secret: string }
-          finalCreds = {
-            clientId: portalKey.client_id,
-            clientSecret: data.client_secret,
-          }
-        } else {
-          // No Portal UI key exists; create one
-          const createRes = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys`, {
-            method: "POST",
-            body: JSON.stringify({ name: "Portal UI" }),
-          })
-          if (!createRes.ok) {
-            throw new Error("Failed to auto-provision Portal UI API credentials")
-          }
-          const data = (await createRes.json()) as { client_id: string; client_secret: string }
-          finalCreds = {
-            clientId: data.client_id,
-            clientSecret: data.client_secret,
-          }
-        }
-
-        // 3. Cache and update state
-        localStorage.setItem(cacheKey, JSON.stringify(finalCreds))
+        const nextCreds = await resolveInboxCredentials(workspaceId)
         if (!cancelled) {
-          setCreds(finalCreds)
+          setCreds(nextCreds)
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Authentication error")
+          setError("Could not set up inbox access. Try again.")
         }
       } finally {
         if (!cancelled) {
@@ -117,5 +91,5 @@ export function useInboxKey(workspaceId: string | undefined) {
     }
   }, [workspaceId])
 
-  return { creds, isLoading, error }
+  return { creds, isLoading, error, refreshCreds }
 }

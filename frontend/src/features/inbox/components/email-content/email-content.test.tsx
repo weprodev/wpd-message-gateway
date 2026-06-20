@@ -23,6 +23,7 @@ describe("EmailContent Component", () => {
     render(<EmailContent message={mockEmail} onDelete={vi.fn()} />)
     expect(screen.getByText("Welcome to Message Gateway!")).toBeInTheDocument()
     expect(screen.getAllByText(/John Doe/).length).toBeGreaterThan(0)
+    expect(screen.getByText("e1")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument()
   })
 })

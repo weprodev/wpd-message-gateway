@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -9,42 +9,69 @@ import { buildInboxEventsUrl, deleteInboxEmail, fetchInboxEmails } from "../inbo
 import { useInboxKey } from "../hooks/use-inbox-key.hook"
 import { EmailList } from "../components/email-list"
 import { EmailContent } from "../components/email-content"
-import type { StoredEmail } from "../inbox.types"
+import type { InboxCredentials, StoredEmail } from "../inbox.types"
 
 export function EmailInboxPage() {
   const navigate = useNavigate()
   const { wid } = useParams<{ wid: string }>()
-  const { creds, isLoading: credsLoading, error: credsError } = useInboxKey(wid)
+  const { creds, isLoading: credsLoading, error: credsError, refreshCreds } = useInboxKey(wid)
 
   const [messages, setMessages] = useState<StoredEmail[]>([])
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const authRetryRef = useRef(false)
 
-  const fetchEmails = useCallback(async () => {
-    if (!wid || !creds) return
-    await Promise.resolve()
-    setError(null)
+  const fetchEmails = useCallback(
+    async (activeCreds: InboxCredentials) => {
+      if (!wid) return
 
-    const result = await fetchInboxEmails(wid, creds)
-    if (!result.ok) {
-      setError(result.message ?? "Failed to load emails")
+      setError(null)
+      setIsLoading(true)
+
+      const result = await fetchInboxEmails(wid, activeCreds)
+      if (!result.ok) {
+        if (result.unauthorized && !authRetryRef.current) {
+          authRetryRef.current = true
+          const refreshed = await refreshCreds()
+          if (refreshed) {
+            const retryResult = await fetchInboxEmails(wid, refreshed)
+            if (retryResult.ok) {
+              setMessages(retryResult.items)
+              if (retryResult.items.length > 0) {
+                setSelectedMessageId((prev) => prev ?? retryResult.items[0].id)
+              }
+              setIsLoading(false)
+              return
+            }
+            setError(retryResult.message)
+            setIsLoading(false)
+            return
+          }
+        }
+
+        setError(result.message)
+        setIsLoading(false)
+        return
+      }
+
+      authRetryRef.current = false
+      setMessages(result.items)
+      if (result.items.length > 0) {
+        setSelectedMessageId((prev) => prev ?? result.items[0].id)
+      }
       setIsLoading(false)
-      return
-    }
-
-    setMessages(result.items)
-    if (result.items.length > 0) {
-      setSelectedMessageId((prev) => prev ?? result.items[0].id)
-    }
-    setIsLoading(false)
-  }, [wid, creds])
+    },
+    [wid, refreshCreds]
+  )
 
   useEffect(() => {
+    authRetryRef.current = false
     if (creds) {
       Promise.resolve().then(() => {
-        void fetchEmails()
+        void fetchEmails(creds)
       })
     }
   }, [creds, fetchEmails])
@@ -65,7 +92,7 @@ export function EmailInboxPage() {
             parsed.type === "email_deleted" ||
             parsed.type === "messages_cleared"
           ) {
-            void fetchEmails()
+            void fetchEmails(creds)
           }
         } catch (err) {
           console.error("Failed to parse SSE event data:", err)
@@ -80,12 +107,29 @@ export function EmailInboxPage() {
     }
   }, [wid, creds, fetchEmails])
 
+  const handleRetry = async () => {
+    if (!wid) return
+
+    setIsRetrying(true)
+    setError(null)
+    authRetryRef.current = false
+
+    try {
+      const nextCreds = (await refreshCreds()) ?? creds
+      if (nextCreds) {
+        await fetchEmails(nextCreds)
+      }
+    } finally {
+      setIsRetrying(false)
+    }
+  }
+
   const handleDeleteMessage = async (messageId: string) => {
     if (!wid || !creds) return
     setIsDeleting(true)
     const result = await deleteInboxEmail(wid, messageId, creds)
     if (!result.ok) {
-      alert(result.message ?? "Failed to delete email")
+      alert(result.message)
       setIsDeleting(false)
       return
     }
@@ -110,7 +154,8 @@ export function EmailInboxPage() {
   }
 
   const activeMessage = messages.find((m) => m.id === selectedMessageId) || null
-  const isBootstrapLoading = credsLoading || (isLoading && !!creds)
+  const isBootstrapLoading = credsLoading || isRetrying || (isLoading && !!creds)
+  const displayError = credsError || error
 
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-160px)] min-h-[500px]">
@@ -125,7 +170,14 @@ export function EmailInboxPage() {
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
-          <Button type="button" variant="outline" size="sm" onClick={() => void fetchEmails()} disabled={isBootstrapLoading} className="h-10">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => creds && void fetchEmails(creds)}
+            disabled={isBootstrapLoading || !creds}
+            className="h-10"
+          >
             <Icon name="refresh" size="sm" data-icon="inline-start" className={isBootstrapLoading ? "animate-spin" : undefined} />
             Refresh
           </Button>
@@ -136,14 +188,14 @@ export function EmailInboxPage() {
         </div>
       </div>
 
-      {credsError || error ? (
+      {displayError ? (
         <div className="flex-1 bg-card border border-border rounded-2xl flex flex-col items-center justify-center p-6 text-center">
           <span className="text-sm font-semibold text-foreground">Could not connect to Simulated Inbox</span>
           <p className="text-xs text-text-secondary max-w-sm mt-1 mb-4">
-            {credsError || error}
+            {displayError}
           </p>
-          <Button variant="outline" size="sm" onClick={() => void fetchEmails()}>
-            Try again
+          <Button variant="outline" size="sm" onClick={() => void handleRetry()} disabled={isBootstrapLoading}>
+            {isBootstrapLoading ? "Reconnecting…" : "Try again"}
           </Button>
         </div>
       ) : isBootstrapLoading ? (

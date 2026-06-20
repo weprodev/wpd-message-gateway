@@ -28,9 +28,10 @@ export function EmailContent({ message, onDelete, isDeleting = false }: EmailCon
   const sender = message.email.from_name
     ? `${message.email.from_name} <${message.email.from}>`
     : message.email.from || "Unknown Sender"
-  
+
   const recipients = (message.email.to || []).join(", ")
   const formattedDate = formatFullTime(message.created_at)
+  const messageId = message.id?.trim() || "—"
 
   const handleDelete = () => {
     if (onDelete) {
@@ -39,6 +40,16 @@ export function EmailContent({ message, onDelete, isDeleting = false }: EmailCon
   }
 
   const bodyContent = message.email.html || `<div style="font-family: system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.6; color: #111827; white-space: pre-wrap; padding: 20px;">${message.email.plain_text || ""}</div>`
+
+  const metadataRows = [
+    { label: "From", value: sender },
+    { label: "To", value: recipients },
+    ...(message.email.cc && message.email.cc.length > 0
+      ? [{ label: "Cc", value: message.email.cc.join(", ") }]
+      : []),
+    { label: "Date", value: formattedDate },
+    { label: "ID", value: messageId },
+  ]
 
   return (
     <div className="bg-card flex flex-col flex-1 h-full min-w-0 relative">
@@ -65,28 +76,14 @@ export function EmailContent({ message, onDelete, isDeleting = false }: EmailCon
       </div>
 
       <div className="bg-muted/10 px-4 py-3 border-b border-border flex flex-col gap-1.5 shrink-0 font-mono text-[11px] leading-relaxed">
-        <div className="flex items-start">
-          <span className="w-16 text-text-tertiary font-semibold">From:</span>
-          <span className="text-foreground break-all">{sender}</span>
-        </div>
-        <div className="flex items-start">
-          <span className="w-16 text-text-tertiary font-semibold">To:</span>
-          <span className="text-foreground break-all">{recipients}</span>
-        </div>
-        {message.email.cc && message.email.cc.length > 0 && (
-          <div className="flex items-start">
-            <span className="w-16 text-text-tertiary font-semibold">Cc:</span>
-            <span className="text-foreground break-all">{message.email.cc.join(", ")}</span>
+        {metadataRows.map((row) => (
+          <div key={row.label} className="flex items-start gap-3">
+            <span className="w-12 shrink-0 whitespace-nowrap text-text-tertiary font-semibold">
+              {row.label}:
+            </span>
+            <span className="min-w-0 flex-1 break-all text-foreground">{row.value}</span>
           </div>
-        )}
-        <div className="flex items-start">
-          <span className="w-16 text-text-tertiary font-semibold">Date:</span>
-          <span className="text-foreground">{formattedDate}</span>
-        </div>
-        <div className="flex items-start">
-          <span className="w-16 text-text-tertiary font-semibold">Message ID:</span>
-          <span className="text-foreground font-mono">{message.id}</span>
-        </div>
+        ))}
       </div>
 
       <div className="flex-1 w-full bg-white relative min-h-0">
