@@ -1,27 +1,22 @@
-import type React from "react"
 import * as Tabs from "@radix-ui/react-tabs"
 import { useParams } from "react-router-dom"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { PageHeader } from "@/shared/components/page-header"
 import { Button } from "@/components/ui/button"
-import { DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Icon } from "@/components/ui/icon"
-import { Input } from "@/components/ui/input"
-import { Modal } from "@/components/ui/modal"
-import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
-import { IntegrationProviderIcon } from "../components/integration-provider-icon"
-import { IntegrationRow } from "../components/integration-row"
+import { ConnectModal } from "@/features/integrations/components/connect-modal"
+import { DisconnectModal } from "@/features/integrations/components/disconnect-modal"
+import { IntegrationRow } from "@/features/integrations/components/integration-row"
 import {
   filterIntegrationsByTab,
   groupByCategory,
   useIntegrations,
   type IntegrationViewModel,
-} from "../hooks/use-integrations.hook"
-import { fetchProviderConfigFields, type ProviderConfigField } from "../integrations.api"
-import type { IntegrationChannel, IntegrationActionResult } from "../integrations.types"
+} from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationActionResult, IntegrationChannel } from "@/features/integrations/integrations.types"
 
 const CATEGORY_LABELS: Record<IntegrationChannel, string> = {
   email: "Email",
@@ -30,8 +25,6 @@ const CATEGORY_LABELS: Record<IntegrationChannel, string> = {
   chat: "Chat",
 }
 
-type DisconnectSubmittingAction = "deactivate" | "remove" | null
-
 export function IntegrationsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
   const [activeTab, setActiveTab] = useState<"all" | "connected" | "available">("all")
@@ -39,104 +32,7 @@ export function IntegrationsPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [connectProvider, setConnectProvider] = useState<IntegrationViewModel | null>(null)
   const [disconnectProvider, setDisconnectProvider] = useState<IntegrationViewModel | null>(null)
-  const [connectFields, setConnectFields] = useState<ProviderConfigField[]>([])
-  const [isConnectFieldsLoading, setIsConnectFieldsLoading] = useState(false)
-  const [connectError, setConnectError] = useState<string | null>(null)
-  const [connectFormData, setConnectFormData] = useState<Record<string, string>>({})
-  const [isConnectSubmitting, setIsConnectSubmitting] = useState(false)
-  const [disconnectSubmittingAction, setDisconnectSubmittingAction] = useState<DisconnectSubmittingAction>(null)
-  const [disconnectError, setDisconnectError] = useState<string | null>(null)
   const { items, isLoading, error, connect, activate, deactivate, removeIntegration } = useIntegrations(wid)
-
-  const isDisconnectSubmitting = disconnectSubmittingAction !== null
-
-  useEffect(() => {
-    if (!connectProvider) return
-
-    const loadFields = async () => {
-      setIsConnectFieldsLoading(true)
-      setConnectError(null)
-      try {
-        const result = await fetchProviderConfigFields(wid, connectProvider.id)
-        setConnectFields(result)
-
-        const defaults: Record<string, string> = {}
-        result.forEach((field) => {
-          defaults[field.key] = field.default_value || ""
-        })
-        setConnectFormData(defaults)
-      } catch (err) {
-        setConnectError(err instanceof Error ? err.message : "Failed to load configuration fields")
-        setConnectFields([])
-      } finally {
-        setIsConnectFieldsLoading(false)
-      }
-    }
-
-    void loadFields()
-  }, [connectProvider, wid])
-
-  function closeConnectDialog() {
-    setConnectProvider(null)
-    setConnectFields([])
-    setConnectFormData({})
-    setConnectError(null)
-    setIsConnectSubmitting(false)
-  }
-
-  function closeDisconnectDialog() {
-    if (isDisconnectSubmitting) return
-    setDisconnectProvider(null)
-    setDisconnectError(null)
-    setDisconnectSubmittingAction(null)
-  }
-
-  function handleConnectInputChange(key: string, value: string) {
-    setConnectFormData((prev) => ({ ...prev, [key]: value }))
-  }
-
-  async function handleConnectSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!connectProvider) return
-
-    setIsConnectSubmitting(true)
-    setConnectError(null)
-    try {
-      const result = await connect(connectProvider, connectFormData)
-      if (!result.ok) {
-        setConnectError(result.message ?? "Failed to connect provider")
-      } else {
-        closeConnectDialog()
-      }
-    } catch (err) {
-      setConnectError(err instanceof Error ? err.message : "Failed to connect provider")
-    } finally {
-      setIsConnectSubmitting(false)
-    }
-  }
-
-  async function runDisconnectAction(
-    action: DisconnectSubmittingAction,
-    handler: (provider: IntegrationViewModel) => Promise<IntegrationActionResult>,
-  ) {
-    if (!disconnectProvider || !action) return
-
-    setDisconnectSubmittingAction(action)
-    setDisconnectError(null)
-    try {
-      const result = await handler(disconnectProvider)
-      if (!result.ok) {
-        setDisconnectError(result.message ?? "Failed to update provider")
-      } else {
-        setDisconnectProvider(null)
-        setDisconnectError(null)
-      }
-    } catch (err) {
-      setDisconnectError(err instanceof Error ? err.message : "Failed to update provider")
-    } finally {
-      setDisconnectSubmittingAction(null)
-    }
-  }
 
   async function runProviderAction(
     provider: IntegrationViewModel,
@@ -275,185 +171,21 @@ export function IntegrationsPage() {
         })}
       </Tabs.Root>
 
-      <Modal
+      <ConnectModal
         isOpen={connectProvider !== null}
-        onClose={closeConnectDialog}
-        title={connectProvider ? `Connect ${connectProvider.name}` : undefined}
-      >
-        {connectProvider && isConnectFieldsLoading ? (
-          <div className="flex items-center justify-center gap-3 py-8">
-            <Spinner />
-            <span className="text-sm text-text-secondary">Loading configuration...</span>
-          </div>
-        ) : null}
+        onClose={() => setConnectProvider(null)}
+        workspaceId={wid}
+        provider={connectProvider}
+        onConnect={connect}
+      />
 
-        {connectProvider && connectError && connectFields.length === 0 && !isConnectFieldsLoading ? (
-          <div className="flex flex-col gap-4 py-4">
-            <p className="text-sm text-destructive">{connectError}</p>
-            <Button onClick={closeConnectDialog} variant="outline">
-              Close
-            </Button>
-          </div>
-        ) : null}
-
-        {connectProvider && connectFields.length > 0 && !isConnectFieldsLoading ? (
-          <form onSubmit={handleConnectSubmit} className="flex flex-col gap-6">
-            {connectError ? (
-              <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                {connectError}
-              </p>
-            ) : null}
-
-            <div className="flex max-h-[350px] flex-col gap-4 overflow-y-auto pr-1">
-              {connectFields.map((field) => (
-                <div key={field.key} className="flex flex-col gap-1.5">
-                  <label htmlFor={field.key} className="text-sm font-medium text-foreground">
-                    {field.label}
-                    {field.required ? <span className="ml-1 text-destructive">*</span> : null}
-                  </label>
-                  <Input
-                    id={field.key}
-                    type={field.field_type === "password" ? "password" : field.field_type === "email" ? "email" : "text"}
-                    required={field.required}
-                    value={connectFormData[field.key] || ""}
-                    onChange={(e) => handleConnectInputChange(field.key, e.target.value)}
-                    placeholder={field.description || `Enter ${field.label.toLowerCase()}`}
-                    className="bg-input"
-                  />
-                  {field.description ? (
-                    <span className="text-[12px] leading-normal text-text-secondary">
-                      {field.description}
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-border pt-2">
-              <Button type="button" variant="outline" onClick={closeConnectDialog} disabled={isConnectSubmitting}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isConnectSubmitting}
-                className="bg-primary-brand hover:bg-primary-brand-hover"
-              >
-                {isConnectSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <Spinner size="sm" />
-                    <span>Connecting...</span>
-                  </div>
-                ) : (
-                  "Connect"
-                )}
-              </Button>
-            </div>
-          </form>
-        ) : null}
-      </Modal>
-
-      <Modal
+      <DisconnectModal
         isOpen={disconnectProvider !== null}
-        onClose={closeDisconnectDialog}
-        preventClose={isDisconnectSubmitting}
-        header={
-          disconnectProvider ? (
-            <div className="flex items-start gap-4">
-              <IntegrationProviderIcon
-                icon={disconnectProvider.icon}
-                name={disconnectProvider.name}
-                className="size-12 p-2.5 text-2xl"
-              />
-              <div className="min-w-0 flex-1">
-                <DialogTitle className="text-xl font-semibold text-foreground">
-                  Disconnect {disconnectProvider.name}
-                </DialogTitle>
-                <DialogDescription className="mt-1 text-sm text-text-secondary">
-                  Are you sure you want to disconnect this provider?
-                </DialogDescription>
-              </div>
-            </div>
-          ) : undefined
-        }
-      >
-        {disconnectProvider ? (
-          <div className="flex flex-col gap-6">
-            {disconnectError ? (
-              <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                {disconnectError}
-              </p>
-            ) : null}
-
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-card">
-                  <Icon name="pause" size="sm" className="text-text-secondary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-foreground">Deactivate Connection</h3>
-                  <p className="mt-1 text-[13px] leading-normal text-text-secondary">
-                    Stop all message delivery immediately. Your API keys and configurations will be preserved for later use.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-destructive/20 bg-card">
-                  <Icon name="delete" size="sm" className="text-destructive" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-foreground">Remove Integration</h3>
-                  <p className="mt-1 text-[13px] leading-normal text-text-secondary">
-                    Permanently delete all API keys and configurations associated with this provider. This action cannot be undone.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={closeDisconnectDialog}
-                disabled={isDisconnectSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => runDisconnectAction("deactivate", (provider) => runProviderAction(provider, deactivate))}
-                disabled={isDisconnectSubmitting}
-                className="border-primary-brand text-primary-brand hover:bg-primary-brand/5"
-              >
-                {disconnectSubmittingAction === "deactivate" ? (
-                  <span className="flex items-center gap-2">
-                    <Spinner size="sm" />
-                    Deactivating...
-                  </span>
-                ) : (
-                  "Deactivate"
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => runDisconnectAction("remove", (provider) => runProviderAction(provider, removeIntegration))}
-                disabled={isDisconnectSubmitting}
-              >
-                {disconnectSubmittingAction === "remove" ? (
-                  <span className="flex items-center gap-2">
-                    <Spinner size="sm" />
-                    Removing...
-                  </span>
-                ) : (
-                  "Remove Integration"
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+        provider={disconnectProvider}
+        onClose={() => setDisconnectProvider(null)}
+        onDeactivate={(provider) => runProviderAction(provider, deactivate)}
+        onRemove={(provider) => runProviderAction(provider, removeIntegration)}
+      />
     </div>
   )
 }

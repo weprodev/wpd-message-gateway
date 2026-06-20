@@ -2,8 +2,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-import { IntegrationProviderIcon } from "../integration-provider-icon"
-import type { IntegrationViewModel } from "../../hooks/use-integrations.hook"
+import { IntegrationProviderIcon } from "@/features/integrations/components/integration-provider-icon"
+import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
 
 interface IntegrationRowProps {
   provider: IntegrationViewModel

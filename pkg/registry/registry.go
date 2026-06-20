@@ -14,8 +14,8 @@ import (
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
-// CommonConfig contains credential fields shared across all provider channels.
-// JSON keys match provider_config_fields / Portal integration payloads (snake_case).
+// CommonConfig holds credential fields shared across provider channels.
+// json tags: Portal stores integration config as snake_case; see provider_cache.go.
 type CommonConfig struct {
 	APIKey    string            `json:"api_key"`
 	APISecret string            `json:"api_secret"`

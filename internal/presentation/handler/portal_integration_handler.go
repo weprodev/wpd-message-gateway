@@ -69,7 +69,7 @@ func (h *PortalIntegrationHandler) UpsertIntegration(c echo.Context) error {
 	}
 	status := body.Status
 	if status == "" {
-		status = "connected"
+		status = domain.IntegrationStatusConnected
 	}
 	intg := &domain.Integration{
 		WorkspaceID:  wid,

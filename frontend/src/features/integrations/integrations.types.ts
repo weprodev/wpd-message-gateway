@@ -1,5 +1,12 @@
 export type IntegrationChannel = "email" | "sms" | "push" | "chat"
 
+export const INTEGRATION_STATUS = {
+  CONNECTED: "connected",
+  DISCONNECTED: "disconnected",
+} as const
+
+export type IntegrationStatus = (typeof INTEGRATION_STATUS)[keyof typeof INTEGRATION_STATUS]
+
 export type IntegrationActionResult =
   | { ok: true }
   | { ok: false; message?: string }
@@ -10,7 +17,7 @@ export interface Integration {
   channel_type: IntegrationChannel
   provider_name: string
   config: Record<string, unknown>
-  status: string
+  status: IntegrationStatus
   is_default: boolean
   created_at: string
   updated_at: string

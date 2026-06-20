@@ -7,7 +7,7 @@ Canonical playbooks: **`docs/agents/`**. Entry points: **`CLAUDE.md`** (Claude C
 1. Read **`docs/agents/master-agent.md`** at session start.
 2. **After any code change** (implement, fix, refactor): follow **`docs/agents/verification.md`** — lint → **`/smell develop`** → fix BLOCKER/HIGH → **`make audit`**. Agents run this themselves; never ask the user.
 3. **Code review:** **`/smell develop`** first, then **`docs/agents/review-agent.md`**. After applying review fixes, repeat the verification chain.
-4. **Before PR or marking done:** verification chain complete; zero BLOCKER/HIGH smell findings.
+4. **Before PR or marking done:** verification chain complete; zero BLOCKER/HIGH smell findings; diff respects KISS, DRY, DDD, and SOLID (see `/smell` principles pass).
 
 ## Agent commands
 

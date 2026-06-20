@@ -76,14 +76,14 @@ func (r *IntegrationRepository) GetActiveByWorkspaceAndChannel(ctx context.Conte
 		SELECT i.id, i.workspace_id, i.channel_type, p.name AS provider_name, i.encrypted_config, i.status, i.is_default, i.created_at, i.updated_at
 		FROM integrations i
 		JOIN providers p ON i.provider_id = p.id
-		WHERE i.workspace_id = $1 AND i.channel_type = $2 AND i.status = 'connected'
+		WHERE i.workspace_id = $1 AND i.channel_type = $2 AND i.status = $3
 		ORDER BY i.is_default DESC, i.created_at DESC
 		LIMIT 1
 	`
 	var intg domain.Integration
 	var encryptedConfig []byte
 
-	err := r.client.GetDB(ctx).QueryRowContext(ctx, query, workspaceID, channelType).
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, query, workspaceID, channelType, domain.IntegrationStatusConnected).
 		Scan(&intg.ID, &intg.WorkspaceID, &intg.ChannelType, &intg.ProviderName,
 			&encryptedConfig, &intg.Status, &intg.IsDefault, &intg.CreatedAt, &intg.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {

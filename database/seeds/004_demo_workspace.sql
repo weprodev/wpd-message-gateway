@@ -1,4 +1,16 @@
--- Demo workspace, API key, email integration, template (aligned with latest schema)
+-- Demo workspace (idempotent — safe to re-run via init-db.sh, run_migrations.sh, or make seed-demo).
+-- Portal: demo@weprodev.com / secret
+-- API key: demo-client-id / demo-secret
+-- Requires 001_seed_permissions.sql and 002_seed_providers.sql first.
+
+-- Drop conflicting rows so fixed demo UUIDs stay stable after manual sign-up.
+DELETE FROM users
+WHERE email = 'demo@weprodev.com'
+  AND id <> '00000000-0000-0000-0000-000000000010';
+
+DELETE FROM workspaces
+WHERE slug = 'demo'
+  AND id <> '00000000-0000-0000-0000-000000000001';
 
 INSERT INTO users (id, email, password_hash, first_name, last_name, email_verified)
 VALUES (
@@ -9,13 +21,12 @@ VALUES (
     'User',
     true
 )
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO roles (id, name, display_name)
-VALUES
-    ('00000000-0000-0000-0000-000000000020', 'admin', 'Admin'),
-    ('00000000-0000-0000-0000-000000000021', 'member', 'Member')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    password_hash = EXCLUDED.password_hash,
+    first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
+    email_verified = EXCLUDED.email_verified;
 
 INSERT INTO workspaces (id, name, slug, owner_id, status, is_private, hashed_pin_code, icon_key)
 VALUES (
@@ -28,7 +39,12 @@ VALUES (
     NULL,
     NULL
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    slug = EXCLUDED.slug,
+    owner_id = EXCLUDED.owner_id,
+    status = EXCLUDED.status,
+    is_private = EXCLUDED.is_private;
 
 INSERT INTO workspace_members (workspace_id, user_id, role_id)
 VALUES (
@@ -36,21 +52,22 @@ VALUES (
     '00000000-0000-0000-0000-000000000010',
     '00000000-0000-0000-0000-000000000020'
 )
-ON CONFLICT (workspace_id, user_id) DO NOTHING;
+ON CONFLICT (workspace_id, user_id) DO UPDATE SET
+    role_id = EXCLUDED.role_id;
 
 INSERT INTO model_has_roles (role_id, model_type, model_id, team_id)
 VALUES (
-    '00000000-0000-0000-0000-000000000020', -- 'admin' role
+    '00000000-0000-0000-0000-000000000020',
     'users',
-    '00000000-0000-0000-0000-000000000010', -- demo user
-    '00000000-0000-0000-0000-000000000001'  -- demo workspace
+    '00000000-0000-0000-0000-000000000010',
+    '00000000-0000-0000-0000-000000000001'
 )
 ON CONFLICT (role_id, model_id, model_type, team_id) DO NOTHING;
 
-
 INSERT INTO workspace_channels (workspace_id, channel_type, enabled)
 VALUES ('00000000-0000-0000-0000-000000000001', 'email', true)
-ON CONFLICT (workspace_id, channel_type) DO NOTHING;
+ON CONFLICT (workspace_id, channel_type) DO UPDATE SET
+    enabled = EXCLUDED.enabled;
 
 INSERT INTO api_keys (id, workspace_id, client_id, client_secret_hash, name, is_active)
 VALUES (
@@ -61,22 +78,12 @@ VALUES (
     'Demo API Key',
     true
 )
-ON CONFLICT (client_id) DO NOTHING;
+ON CONFLICT (client_id) DO UPDATE SET
+    client_secret_hash = EXCLUDED.client_secret_hash,
+    name = EXCLUDED.name,
+    is_active = EXCLUDED.is_active,
+    workspace_id = EXCLUDED.workspace_id;
 
-INSERT INTO providers (id, name, channel_type, status, icon_path, description)
-VALUES (
-    '00000000-0000-0000-0000-000000000030',
-    'memory',
-    'email',
-    'active',
-    '/assets/providers/memory.svg',
-    'In-memory simulator for development and simulation'
-)
-ON CONFLICT (id) DO UPDATE SET
-    icon_path = EXCLUDED.icon_path,
-    description = EXCLUDED.description;
-
--- Encrypted JSON "{}" for memory provider (AES-GCM, dev only)
 INSERT INTO integrations (id, workspace_id, channel_type, provider_id, encrypted_config, status, is_default)
 VALUES (
     '00000000-0000-0000-0000-000000000003',
@@ -87,19 +94,7 @@ VALUES (
     'connected',
     true
 )
-ON CONFLICT (workspace_id, provider_id) DO NOTHING;
-
-INSERT INTO templates (id, workspace_id, name, unique_key, channel_type, subject, content, category, is_active, is_default)
-VALUES (
-    '00000000-0000-0000-0000-000000000004',
-    '00000000-0000-0000-0000-000000000001',
-    'Welcome Email',
-    'welcome_email',
-    'email',
-    'Welcome',
-    '<h1>Welcome to WeProDev!</h1><p>Your demo workspace is active.</p>',
-    'transactional',
-    true,
-    true
-)
-ON CONFLICT (workspace_id, unique_key) DO NOTHING;
+ON CONFLICT (workspace_id, provider_id) DO UPDATE SET
+    encrypted_config = EXCLUDED.encrypted_config,
+    status = EXCLUDED.status,
+    is_default = EXCLUDED.is_default;

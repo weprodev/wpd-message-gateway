@@ -42,8 +42,8 @@ Fix compile/lint failures before smell — smell is not a substitute for lint.
 
 Follow `.claude/commands/smell.md` on the git diff vs `develop`.
 
-- Produce the **Smell Report**
-- **Fix all BLOCKER and HIGH** catalog findings (`MGW.*`, `GO.*`, `CC.*`, `TS.*`)
+- Produce the **Smell Report** (includes **Principles checked:** Clean Code · KISS · DRY · DDD · SOLID)
+- **Fix all BLOCKER and HIGH** catalog findings (`MGW.*`, `CC.*`, `DDD.*`, `SOLID.*`, `GO.*`, `TS.*`)
 - Re-run `/smell` after fixes until clean or only MEDIUM/LOW/NIT remain
 
 ### 3. `make audit`

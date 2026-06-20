@@ -1,6 +1,6 @@
 import { apiFetch } from "@/core/api/client"
 
-import type { Integration, IntegrationActionResult, IntegrationChannel } from "./integrations.types"
+import type { Integration, IntegrationActionResult, IntegrationChannel, IntegrationStatus } from "./integrations.types"
 
 export async function listIntegrations(workspaceId: string): Promise<Integration[]> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations`)
@@ -16,7 +16,7 @@ export async function upsertIntegration(
     channel_type: IntegrationChannel
     provider_name: string
     config?: Record<string, unknown>
-    status?: string
+    status?: IntegrationStatus
     is_default?: boolean
   },
 ): Promise<{ ok: true; integration: Integration } | { ok: false; message?: string }> {

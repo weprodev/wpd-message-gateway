@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react"
 
-import { deleteIntegration, listIntegrations, upsertIntegration, fetchProviders } from "../integrations.api"
-import type { BackendProvider } from "../integrations.api"
-import type { Integration, IntegrationActionResult, IntegrationChannel } from "../integrations.types"
+import { deleteIntegration, listIntegrations, upsertIntegration, fetchProviders } from "@/features/integrations/integrations.api"
+import type { BackendProvider } from "@/features/integrations/integrations.api"
+import {
+  INTEGRATION_STATUS,
+  type Integration,
+  type IntegrationActionResult,
+  type IntegrationChannel,
+  type IntegrationStatus,
+} from "@/features/integrations/integrations.types"
 
 export interface IntegrationViewModel {
   id: string
@@ -32,10 +38,14 @@ function mergeCatalogWithIntegrations(providers: BackendProvider[], integrations
       isAvailable: provider.status === "active",
       isComingSoon: provider.status === "not_supported",
       integration,
-      isConnected: integration?.status === "connected",
-      isDeactivated: integration?.status === "disconnected",
+      isConnected: integration?.status === INTEGRATION_STATUS.CONNECTED,
+      isDeactivated: integration?.status === INTEGRATION_STATUS.DISCONNECTED,
     }
   })
+}
+
+function integrationNotFound(provider: IntegrationViewModel): IntegrationActionResult {
+  return { ok: false, message: `No integration found for ${provider.name}` }
 }
 
 export function useIntegrations(workspaceId: string) {
@@ -72,59 +82,42 @@ export function useIntegrations(workspaceId: string) {
     }
   }, [workspaceId, trigger])
 
-  async function connect(
+  async function saveIntegrationStatus(
     provider: IntegrationViewModel,
-    config: Record<string, unknown> = {},
+    status: IntegrationStatus,
+    config: Record<string, unknown>,
   ): Promise<IntegrationActionResult> {
     const result = await upsertIntegration(workspaceId, {
       channel_type: provider.category,
       provider_name: provider.id,
-      status: "connected",
-      config: config,
+      status,
+      config,
+      ...(provider.integration ? { is_default: provider.integration.is_default } : {}),
     })
     if (!result.ok) return result
     reload()
     return { ok: true }
+  }
+
+  async function connect(
+    provider: IntegrationViewModel,
+    config: Record<string, unknown> = {},
+  ): Promise<IntegrationActionResult> {
+    return saveIntegrationStatus(provider, INTEGRATION_STATUS.CONNECTED, config)
   }
 
   async function activate(provider: IntegrationViewModel): Promise<IntegrationActionResult> {
-    if (!provider.integration) {
-      return { ok: false, message: `No integration found for ${provider.name}` }
-    }
-
-    const result = await upsertIntegration(workspaceId, {
-      channel_type: provider.category,
-      provider_name: provider.id,
-      status: "connected",
-      config: provider.integration.config,
-      is_default: provider.integration.is_default,
-    })
-    if (!result.ok) return result
-    reload()
-    return { ok: true }
+    if (!provider.integration) return integrationNotFound(provider)
+    return saveIntegrationStatus(provider, INTEGRATION_STATUS.CONNECTED, provider.integration.config)
   }
 
   async function deactivate(provider: IntegrationViewModel): Promise<IntegrationActionResult> {
-    if (!provider.integration) {
-      return { ok: false, message: `No integration found for ${provider.name}` }
-    }
-
-    const result = await upsertIntegration(workspaceId, {
-      channel_type: provider.category,
-      provider_name: provider.id,
-      status: "disconnected",
-      config: provider.integration.config,
-      is_default: provider.integration.is_default,
-    })
-    if (!result.ok) return result
-    reload()
-    return { ok: true }
+    if (!provider.integration) return integrationNotFound(provider)
+    return saveIntegrationStatus(provider, INTEGRATION_STATUS.DISCONNECTED, provider.integration.config)
   }
 
   async function removeIntegration(provider: IntegrationViewModel): Promise<IntegrationActionResult> {
-    if (!provider.integration) {
-      return { ok: false, message: `No integration found for ${provider.name}` }
-    }
+    if (!provider.integration) return integrationNotFound(provider)
     if (!provider.integration.id) {
       return { ok: false, message: `Cannot remove ${provider.name}: integration id is missing` }
     }

@@ -74,7 +74,7 @@ func TestPortalIntegrationHandler_ListIntegrations(t *testing.T) {
 					ChannelType:  "email",
 					ProviderName: "mailgun",
 					Config:       []byte(`{"api_key":"123"}`),
-					Status:       "connected",
+					Status:       domain.IntegrationStatusConnected,
 				},
 				{
 					ID:           "intg-2",
@@ -82,7 +82,7 @@ func TestPortalIntegrationHandler_ListIntegrations(t *testing.T) {
 					ChannelType:  "email",
 					ProviderName: "memory",
 					Config:       []byte(`{}`),
-					Status:       "connected",
+					Status:       domain.IntegrationStatusConnected,
 				},
 			},
 		}
@@ -163,7 +163,7 @@ func TestPortalIntegrationHandler_UpsertIntegration(t *testing.T) {
 		})
 		h := NewPortalIntegrationHandler(svc)
 
-		body := `{"channel_type":"email","provider_name":"mailgun","config":{"api_key":"secret-key"},"status":"connected","is_default":true}`
+		body := `{"channel_type":"email","provider_name":"mailgun","config":{"api_key":"secret-key"},"status":"` + domain.IntegrationStatusConnected + `","is_default":true}`
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/ws-123/integrations", strings.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
