@@ -1,7 +1,6 @@
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Icon } from "@/components/ui/icon"
 import { Modal } from "@/components/ui/modal"
 import { Spinner } from "@/components/ui/spinner"
@@ -63,8 +62,8 @@ export function DisconnectModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      preventClose={isSubmitting}
-      header={
+      preventDismiss={isSubmitting}
+      title={
         provider ? (
           <div className="flex items-start gap-4">
             <IntegrationProviderIcon
@@ -72,17 +71,11 @@ export function DisconnectModal({
               name={provider.name}
               className="size-12 p-2.5 text-2xl"
             />
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="text-xl font-semibold text-foreground">
-                Disconnect {provider.name}
-              </DialogTitle>
-              <DialogDescription className="mt-1 text-sm text-text-secondary">
-                Are you sure you want to disconnect this provider?
-              </DialogDescription>
-            </div>
+            <span className="min-w-0 flex-1 pt-1">Disconnect {provider.name}</span>
           </div>
         ) : undefined
       }
+      description="Are you sure you want to disconnect this provider?"
     >
       {provider ? (
         <div className="flex flex-col gap-6">

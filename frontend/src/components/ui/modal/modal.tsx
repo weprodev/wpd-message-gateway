@@ -10,7 +10,7 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   children: ReactNode
-  title?: string
+  title?: ReactNode
   description?: ReactNode
   /** When true, blocks overlay, escape, and close-button dismissal until the caller closes the modal. */
   preventDismiss?: boolean
