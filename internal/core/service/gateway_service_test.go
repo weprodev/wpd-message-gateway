@@ -200,6 +200,48 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 	}
 }
 
+func TestGatewayService_SendEmail_memoryAndDatabase_memoryIntegration(t *testing.T) {
+	ts := time.Now()
+	intg := &domain.Integration{
+		ID:           "int-1",
+		WorkspaceID:  "ws-1",
+		ChannelType:  "email",
+		ProviderName: memoryProviderName,
+		Config:       []byte(`{}`),
+		Status:       "connected",
+		CreatedAt:    ts,
+		UpdatedAt:    ts,
+	}
+	settings := &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyDataRetention: domain.RetentionMemoryDatabase,
+	}}
+	inbox := &stubInbox{emailID: "inbox-msg-1"}
+	stored := &stubStoredMessages{}
+	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, stored, nil)
+
+	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
+		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
+	})
+	if err != nil {
+		t.Fatalf("SendEmail: %v", err)
+	}
+	if res.Meta["inbox_message_id"] != "inbox-msg-1" {
+		t.Fatalf("inbox_message_id: %v", res.Meta["inbox_message_id"])
+	}
+	if res.Meta["stored_message_id"] != "stored-msg-1" {
+		t.Fatalf("stored_message_id: %v", res.Meta["stored_message_id"])
+	}
+	if res.Meta["dispatch_mode"] != string(domain.DispatchMemoryAndProvider) {
+		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
+	}
+	if stored.lastOutcomeFor != "stored-msg-1" {
+		t.Fatalf("outcome stored_message_id: %q", stored.lastOutcomeFor)
+	}
+	if stored.lastOutcome == nil || stored.lastOutcome.Status != domain.StoredMessageDispatchSent {
+		t.Fatalf("dispatch outcome: %+v", stored.lastOutcome)
+	}
+}
+
 func TestGatewayService_SendEmail_providerAndDatabase_memoryIntegration(t *testing.T) {
 	ts := time.Now()
 	intg := &domain.Integration{

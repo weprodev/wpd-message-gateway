@@ -431,7 +431,7 @@ See [Portal inbox](./portal-inbox.md) for mode behavior.
 | `data_retention` | Dispatch mode | Behavior | Use Case |
 |------------------|---------------|----------|----------|
 | `memory` | `memory_only` | In-process RAM only, **not sent** | Development, testing |
-| `memory_database` | `memory_and_provider` | Portal inbox (RAM) **and** real provider send | Staging, debugging |
+| `memory_database` | `memory_and_provider` | Portal inbox (RAM), PostgreSQL (`stored_messages`), **and** real provider send | Staging, debugging |
 | `providers` | `provider_only` | Sent to real provider, no local copy | Production |
 | `provider_database` | `provider_and_database` | Sent to real provider **and** payload stored in PostgreSQL | Production with durable retention |
 

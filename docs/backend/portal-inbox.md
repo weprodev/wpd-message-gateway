@@ -76,7 +76,7 @@ Each workspace controls how its outbound messages are handled:
 | `memory_only` | Captured in RAM only, **no** external provider called. **Default.** |
 | `provider_only` | Sent through the connected integration, **no** memory copy. |
 | `provider_and_database` | Sent through the integration **and** full payload stored in PostgreSQL (`stored_messages`). **No** RAM inbox copy. |
-| `memory_and_provider` | Stored in memory **and** sent through the integration. |
+| `memory_and_provider` | Stored in memory **and** full payload stored in PostgreSQL (`stored_messages`), then sent through the integration. |
 
 Set via REST (no Portal UI page yet):
 

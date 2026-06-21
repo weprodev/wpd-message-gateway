@@ -53,8 +53,8 @@ type GatewayService struct {
 // NewGatewayService constructs a GatewayService.
 //
 // inbox is the in-process capture store (implements port.InboxWriter).
-// storedMessages persists payloads to PostgreSQL for provider_and_database mode.
-// Pass nil to disable durable capture — provider_and_database dispatch will then warn and skip DB write.
+// storedMessages persists payloads to PostgreSQL for provider_and_database and memory_and_provider modes.
+// Pass nil to disable durable capture — database-backed dispatch modes will then fail or warn on persist.
 func NewGatewayService(
 	integrations port.IntegrationRepository,
 	templates port.TemplateRepository,
@@ -172,7 +172,20 @@ func (s *GatewayService) dispatch(
 		return s.sendViaActiveProvider(ctx, workspaceID, mode, channel, writeToInbox, sendViaProvider, nil, "", "message dispatched via provider only")
 
 	case domain.DispatchMemoryAndProvider:
-		return s.sendViaActiveProvider(ctx, workspaceID, mode, channel, writeToInbox, sendViaProvider, writeToInbox, "inbox_message_id", "message dispatched via memory and provider")
+		inboxResult, err := writeToInbox()
+		if err != nil {
+			slog.ErrorContext(ctx, "inbox write failed", "error", err, "workspace_id", workspaceID, "channel", channel, "dispatch_mode", mode)
+			return nil, err
+		}
+		provResult, err := s.sendViaActiveProvider(ctx, workspaceID, mode, channel, writeToInbox, sendViaProvider, writeToArchive, "stored_message_id", "message dispatched via memory and database")
+		if err != nil {
+			return nil, err
+		}
+		if provResult.Meta == nil {
+			provResult.Meta = make(map[string]string)
+		}
+		provResult.Meta["inbox_message_id"] = inboxResult.ID
+		return provResult, nil
 
 	case domain.DispatchProviderAndDatabase:
 		return s.sendViaActiveProvider(ctx, workspaceID, mode, channel, writeToInbox, sendViaProvider, writeToArchive, "stored_message_id", "message dispatched via provider and database")
@@ -207,7 +220,7 @@ func (s *GatewayService) sendViaActiveProvider(
 		slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
 		return nil, err
 	}
-	if intg.ProviderName == memoryProviderName && mode != domain.DispatchProviderAndDatabase {
+	if intg.ProviderName == memoryProviderName && !modePersistsToDatabase(mode) {
 		r, err := writeToInbox()
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
@@ -221,7 +234,7 @@ func (s *GatewayService) sendViaActiveProvider(
 	if persist != nil {
 		persistResult, err := persist()
 		if err != nil {
-			if mode == domain.DispatchProviderAndDatabase {
+			if modePersistsToDatabase(mode) {
 				slog.ErrorContext(ctx, "archive persist failed", "error", err, "workspace_id", workspaceID, "channel", channel, "dispatch_mode", mode)
 				return nil, err
 			}
@@ -408,6 +421,10 @@ func (s *GatewayService) recordStoredMessageOutcome(
 		slog.WarnContext(ctx, "stored message dispatch outcome update failed (non-fatal)",
 			"error", err, "stored_message_id", storedMessageID, "dispatch_status", outcome.Status)
 	}
+}
+
+func modePersistsToDatabase(mode domain.MessageDispatchMode) bool {
+	return mode == domain.DispatchProviderAndDatabase || mode == domain.DispatchMemoryAndProvider
 }
 
 func truncateStoredDispatchError(msg string) string {

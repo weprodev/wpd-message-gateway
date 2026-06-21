@@ -23,7 +23,7 @@ const (
 	DispatchProviderOnly MessageDispatchMode = "provider_only"
 	// DispatchProviderAndDatabase sends through the integration and persists the payload in PostgreSQL.
 	DispatchProviderAndDatabase MessageDispatchMode = "provider_and_database"
-	// DispatchMemoryAndProvider stores in memory and sends through the integration.
+	// DispatchMemoryAndProvider stores in memory and PostgreSQL (stored_messages) and sends through the integration.
 	DispatchMemoryAndProvider MessageDispatchMode = "memory_and_provider"
 	// DispatchMemoryOnly keeps messages in memory only; external providers are not called.
 	DispatchMemoryOnly MessageDispatchMode = "memory_only"
