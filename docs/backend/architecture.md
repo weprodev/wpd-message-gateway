@@ -227,17 +227,11 @@ This doc intentionally does **not** duplicate full column lists.
 
 ### Configuring providers (server mode)
 
-Provider credentials are stored AES-encrypted in the `integrations` table. Configure via **Portal REST API** (no Integrations UI page yet):
-
-1. Portal JWT from login
-2. `POST /api/v1/workspaces/:wid/integrations` with channel, provider name, and config JSON
-3. Set dispatch mode: `PATCH /api/v1/workspaces/:wid/settings` with `message_dispatch_mode`
-
-See [Usage guide](./usage.md) and [E2E bootstrap](./e2e-testing.md).
+Provider credentials are stored AES-encrypted in the `integrations` table. Configure via the **Integrations** page in the Portal UI or `POST /api/v1/workspaces/:wid/integrations`.
 
 ### Portal UI coverage
 
-The React Portal (`frontend/`) currently implements: auth, workspace list, message **logs**, and **send test**. Memory inbox browsing, integrations, API keys, templates, members, and settings are REST/Bruno only until UI pages land.
+The React Portal (`frontend/`) currently implements: auth, workspace list, **integrations**, message **logs**, and **send test**. API keys, templates, members, settings, and memory inbox browsing are REST/Bruno only.
 
 ---
 
@@ -422,7 +416,7 @@ A **workspace** is the primary isolation unit. All resources (API keys, integrat
 
 ### 2. Integrations — DB-Stored Provider Config (Server Mode)
 
-In server mode, provider credentials (Mailgun API keys, etc.) are stored **encrypted** in the `integrations` table. Configure them via the **Portal REST API** — not in YAML files. (No Integrations UI page yet.)
+In server mode, provider credentials (Mailgun API keys, etc.) are stored **encrypted** in the `integrations` table. Configure them via the Portal **Integrations** page or the REST API.
 
 ### 3. Ports (Interfaces)
 
@@ -459,9 +453,9 @@ The **memory provider** captures messages in process RAM. It's always available 
 
 The React Portal runs at `portal.ui_port` (default **10104**) when the server starts.
 
-**Portal UI today:** sign in, list workspaces, view message logs, send test messages.
+**Portal UI today:** sign in, list workspaces, manage **integrations**, view message logs, send test messages.
 
-**REST only (no UI pages yet):** workspace create, integrations, API keys, templates, members, settings, memory inbox browser. See [Portal UI coverage](#portal-ui-coverage) above and [Usage guide](./usage.md).
+**REST only (no UI pages yet):** workspace create, API keys, templates, members, settings, memory inbox browser.
 
 ---
 

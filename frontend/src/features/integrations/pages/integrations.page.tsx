@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
 
-import { IntegrationRow } from "../components/integration-row"
-import { ConnectModal } from "../components/connect-modal"
+import { ConnectModal } from "@/features/integrations/components/connect-modal"
+import { DisconnectModal } from "@/features/integrations/components/disconnect-modal"
+import { IntegrationRow } from "@/features/integrations/components/integration-row"
 import {
   filterIntegrationsByTab,
   groupByCategory,
   useIntegrations,
-} from "../hooks/use-integrations.hook"
-import type { IntegrationChannel } from "../integrations.types"
+  type IntegrationViewModel,
+} from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationActionResult, IntegrationChannel } from "@/features/integrations/integrations.types"
 
 const CATEGORY_LABELS: Record<IntegrationChannel, string> = {
   email: "Email",
@@ -27,17 +29,31 @@ export function IntegrationsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
   const [activeTab, setActiveTab] = useState<"all" | "connected" | "available">("all")
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [connectProvider, setConnectProvider] = useState<(typeof items)[number] | null>(null)
-  const { items, isLoading, error, connect, disconnect } = useIntegrations(wid)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [connectProvider, setConnectProvider] = useState<IntegrationViewModel | null>(null)
+  const [disconnectProvider, setDisconnectProvider] = useState<IntegrationViewModel | null>(null)
+  const { items, isLoading, error, connect, activate, deactivate, removeIntegration } = useIntegrations(wid)
 
-  async function handleConnect(provider: (typeof items)[number], config: Record<string, unknown>) {
-    await connect(provider, config)
-  }
-
-  async function handleDisconnect(provider: (typeof items)[number]) {
+  async function runProviderAction(
+    provider: IntegrationViewModel,
+    action: (provider: IntegrationViewModel) => Promise<IntegrationActionResult>,
+    options?: { surfaceErrors?: boolean },
+  ): Promise<IntegrationActionResult> {
     setBusyId(provider.id)
+    if (options?.surfaceErrors) setActionError(null)
     try {
-      await disconnect(provider)
+      const result = await action(provider)
+      if (!result.ok && options?.surfaceErrors) {
+        setActionError(result.message ?? "Failed to update provider")
+      }
+      return result
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update provider"
+      if (options?.surfaceErrors) {
+        setActionError(message)
+        return { ok: false, message }
+      }
+      throw err
     } finally {
       setBusyId(null)
     }
@@ -61,6 +77,12 @@ export function IntegrationsPage() {
       {error ? (
         <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
+        </p>
+      ) : null}
+
+      {actionError ? (
+        <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {actionError}
         </p>
       ) : null}
 
@@ -133,7 +155,10 @@ export function IntegrationsPage() {
                             provider={provider}
                             isBusy={busyId === provider.id}
                             onConnect={setConnectProvider}
-                            onDisconnect={handleDisconnect}
+                            onActivate={(provider) =>
+                              runProviderAction(provider, activate, { surfaceErrors: true })
+                            }
+                            onDisconnect={setDisconnectProvider}
                           />
                         ))}
                       </div>
@@ -151,7 +176,15 @@ export function IntegrationsPage() {
         onClose={() => setConnectProvider(null)}
         workspaceId={wid}
         provider={connectProvider}
-        onConnect={handleConnect}
+        onConnect={connect}
+      />
+
+      <DisconnectModal
+        isOpen={disconnectProvider !== null}
+        provider={disconnectProvider}
+        onClose={() => setDisconnectProvider(null)}
+        onDeactivate={(provider) => runProviderAction(provider, deactivate)}
+        onRemove={(provider) => runProviderAction(provider, removeIntegration)}
       />
     </div>
   )

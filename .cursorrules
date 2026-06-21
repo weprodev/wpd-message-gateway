@@ -11,6 +11,6 @@
 | **Frontend work** (`frontend/`) | **typescript-react-reviewer** + **typescript-advanced-types** — `.cursor/skills/typescript-react-reviewer/SKILL.md`, `.cursor/skills/typescript-advanced-types/SKILL.md` |
 | **Architecture / refactors** | **software-architecture** — `.cursor/skills/software-architecture/SKILL.md` (load with domain skills) |
 
-**Non‑negotiables:** plan before large edits; run **`/smell`** after implementations and before reviews; **`make audit`** before done; fix smell **BLOCKER/HIGH** before PR; never expose secrets; sync docs/Storybook/schema with code.
+**Non‑negotiables:** plan before large edits; run **`/smell`** after implementations and before reviews (Clean Code, KISS, DRY, DDD, SOLID + architecture); **`make audit`** before done; fix smell **BLOCKER/HIGH** before PR; never expose secrets; sync docs/Storybook/schema with code; remove dead code and stale comments/docs you touch.
 
 See **`AGENTS.md`** and **`docs/agents/prompts.md`**.

@@ -1,4 +1,4 @@
-.PHONY: it install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync agents agents-kill start stop test audit build clean docker-check dev dev-down help ui-install ui ui-build ui-format ui-test ui-lint storybook
+.PHONY: it install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync agents agents-kill start stop test audit build clean docker-check dev dev-down seed-demo help ui-install ui ui-build ui-format ui-test ui-lint storybook
 
 # ============================================================================
 # ANSI Color Codes
@@ -314,6 +314,15 @@ dev-down: docker-check
 	@docker compose down
 	@printf "$(GREEN)✅ Stopped!$(RESET)\n"
 
+## Re-apply SQL seeds to the running Postgres container (demo user, RBAC, providers)
+seed-demo: docker-check
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🌱 Applying database seeds...$(RESET)\n"
+	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
+		bash /docker-entrypoint-initdb.d/apply-seeds.sh /docker-entrypoint-initdb.d/seeds
+	@printf "$(GREEN)✅ Seeds applied (demo@weprodev.com / secret)$(RESET)\n"
+	@printf "\n"
+
 
 # ============================================================================
 # Help
@@ -359,6 +368,7 @@ help:
 	@printf "$(BOLD)$(GREEN)🐳 Docker$(RESET)\n"
 	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway, DB, and UI via Docker (with hot-reloading)\n"
 	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker containers\n"
+	@printf "   $(YELLOW)make seed-demo$(RESET)    Re-apply SQL seeds (demo@weprodev.com / secret)\n"
 	@printf "\n"
 
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"

@@ -4,7 +4,10 @@
 .agent/
 .flowai/
 .gemini/
-.claude/
+.claude/**
+!.claude/commands/
+.claude/commands/**
+!.claude/commands/smell.md
 .specify/
 
 # OS generated files
@@ -22,7 +25,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
-.claude/
 .specify/
 .flowai/
 .gemini/

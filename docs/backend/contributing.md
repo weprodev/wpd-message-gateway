@@ -145,10 +145,10 @@ gw.SendEmail(ctx, email)
 ### Step 5: Use in server mode (REST API)
 
 1. Start the server and obtain a portal JWT (`POST /api/v1/auth/login`)
-2. `POST /api/v1/workspaces/:wid/integrations` with channel **email**, provider **sendgrid**, and JSON config (`api_key`, `from_email`, `from_name`)
+2. `POST /api/v1/workspaces/:wid/integrations` with channel **email**, provider **sendgrid**, and JSON config (`api_key`, `from_email`, `from_name`) — or use the Portal **Integrations** page
 3. The `GatewayService` reads this from DB and instantiates your provider via the registry factory
 
-> Provider config in server mode is stored **AES-encrypted** in the `integrations` table. Configure via REST — not in YAML files. (No Portal UI page for integrations yet.)
+> Provider config in server mode is stored **AES-encrypted** in the `integrations` table — configure via Portal UI or REST, not YAML files.
 
 ### Step 6: Add Tests
 

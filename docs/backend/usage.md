@@ -145,12 +145,11 @@ The Portal UI currently supports:
 
 1. **Register** and **sign in** (email + password)
 2. **Workspaces** — list workspaces you belong to and open one
-3. **Message logs** — audit trail of gateway send requests (Overview + channel tabs)
-4. **Send test** — send a test message through the gateway for the workspace
+3. **Integrations** — connect, activate, deactivate, or remove messaging providers
+4. **Message logs** — audit trail of gateway send requests (Overview + channel tabs)
+5. **Send test** — send a test message through the gateway for the workspace
 
-You need at least one workspace before the list is useful. Provision workspaces, API keys, and dispatch mode via the **REST API** (no Portal pages for these yet). See [E2E bootstrap](./e2e-testing.md#2-bootstrap-create-workspace-and-api-key) for a full curl flow used in CI.
-
-For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_mailgun_config.sql`, and optionally `003_demo_workspace.sql`.
+For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_providers.sql`, `003_seed_mailgun_config.sql`, and `004_demo_workspace.sql` (optional demo data: `demo@weprodev.com` / `secret`).
 
 ### Sending via HTTP
 
@@ -354,8 +353,9 @@ Roles and permissions are defined in [permission.go](../../internal/core/domain/
 
 To bootstrap roles and permissions, make sure you run the database seeds:
 1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.
-2. Run `database/seeds/002_seed_mailgun_config.sql` to seed Mailgun provider config fields.
-3. Run `database/seeds/003_demo_workspace.sql` (optional) to create a demo workspace, user, and assign the `admin` role to the demo user.
+2. Run `database/seeds/002_seed_providers.sql` to seed the provider catalog (memory, mailgun, etc.).
+3. Run `database/seeds/003_seed_mailgun_config.sql` to seed Mailgun Portal config field metadata.
+4. Run `database/seeds/004_demo_workspace.sql` (optional) — demo user (`demo@weprodev.com` / `secret`), workspace, admin role, memory integration, API key (`demo-client-id` / `demo-secret`).
 
 ### Dual Authorization Models
 

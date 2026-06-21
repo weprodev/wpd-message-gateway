@@ -169,7 +169,7 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 		ChannelType:  "email",
 		ProviderName: memoryProviderName,
 		Config:       []byte(`{}`),
-		Status:       "connected",
+		Status:       domain.IntegrationStatusConnected,
 		CreatedAt:    ts,
 		UpdatedAt:    ts,
 	}
