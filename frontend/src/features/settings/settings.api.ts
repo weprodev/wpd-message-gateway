@@ -1,13 +1,50 @@
 import { apiFetch } from "@/core/api/client"
+import { httpError, requireClientSecret } from "@/lib/errors"
 
-import type { ApiKey, WorkspaceSettings } from "./settings.types"
+import type { ApiKey, RetentionMode, WorkspaceSettings } from "./settings.types"
+
+const DISPATCH_TO_RETENTION: Record<string, RetentionMode> = {
+  memory_only: "memory",
+  memory_and_provider: "memory_database",
+  provider_only: "providers",
+  provider_and_database: "provider_database",
+}
+
+const RETENTION_MODES: RetentionMode[] = ["memory", "memory_database", "providers", "provider_database"]
+
+function normalizeRetentionMode(value: string | undefined): RetentionMode {
+  if (value === "both") {
+    return "memory_database"
+  }
+  if (value && RETENTION_MODES.includes(value as RetentionMode)) {
+    return value as RetentionMode
+  }
+  return "memory"
+}
+
+function mapSettingsFromApi(raw: Record<string, string>): WorkspaceSettings {
+  const rawRetention =
+    raw.data_retention ??
+    (raw.message_dispatch_mode ? DISPATCH_TO_RETENTION[raw.message_dispatch_mode] : undefined)
+
+  return {
+    ...raw,
+    data_retention: normalizeRetentionMode(rawRetention),
+  }
+}
+
+async function ensureOk(response: Response, fallback: string): Promise<void> {
+  if (!response.ok) {
+    throw await httpError(response, fallback)
+  }
+}
 
 export async function getSettings(workspaceId: string): Promise<WorkspaceSettings> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`)
   if (!res.ok) {
     throw new Error("Failed to load settings")
   }
-  return (await res.json()) as WorkspaceSettings
+  return mapSettingsFromApi((await res.json()) as Record<string, string>)
 }
 
 export async function patchSettings(
@@ -35,16 +72,17 @@ export async function listApiKeys(workspaceId: string): Promise<ApiKey[]> {
 export async function createApiKey(
   workspaceId: string,
   name: string,
-): Promise<ApiKey & { client_secret?: string }> {
+): Promise<ApiKey & { client_secret: string }> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   })
-  if (!res.ok) {
-    throw new Error("Failed to create API key")
-  }
-  return (await res.json()) as ApiKey & { client_secret?: string }
+  await ensureOk(res, "Failed to create API key")
+
+  const created = (await res.json()) as ApiKey & { client_secret?: string }
+
+  return { ...created, client_secret: requireClientSecret(created) }
 }
 
 export async function deleteApiKey(workspaceId: string, keyId: string): Promise<void> {
@@ -63,8 +101,9 @@ export async function regenerateApiKey(
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys/${keyId}/regenerate`, {
     method: "POST",
   })
-  if (!res.ok) {
-    throw new Error("Failed to regenerate API key")
-  }
-  return (await res.json()) as { client_secret: string }
+  await ensureOk(res, "Failed to regenerate API key")
+
+  const regenerated = (await res.json()) as { client_secret?: string }
+
+  return { client_secret: requireClientSecret(regenerated) }
 }

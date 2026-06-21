@@ -421,16 +421,19 @@ PATCH /api/v1/workspaces/:wid/settings
 Authorization: Bearer <portal-jwt>
 Content-Type: application/json
 
-{ "message_dispatch_mode": "provider_only" }
+{ "data_retention": "providers" }
+// or: "memory" | "memory_database" | "providers" | "provider_database"
+// legacy aliases (accepted on read/PATCH, normalized on response): "provider", "memory_and_database", "provider_and_database", "both", "message_dispatch_mode"
 ```
 
 See [Portal inbox](./portal-inbox.md) for mode behavior.
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| `memory_only` | In-process RAM only, **not sent** | Development, testing |
-| `provider_only` | Sent to real provider, no local copy | Production |
-| `memory_and_provider` | Both — local copy + real send | Staging, debugging |
+| `data_retention` | Dispatch mode | Behavior | Use Case |
+|------------------|---------------|----------|----------|
+| `memory` | `memory_only` | In-process RAM only, **not sent** | Development, testing |
+| `memory_database` | `memory_and_provider` | Portal inbox (RAM) **and** real provider send | Staging, debugging |
+| `providers` | `provider_only` | Sent to real provider, no local copy | Production |
+| `provider_database` | `provider_and_database` | Sent to real provider **and** payload stored in PostgreSQL | Production with durable retention |
 
 ---
 

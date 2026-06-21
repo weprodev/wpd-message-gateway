@@ -17,13 +17,18 @@ function formatLastUsed(value?: string | null): string {
   return date.toLocaleDateString()
 }
 
+function maskClientId(clientId: string): string {
+  if (clientId.length <= 8) return "••••••••"
+  return `${"•".repeat(Math.max(clientId.length - 4, 4))}${clientId.slice(-4)}`
+}
+
 export function ApiKeyRow({ apiKey, onRegenerate, onDelete, isBusy }: ApiKeyRowProps) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-4 last:border-b-0">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground">{apiKey.name}</p>
         <p className="mt-1 font-mono text-xs text-text-secondary">
-          {apiKey.client_id.replace(/^(.{8}).*(.{8})$/, "............$2")}
+          {maskClientId(apiKey.client_id)}
         </p>
         <p className="mt-1 text-xs text-text-tertiary">
           Last used: {formatLastUsed(apiKey.last_used_at)}
@@ -42,7 +47,7 @@ export function ApiKeyRow({ apiKey, onRegenerate, onDelete, isBusy }: ApiKeyRowP
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="destructive"
           size="sm"
           disabled={isBusy}
           onClick={() => onDelete(apiKey.id)}

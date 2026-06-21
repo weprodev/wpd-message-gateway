@@ -273,7 +273,34 @@ CREATE INDEX idx_message_request_logs_workspace_api_created
     WHERE api_key_id IS NOT NULL;
 
 -- ==============================================================================
--- 12. TEMPLATES TABLE
+-- 12. STORED_MESSAGES TABLE (Durable outbound payloads — provider_and_database mode)
+-- ==============================================================================
+
+CREATE TABLE stored_messages (
+    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id          UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    channel_type          TEXT        NOT NULL CHECK (channel_type IN ('email', 'sms', 'push', 'chat')),
+    payload               JSONB       NOT NULL,
+    dispatch_status       TEXT        NOT NULL DEFAULT 'pending'
+                                      CHECK (dispatch_status IN ('pending', 'sent', 'failed')),
+    provider_message_id   TEXT,
+    provider_status_code  SMALLINT,
+    dispatch_error        TEXT,
+    dispatched_at         TIMESTAMPTZ,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_stored_messages_workspace_created
+    ON stored_messages (workspace_id, created_at DESC);
+
+CREATE INDEX idx_stored_messages_workspace_channel_created
+    ON stored_messages (workspace_id, channel_type, created_at DESC);
+
+CREATE INDEX idx_stored_messages_workspace_dispatch_status
+    ON stored_messages (workspace_id, dispatch_status, created_at DESC);
+
+-- ==============================================================================
+-- 13. TEMPLATES TABLE
 -- ==============================================================================
 
 CREATE TABLE templates (
@@ -301,7 +328,7 @@ CREATE TRIGGER trg_templates_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==============================================================================
--- 13. TEMPLATE_COMPONENTS TABLE
+-- 14. TEMPLATE_COMPONENTS TABLE
 -- ==============================================================================
 
 CREATE TABLE template_components (
@@ -324,7 +351,7 @@ CREATE TRIGGER trg_template_components_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==============================================================================
--- 14. WORKSPACE_SETTINGS TABLE (Key-value store)
+-- 15. WORKSPACE_SETTINGS TABLE (Key-value store)
 -- ==============================================================================
 
 CREATE TABLE workspace_settings (
@@ -343,7 +370,7 @@ CREATE TRIGGER trg_workspace_settings_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==============================================================================
--- 15. WORKSPACE_ACCESS_AUDITS TABLE (Append-only)
+-- 16. WORKSPACE_ACCESS_AUDITS TABLE (Append-only)
 -- ==============================================================================
 
 CREATE TABLE workspace_access_audits (
@@ -364,7 +391,7 @@ CREATE INDEX idx_workspace_access_audits_actor_user_id
     WHERE actor_user_id IS NOT NULL;
 
 -- ==============================================================================
--- 16. PERMISSIONS TABLE (RBAC Engine)
+-- 17. PERMISSIONS TABLE (RBAC Engine)
 -- ==============================================================================
 
 CREATE TABLE permissions (
@@ -382,7 +409,7 @@ CREATE TRIGGER trg_permissions_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==============================================================================
--- 17. ROLE_HAS_PERMISSIONS JOIN TABLE (RBAC Engine)
+-- 18. ROLE_HAS_PERMISSIONS JOIN TABLE (RBAC Engine)
 -- ==============================================================================
 
 CREATE TABLE role_has_permissions (
@@ -393,7 +420,7 @@ CREATE TABLE role_has_permissions (
 );
 
 -- ==============================================================================
--- 18. MODEL_HAS_ROLES TABLE (Polymorphic RBAC mappings)
+-- 19. MODEL_HAS_ROLES TABLE (Polymorphic RBAC mappings)
 -- ==============================================================================
 
 CREATE TABLE model_has_roles (
@@ -409,7 +436,7 @@ CREATE TABLE model_has_roles (
 CREATE INDEX idx_model_has_roles_lookup ON model_has_roles (model_id, model_type, team_id);
 
 -- ==============================================================================
--- 19. MODEL_HAS_PERMISSIONS TABLE (Polymorphic RBAC mappings)
+-- 20. MODEL_HAS_PERMISSIONS TABLE (Polymorphic RBAC mappings)
 -- ==============================================================================
 
 CREATE TABLE model_has_permissions (

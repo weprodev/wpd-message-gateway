@@ -23,6 +23,25 @@ describe("Modal Component", () => {
     expect(handleClose).toHaveBeenCalledTimes(1)
   })
 
+  it("renders description below the title", () => {
+    render(
+      <Modal isOpen={true} onClose={vi.fn()} title="Modal Title" description="Supporting copy">
+        Content
+      </Modal>,
+    )
+    expect(screen.getByText("Supporting copy")).toBeInTheDocument()
+  })
+
+  it("does not call onClose from the close button when preventDismiss is enabled", () => {
+    const handleClose = vi.fn()
+    render(
+      <Modal isOpen={true} onClose={handleClose} title="Modal Title" preventDismiss>
+        Content
+      </Modal>,
+    )
+    expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument()
+  })
+
   it("does not call onClose when preventClose is true", () => {
     const handleClose = vi.fn()
     render(
@@ -30,8 +49,6 @@ describe("Modal Component", () => {
         Content
       </Modal>,
     )
-    const closeButton = screen.getByRole("button", { name: /close/i })
-    closeButton.click()
-    expect(handleClose).not.toHaveBeenCalled()
+    expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument()
   })
 })

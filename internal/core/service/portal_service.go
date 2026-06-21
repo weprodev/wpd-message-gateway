@@ -561,11 +561,11 @@ func (s *PortalService) GetSettings(ctx context.Context, workspaceID string) (ma
 	} else {
 		m[settingKeyPinConfigured] = "false"
 	}
-	return m, nil
+	return normalizeSettingsForAPI(m), nil
 }
 
 func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, kv map[string]string) error {
-	for k, v := range kv {
+	for k, v := range normalizeSettingsPatch(kv) {
 		if k == settingKeyPinCode {
 			pin := strings.TrimSpace(v)
 			if pin == "" {
@@ -617,6 +617,50 @@ func (s *PortalService) migrateLegacyWorkspacePIN(ctx context.Context, ws *domai
 	}
 	ws.HashedPin = hashedPin
 	return s.settings.Delete(ctx, ws.ID, settingKeyPinCode)
+}
+
+func normalizeSettingsPatch(kv map[string]string) map[string]string {
+	out := make(map[string]string, len(kv))
+	for k, v := range kv {
+		switch k {
+		case domain.SettingKeyMessageDispatchMode:
+			if retention, ok := domain.DispatchModeToDataRetentionValue(v); ok {
+				out[domain.SettingKeyDataRetention] = retention
+			}
+		case domain.SettingKeyDataRetention:
+			if retention, ok := domain.DispatchModeToDataRetentionValue(v); ok {
+				out[domain.SettingKeyDataRetention] = retention
+			} else {
+				out[domain.SettingKeyDataRetention] = v
+			}
+		default:
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func normalizeSettingsForAPI(raw map[string]string) map[string]string {
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		if k == domain.SettingKeyMessageDispatchMode {
+			continue
+		}
+		out[k] = v
+	}
+	if _, ok := out[domain.SettingKeyDataRetention]; !ok {
+		if legacy, ok := raw[domain.SettingKeyMessageDispatchMode]; ok {
+			if retention, ok := domain.DispatchModeToDataRetentionValue(legacy); ok {
+				out[domain.SettingKeyDataRetention] = retention
+			}
+		}
+	}
+	if retention, ok := out[domain.SettingKeyDataRetention]; ok {
+		if canonical, ok := domain.DispatchModeToDataRetentionValue(retention); ok {
+			out[domain.SettingKeyDataRetention] = canonical
+		}
+	}
+	return out
 }
 
 // ListInvitations returns all pending invitations for a workspace.

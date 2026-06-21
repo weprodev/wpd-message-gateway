@@ -161,7 +161,7 @@ function ConnectForm({ workspaceId, provider, onConnect, onClose }: ConnectFormP
         >
           {isSubmitting ? (
             <div className="flex items-center gap-2">
-              <Spinner size="sm" />
+              <Spinner size="sm" variant="onSolid" />
               <span>Connecting...</span>
             </div>
           ) : (

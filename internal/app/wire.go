@@ -100,6 +100,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	intgRepo := postgres.NewIntegrationRepository(pgClient, encService)
 	tmplRepo := postgres.NewTemplateRepository(pgClient)
 	logRepo := postgres.NewMessageRequestLogRepository(pgClient)
+	storedMsgRepo := postgres.NewStoredMessageRepository(pgClient)
 	userRepo := postgres.NewUserRepository(pgClient)
 	memberRepo := postgres.NewWorkspaceMemberRepository(pgClient)
 	inviteRepo := postgres.NewInvitationRepository(pgClient)
@@ -137,7 +138,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	)
 
 	// ── Gateway service ─────────────────────────────────────────────────────
-	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxStore, logRepo)
+	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxStore, storedMsgRepo, logRepo)
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.

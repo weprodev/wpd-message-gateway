@@ -243,6 +243,7 @@ Each workspace independently controls how outbound messages are handled:
 | --------------------- | ----------------------------------------------------------------------------------- |
 | `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. |
 | `provider_only`       | Sent through the connected integration only. No in-memory copy.                     |
+| `provider_and_database` | Sent through the integration **and** full payload persisted in PostgreSQL (`stored_messages`). No RAM inbox copy. |
 | `memory_and_provider` | Stored in memory AND sent through the integration.                                  |
 
 Configured via `PATCH /api/v1/workspaces/:wid/settings` (REST — no Portal UI page yet):
@@ -286,6 +287,9 @@ GatewayService.SendEmail(ctx, workspaceID, email)
     │                  Decrypts AES config
     │                  Instantiates provider via registry
     │                  → sends to Mailgun/etc
+    │
+    ├── provider_and_database → persist payload to stored_messages (PostgreSQL)
+    │                          → then send via integration (same as provider_only)
     │
     └── memory_and_provider → both paths above
 ```
@@ -442,6 +446,7 @@ The **memory provider** captures messages in process RAM. It's always available 
 
 - Use `memory_only` for local development (captured messages via inbox REST API / Bruno)
 - Use `provider_only` in production (messages go to real provider)
+- Use `provider_and_database` when you need real delivery plus durable message content in PostgreSQL
 - Use `memory_and_provider` to keep a local copy AND send to the real provider
 
 ### 6. Portal (always on)

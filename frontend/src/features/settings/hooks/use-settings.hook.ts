@@ -58,10 +58,11 @@ export function useSettings(workspaceId: string) {
     })
   }
 
-  async function addApiKey(name: string) {
+  async function addApiKey(name: string): Promise<ApiKey & { client_secret: string }> {
     const created = await createApiKey(workspaceId, name)
-    setApiKeys((prev) => [...prev, created])
-    return created
+    const { client_secret: clientSecret, ...apiKey } = created
+    setApiKeys((prev) => [...prev, apiKey])
+    return { ...apiKey, client_secret: clientSecret }
   }
 
   async function removeApiKey(keyId: string) {
@@ -69,7 +70,7 @@ export function useSettings(workspaceId: string) {
     setApiKeys((prev) => prev.filter((key) => key.id !== keyId))
   }
 
-  async function rotateApiKey(keyId: string) {
+  async function rotateApiKey(keyId: string): Promise<{ client_secret: string }> {
     return regenerateApiKey(workspaceId, keyId)
   }
 

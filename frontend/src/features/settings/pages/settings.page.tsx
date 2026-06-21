@@ -1,18 +1,24 @@
 import * as Tabs from "@radix-ui/react-tabs"
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import { useParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
+import { Modal, ModalActions, useModalSession } from "@/components/ui/modal"
 import { Spinner } from "@/components/ui/spinner"
 import { PageHeader } from "@/shared/components/page-header"
 import { cn } from "@/lib/utils"
+import { toUserMessage } from "@/lib/errors"
 
+import { ApiKeyCredentialsView } from "../components/api-key-credentials-view"
 import { ApiKeyRow } from "../components/api-key-row"
 import { RadioOption } from "../components/radio-option"
 import { useSettings } from "../hooks/use-settings.hook"
-import type { RetentionMode, SettingsTab, WorkspaceSettings } from "../settings.types"
+import type { ApiKeyCredentials, RetentionMode, SettingsTab, WorkspaceSettings } from "../settings.types"
+
+const CREATE_FAILED_MESSAGE = "Could not create the API key. Please try again."
+const REGENERATE_FAILED_MESSAGE = "Could not regenerate the API key. Please try again."
 
 interface GeneralSettingsPanelProps {
   settings: WorkspaceSettings
@@ -123,12 +129,12 @@ function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelP
         onChange={() => setRetentionMode("memory")}
       />
       <RadioOption
-        id="retention-both"
+        id="retention-memory-database"
         name="retention"
         label="Memory + Database"
         description="Persist messages in the portal inbox and database."
-        checked={retentionMode === "both"}
-        onChange={() => setRetentionMode("both")}
+        checked={retentionMode === "memory_database"}
+        onChange={() => setRetentionMode("memory_database")}
       />
       <RadioOption
         id="retention-providers"
@@ -137,6 +143,14 @@ function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelP
         description="Send through providers without storing message content."
         checked={retentionMode === "providers"}
         onChange={() => setRetentionMode("providers")}
+      />
+      <RadioOption
+        id="retention-provider-database"
+        name="retention"
+        label="Provider + Database"
+        description="Send through providers and persist the full payload in PostgreSQL."
+        checked={retentionMode === "provider_database"}
+        onChange={() => setRetentionMode("provider_database")}
       />
 
       <Button type="button" onClick={handleSave} disabled={isSaving} className="mt-2 w-fit">
@@ -150,30 +164,136 @@ export function SettingsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
   const [activeTab, setActiveTab] = useState<SettingsTab>("general")
   const [busyKeyId, setBusyKeyId] = useState<string | null>(null)
+  const [pendingDeleteKeyId, setPendingDeleteKeyId] = useState<string | null>(null)
+  const [pendingRegenerateKeyId, setPendingRegenerateKeyId] = useState<string | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  const [createStep, setCreateStep] = useState<"form" | "credentials">("form")
+  const [createName, setCreateName] = useState("")
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [createdCredentials, setCreatedCredentials] = useState<ApiKeyCredentials | null>(null)
+
+  const [regenerateStep, setRegenerateStep] = useState<"confirm" | "credentials">("confirm")
+  const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  const [isRegenerating, setIsRegenerating] = useState(false)
+  const [regeneratedCredentials, setRegeneratedCredentials] = useState<ApiKeyCredentials | null>(null)
 
   const { settings, apiKeys, retentionMode, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
     useSettings(wid)
 
-  async function handleCreateApiKey() {
-    const name = window.prompt("API key name")
-    if (!name?.trim()) return
-    await addApiKey(name.trim())
+  function resetCreateModal() {
+    setCreateStep("form")
+    setCreateName("")
+    setCreateError(null)
+    setIsCreating(false)
+    setCreatedCredentials(null)
   }
 
-  async function handleRegenerate(keyId: string) {
-    setBusyKeyId(keyId)
+  function resetRegenerateModal() {
+    setRegenerateStep("confirm")
+    setRegenerateError(null)
+    setIsRegenerating(false)
+    setRegeneratedCredentials(null)
+  }
+
+  const createSessionRef = useModalSession(isCreateModalOpen, resetCreateModal)
+  const regenerateSessionRef = useModalSession(pendingRegenerateKeyId !== null, resetRegenerateModal)
+
+  function closeCreateModal() {
+    resetCreateModal()
+    setIsCreateModalOpen(false)
+  }
+
+  async function handleCreateSubmit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = createName.trim()
+    if (!trimmed) {
+      setCreateError("API key name is required")
+      return
+    }
+
+    const session = createSessionRef.current
+    setCreateError(null)
+    setIsCreating(true)
     try {
-      await rotateApiKey(keyId)
+      const created = await addApiKey(trimmed)
+      if (session !== createSessionRef.current) return
+      setCreatedCredentials({
+        clientId: created.client_id,
+        clientSecret: created.client_secret,
+        keyName: created.name,
+        mode: "created",
+      })
+      setCreateStep("credentials")
+    } catch (err) {
+      if (session !== createSessionRef.current) return
+      setCreateError(toUserMessage(err, CREATE_FAILED_MESSAGE))
     } finally {
-      setBusyKeyId(null)
+      if (session === createSessionRef.current) {
+        setIsCreating(false)
+      }
     }
   }
 
-  async function handleDeleteKey(keyId: string) {
-    if (!window.confirm("Delete this API key?")) return
-    setBusyKeyId(keyId)
+  function handleRequestRegenerate(keyId: string) {
+    setPendingRegenerateKeyId(keyId)
+  }
+
+  async function handleRegenerateConfirm() {
+    if (!pendingRegenerateKeyId) {
+      setRegenerateError("No API key selected for regeneration.")
+      return
+    }
+
+    const key = apiKeys.find((item) => item.id === pendingRegenerateKeyId)
+    if (!key) {
+      setRegenerateError("This API key could not be found. Refresh the page and try again.")
+      return
+    }
+
+    const session = regenerateSessionRef.current
+    setRegenerateError(null)
+    setIsRegenerating(true)
     try {
-      await removeApiKey(keyId)
+      const { client_secret: clientSecret } = await rotateApiKey(pendingRegenerateKeyId)
+      if (session !== regenerateSessionRef.current) return
+      setRegeneratedCredentials({
+        clientId: key.client_id,
+        clientSecret,
+        keyName: key.name,
+        mode: "regenerated",
+      })
+      setRegenerateStep("credentials")
+    } catch (err) {
+      if (session !== regenerateSessionRef.current) return
+      setRegenerateError(toUserMessage(err, REGENERATE_FAILED_MESSAGE))
+    } finally {
+      if (session === regenerateSessionRef.current) {
+        setIsRegenerating(false)
+      }
+    }
+  }
+
+  function closeRegenerateModal() {
+    resetRegenerateModal()
+    setPendingRegenerateKeyId(null)
+  }
+
+  function handleRequestDelete(keyId: string) {
+    setPendingDeleteKeyId(keyId)
+  }
+
+  function handleCancelDelete() {
+    setPendingDeleteKeyId(null)
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDeleteKeyId) return
+    setBusyKeyId(pendingDeleteKeyId)
+    try {
+      await removeApiKey(pendingDeleteKeyId)
+      setPendingDeleteKeyId(null)
     } finally {
       setBusyKeyId(null)
     }
@@ -237,7 +357,7 @@ export function SettingsPage() {
                 Manage keys used to authenticate gateway requests.
               </p>
             </div>
-            <Button type="button" onClick={handleCreateApiKey}>
+            <Button type="button" onClick={() => setIsCreateModalOpen(true)}>
               <Icon name="add" size="sm" />
               Create key
             </Button>
@@ -254,8 +374,8 @@ export function SettingsPage() {
                   key={key.id}
                   apiKey={key}
                   isBusy={busyKeyId === key.id}
-                  onRegenerate={handleRegenerate}
-                  onDelete={handleDeleteKey}
+                  onRegenerate={handleRequestRegenerate}
+                  onDelete={handleRequestDelete}
                 />
               ))
             )}
@@ -274,6 +394,92 @@ export function SettingsPage() {
           <RetentionSettingsPanel key={`${wid}-${retentionMode}`} initialMode={retentionMode} onSave={saveSettings} />
         </Tabs.Content>
       </Tabs.Root>
+
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={closeCreateModal}
+        title={createStep === "form" ? "Create API key" : "API key created"}
+        preventDismiss={createStep === "credentials" || isCreating}
+      >
+        {createStep === "form" ? (
+          <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="api-key-name" className="text-xs font-semibold uppercase text-text-secondary">
+                Name
+              </label>
+              <Input
+                id="api-key-name"
+                type="text"
+                value={createName}
+                onChange={(event) => {
+                  setCreateName(event.target.value)
+                  if (createError) setCreateError(null)
+                }}
+                placeholder="e.g. Production"
+                disabled={isCreating}
+                autoFocus
+              />
+              {createError ? <p className="text-sm text-destructive">{createError}</p> : null}
+            </div>
+
+            <ModalActions
+              confirmLabel="Create"
+              confirmType="submit"
+              onCancel={closeCreateModal}
+              isLoading={isCreating}
+              loadingLabel="Creating…"
+              cancelDisabled={isCreating}
+              confirmClassName="min-w-[7.25rem]"
+            />
+          </form>
+        ) : createdCredentials ? (
+          <ApiKeyCredentialsView credentials={createdCredentials} onConfirm={closeCreateModal} />
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={pendingDeleteKeyId !== null}
+        onClose={handleCancelDelete}
+        title="Delete API key"
+        description="Are you sure you want to delete this API key?"
+        preventDismiss={pendingDeleteKeyId !== null && busyKeyId === pendingDeleteKeyId}
+      >
+        <ModalActions
+          confirmLabel="Delete"
+          confirmVariant="destructive"
+          onCancel={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+          isLoading={pendingDeleteKeyId !== null && busyKeyId === pendingDeleteKeyId}
+          loadingLabel="Deleting…"
+          confirmClassName="min-w-[7.25rem]"
+        />
+      </Modal>
+
+      <Modal
+        isOpen={pendingRegenerateKeyId !== null}
+        onClose={closeRegenerateModal}
+        title={regenerateStep === "confirm" ? "Regenerate API key" : "API key regenerated"}
+        description={
+          regenerateStep === "confirm" ? "Are you sure you want to regenerate this API key?" : undefined
+        }
+        preventDismiss={regenerateStep === "credentials" || isRegenerating}
+      >
+        {regenerateStep === "confirm" ? (
+          <div className="flex flex-col gap-6">
+            {regenerateError ? <p className="text-sm text-destructive">{regenerateError}</p> : null}
+            <ModalActions
+              confirmLabel="Regenerate"
+              onCancel={closeRegenerateModal}
+              onConfirm={handleRegenerateConfirm}
+              isLoading={isRegenerating}
+              loadingLabel="Regenerating…"
+              confirmClassName="min-w-[9.75rem]"
+            />
+          </div>
+        ) : regeneratedCredentials ? (
+          <ApiKeyCredentialsView credentials={regeneratedCredentials} onConfirm={closeRegenerateModal} />
+        ) : null}
+      </Modal>
 
       <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
         <h2 className="text-base font-semibold text-destructive">Danger zone</h2>

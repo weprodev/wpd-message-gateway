@@ -20,4 +20,9 @@ describe("Spinner Component", () => {
     const { container: containerLg } = render(<Spinner size="lg" />)
     expect(containerLg.firstChild).toHaveClass("size-8")
   })
+
+  it("uses a contrasting border on solid backgrounds", () => {
+    const { container } = render(<Spinner variant="onSolid" />)
+    expect(container.firstChild).toHaveClass("border-current")
+  })
 })

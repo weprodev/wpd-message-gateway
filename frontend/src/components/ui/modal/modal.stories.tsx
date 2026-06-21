@@ -38,3 +38,22 @@ export const Interactive: Story = {
     title: "Modal Title",
   },
 }
+
+export const WithDescription: Story = {
+  render: (args) => {
+    const [isOpen, setIsOpen] = useState(false)
+    return (
+      <>
+        <Button onClick={() => setIsOpen(true)}>Open Modal</Button>
+        <Modal {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      </>
+    )
+  },
+  args: {
+    isOpen: true,
+    onClose: () => {},
+    title: "Delete item",
+    description: "Are you sure you want to continue? This action cannot be undone.",
+    children: null,
+  },
+}

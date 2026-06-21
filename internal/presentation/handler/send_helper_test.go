@@ -45,7 +45,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c.SetRequest(req.WithContext(ctx))
 
 		repo := &mockLogRepo{}
-		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		svc := service.NewGatewayService(nil, nil, nil, nil, nil, repo)
 		helper := NewSendHelper(svc)
 
 		var dst contracts.Email
@@ -94,7 +94,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		repo := &mockLogRepo{createErr: errors.New("db error")}
-		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		svc := service.NewGatewayService(nil, nil, nil, nil, nil, repo)
 		helper := NewSendHelper(svc)
 
 		var dst contracts.Email
