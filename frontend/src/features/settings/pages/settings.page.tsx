@@ -225,7 +225,7 @@ export function SettingsPage() {
             </div>
             <Button type="button" onClick={handleCreateApiKey}>
               <Icon name="add" size="sm" />
-              Create key
+              Generate key
             </Button>
           </div>
 
