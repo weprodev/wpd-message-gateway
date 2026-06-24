@@ -1,4 +1,4 @@
-# Data Model: Data Retention Modes & API Key Modals
+# Data Model: Data Retention Modes
 
 ## Entities
 
@@ -17,32 +17,28 @@
 
 ### MessageDispatchMode (gateway runtime)
 
-| Value | Maps from retention | Message capture | Provider dispatch | Request logs |
-| ----- | ------------------- | --------------- | ----------------- | ------------ |
+| Value | Maps from retention | Message capture | Provider dispatch | Request logs (success only) |
+| ----- | ------------------- | --------------- | ----------------- | --------------------------- |
 | `memory_only` | `memory` | In-process inbox | No | No |
-| `memory_and_database` | `memory_database` | In-process inbox | Per integration | Yes |
+| `memory_and_provider` | `memory_database` | In-process inbox | Per integration | Yes |
 | `provider_only` | `provider` | No | Yes | No |
 | `provider_and_database` | `provider_database` | No | Yes (same as provider_only) | Yes |
 
 **Storage**: `workspace_settings.key = 'message_dispatch_mode'` (synced when retention saved).
 
-**Deprecated removed**: `memory_and_provider`, runtime alias `both` for dispatch mode.
+**Deprecated removed**: runtime alias `both` as a dispatch mode value (read-time alias for retention only).
 
 ### MessageRequestLog (unchanged schema)
 
 Table: `message_request_logs`
 
-Written **only** when dispatch mode is `memory_and_database` or `provider_and_database`.
+Written **only** when dispatch mode is `memory_and_provider` or `provider_and_database` **and** the send succeeded.
 
 Fields used: `workspace_id`, `api_key_id`, `channel_type`, `http_method`, `status_code`, `endpoint`, `provider_name`, `request_id`, `duration_ms`, `error_message`.
 
 ### API Key (unchanged)
 
-No schema or handler changes. Modals consume existing REST responses:
-
-- `POST /api/v1/workspaces/:wid/api-keys` → includes `client_secret` once
-- `POST /api/v1/workspaces/:wid/api-keys/:keyId/regenerate` → `{ client_secret }`
-- `DELETE /api/v1/workspaces/:wid/api-keys/:keyId`
+No schema or handler changes for this feature.
 
 ## State transitions
 
@@ -53,14 +49,6 @@ No schema or handler changes. Modals consume existing REST responses:
 ```
 
 Effective for the next outbound request after settings persist. No retroactive deletion of existing logs or inbox messages.
-
-### API key lifecycle (UI)
-
-```
-Generate key --> Create modal (name) --> API create --> Credentials modal --> dismiss
-Regenerate --> Confirm modal --> API regenerate --> Credentials modal --> dismiss
-Delete --> Confirm modal --> API delete --> list refresh
-```
 
 ## Domain helpers (`dispatch_mode.go`)
 
