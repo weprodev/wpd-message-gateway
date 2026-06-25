@@ -1,12 +1,12 @@
 # Implementation Plan: Data Retention Modes
 
-**Branch**: `001-memory-database-retention` | **Date**: 2026-06-24 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-memory-database-retention` | **Date**: 2026-06-25 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-memory-database-retention/spec.md`
 
 ## Summary
 
-Add a fourth data retention mode (**Provider + Database**) that mirrors Provider Only dispatch but persists request metadata on successful sends only. Refactor **Memory only** and **Provider only** to skip all database writes (including `message_request_logs`). Gate request logging to **Memory + Database** and **Provider + Database** only, and only on the success path in `SendHelper`. Keep existing `DispatchMemoryAndProvider` (`memory_and_provider`) enum; add `DispatchProviderAndDatabase` only.
+Add a fourth data retention mode (**Provider + Database**) with dispatch parity to Provider Only. Separate **operational request logging** (Recent Requests) from **long-term retention** using a `retained` flag on `message_request_logs` (Idea 3): always insert on successful send; set `retained = true` only for **Memory + Database** and **Provider + Database**. Keep `DispatchMemoryAndProvider`; add `DispatchProviderAndDatabase`.
 
 ## Technical Context
 
@@ -14,7 +14,7 @@ Add a fourth data retention mode (**Provider + Database**) that mirrors Provider
 
 **Primary Dependencies**: Echo v4, PostgreSQL, existing design-system components
 
-**Storage**: PostgreSQL `workspace_settings`, `message_request_logs` (gated inserts); in-process inbox for memory capture
+**Storage**: PostgreSQL `workspace_settings`, `message_request_logs` (+ `retained` column migration); in-process inbox for memory capture
 
 **Testing**: Go table-driven tests (`dispatch_mode_test.go`, gateway/handler tests), Vitest for settings UI, Bruno E2E optional
 
@@ -22,11 +22,11 @@ Add a fourth data retention mode (**Provider + Database**) that mirrors Provider
 
 **Project Type**: Dual-mode gateway (embedded SDK + HTTP server); this feature touches server portal + `internal/` only
 
-**Performance Goals**: No additional latency on send path beyond one enum check before log insert
+**Performance Goals**: One INSERT per successful send; one boolean check for `retained`
 
-**Constraints**: Canonical retention values on write; legacy alias support on read; success-only logging
+**Constraints**: Canonical retention values on write; legacy alias on GET; success-only inserts; Recent Requests unfiltered
 
-**Scale/Scope**: 4 retention enums, settings page fourth radio, ~6 backend files
+**Scale/Scope**: 1 migration column, 4 retention enums, settings fourth radio, ~8 backend files
 
 ## Constitution Check
 
@@ -34,13 +34,13 @@ Add a fourth data retention mode (**Provider + Database**) that mirrors Provider
 
 | Principle | Status | Notes |
 | --------- | ------ | ----- |
-| Layer boundaries (handler → service → port) | Pass | Log gating in handler; dispatch in service |
+| Layer boundaries (handler → service → port) | Pass | Handler sets `retained`; dispatch in service |
 | `pkg/` does not import `internal/` | Pass | Changes stay in `internal/` + `frontend/` |
 | Verification chain (lint → smell → audit) | Required post-impl | Per `docs/agents/verification.md` |
 | No secrets in logs/UI persistence | Pass | Request logs store metadata only |
-| KISS / DRY | Pass | Reuse provider dispatch path for `provider_and_database` |
+| KISS / DRY | Pass | One table + flag vs dual table |
 
-**Post-design re-check**: Pass — no new packages or cross-layer violations.
+**Post-design re-check**: Pass — Idea 3 reduces complexity vs insert gating.
 
 ## Project Structure
 
@@ -59,30 +59,37 @@ specs/001-memory-database-retention/
 ### Source Code (repository root)
 
 ```text
+database/migrations/
+└── *_add_retained_to_message_request_logs.up.sql
+
 internal/core/domain/
-├── dispatch_mode.go          # enums, mapping, ShouldPersistRequestLog
-└── dispatch_mode_test.go     # table-driven mapping tests
+├── dispatch_mode.go          # ShouldRetainRequestLog (rename from ShouldPersistRequestLog)
+├── message_request_log.go  # Retained field
+└── dispatch_mode_test.go
 
 internal/core/service/
-└── gateway_service.go        # provider_and_database case; keep memory_and_provider
+└── gateway_service.go        # provider_and_database; keep memory_and_provider
 
 internal/presentation/handler/
-└── send_helper.go            # gate RecordLog by dispatch mode; success path only
+└── send_helper.go            # always RecordLog on success; pass retained flag
 
-internal/presentation/handler/ (or portal settings handler)
-└── settings sync data_retention ↔ message_dispatch_mode on PATCH
+internal/infrastructure/repository/postgres/
+└── message_request_log_repository.go  # INSERT retained column
+
+internal/core/service/
+└── portal_service.go         # GetSettings normalize; PatchSettings sync
 
 frontend/src/features/settings/
-├── settings.types.ts         # RetentionMode union (4 canonical values)
-├── pages/settings.page.tsx     # four radios including Provider + Database
-└── hooks/use-settings.hook.ts  # legacy alias normalization on load
+├── settings.types.ts
+├── pages/settings.page.tsx
+└── hooks/use-settings.hook.ts
 ```
 
-**Structure Decision**: Domain mapping centralized in `dispatch_mode.go`; handler owns log gating and success-only rule.
+**Structure Decision**: Idea 3 — no second table; `retained` on existing log entity; Recent Requests query unchanged.
 
 ## Phase 0: Research — Complete
 
-See [research.md](./research.md). Success-only logging resolved via spec clarifications (2026-06-24).
+See [research.md](./research.md). Idea 3 adopted 2026-06-25 (operational vs retention split).
 
 ## Phase 1: Design — Complete
 
@@ -94,26 +101,30 @@ See [research.md](./research.md). Success-only logging resolved via spec clarifi
 
 ### Implementation phases (for `/speckit-tasks`)
 
-**Phase A — Domain & gateway (backend)**
+**Phase A — Schema & domain**
 
-1. Keep `DispatchMemoryAndProvider` (`memory_and_provider`); add `DispatchProviderAndDatabase`
-2. Implement retention ↔ dispatch mapping helpers and legacy alias normalization
-3. Add `ShouldPersistRequestLog`; gate `SendHelper.RecordLog` by mode and success path
-4. Extract shared provider-send path for `provider_only` and `provider_and_database`
-5. Sync `data_retention` and `message_dispatch_mode` on settings PATCH
-6. Table-driven tests for all mappings
+1. Migration: add `retained BOOLEAN NOT NULL DEFAULT false` to `message_request_logs`
+2. Domain: `ShouldRetainRequestLog`; rename/clarify helper vs insert gating
+3. Update `MessageRequestLog` struct and repository INSERT
+4. Table-driven mapping tests
 
-**Phase B — Portal retention UI**
+**Phase B — Gateway & handler**
 
-1. Update `RetentionMode` type and four `RadioOption` entries (add Provider + Database)
-2. Normalize legacy values on load in hook
+1. Keep `DispatchMemoryAndProvider`; add `DispatchProviderAndDatabase`
+2. Extract shared provider-send path
+3. `SendHelper`: always log successful sends; set `retained` from `ShouldRetainRequestLog` (remove insert gating)
+4. Sync `data_retention` ↔ `message_dispatch_mode` on PATCH; normalize on GET
 
-**Phase C — Verification**
+**Phase C — Portal UI**
 
-1. `go test -race` domain + service + handler
-2. `cd frontend && npm run lint && npm run test`
-3. Manual quickstart scenarios
-4. `make audit`
+1. Four retention radios including Provider + Database
+2. Canonical `RetentionMode` types
+
+**Phase D — Verification**
+
+1. Assert Recent Requests shows sends for memory/provider modes (`retained = false`)
+2. Assert `retained = true` only for database-backed modes
+3. `go test -race`, frontend lint/test, `make audit`
 
 ## Complexity Tracking
 

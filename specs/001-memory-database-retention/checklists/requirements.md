@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass after 2026-06-24 session clarifications (success-only logging, four retention modes).
+- Updated 2026-06-25: Idea 3 — `retained` flag on `message_request_logs`; operational logging vs long-term retention; Recent Requests unfiltered.

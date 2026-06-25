@@ -17,24 +17,42 @@
 
 ### MessageDispatchMode (gateway runtime)
 
-| Value | Maps from retention | Message capture | Provider dispatch | Request logs (success only) |
-| ----- | ------------------- | --------------- | ----------------- | --------------------------- |
-| `memory_only` | `memory` | In-process inbox | No | No |
-| `memory_and_provider` | `memory_database` | In-process inbox | Per integration | Yes |
-| `provider_only` | `provider` | No | Yes | No |
-| `provider_and_database` | `provider_database` | No | Yes (same as provider_only) | Yes |
+| Value | Maps from retention | Message capture | Provider dispatch | `retained` on success |
+| ----- | ------------------- | --------------- | ----------------- | --------------------- |
+| `memory_only` | `memory` | In-process inbox | No | `false` |
+| `memory_and_provider` | `memory_database` | In-process inbox | Per integration | `true` |
+| `provider_only` | `provider` | No | Yes | `false` |
+| `provider_and_database` | `provider_database` | No | Yes (same as provider_only) | `true` |
 
 **Storage**: `workspace_settings.key = 'message_dispatch_mode'` (synced when retention saved).
 
 **Deprecated removed**: runtime alias `both` as a dispatch mode value (read-time alias for retention only).
 
-### MessageRequestLog (unchanged schema)
+### MessageRequestLog (schema change — Idea 3)
 
 Table: `message_request_logs`
 
-Written **only** when dispatch mode is `memory_and_provider` or `provider_and_database` **and** the send succeeded.
+**Purpose split (single table)**:
 
-Fields used: `workspace_id`, `api_key_id`, `channel_type`, `http_method`, `status_code`, `endpoint`, `provider_name`, `request_id`, `duration_ms`, `error_message`.
+| Concern | Rule |
+| ------- | ---- |
+| **Operational monitoring** (Recent Requests) | Insert on every **successful** send; all modes |
+| **Long-term retention** | `retained = true` only for `memory_and_provider` and `provider_and_database` |
+
+**New column**:
+
+| Column | Type | Default | Meaning |
+| ------ | ---- | ------- | ------- |
+| `retained` | `BOOLEAN NOT NULL` | `false` | `true` = kept per data-retention policy; `false` = operational only |
+
+**Existing fields** (unchanged): `workspace_id`, `api_key_id`, `channel_type`, `http_method`, `status_code`, `endpoint`, `provider_name`, `request_id`, `duration_ms`, `error_message`, `created_at`.
+
+**Indexes** (recommended):
+
+- Existing: `(workspace_id, created_at DESC)` — Recent Requests
+- New: `(workspace_id, retained, created_at DESC) WHERE retained = true` — retention exports
+
+**Lifecycle (optional v2)**: Purge rows where `retained = false` and `created_at < now() - operational_ttl`.
 
 ### API Key (unchanged)
 
@@ -48,15 +66,15 @@ No schema or handler changes for this feature.
 [any mode] --user saves new mode--> [updated mode]
 ```
 
-Effective for the next outbound request after settings persist. No retroactive deletion of existing logs or inbox messages.
+Effective for the next outbound request after settings persist. No retroactive update of `retained` on existing log rows.
 
 ## Domain helpers (`dispatch_mode.go`)
 
-- `retentionValueForMode(MessageDispatchMode) string`
+- `RetentionValueForMode(MessageDispatchMode) string`
 - `DataRetentionValueToDispatchMode(string) (MessageDispatchMode, bool)`
 - `ParseMessageDispatchMode(string) (MessageDispatchMode, bool)`
-- `normalizeRetentionValue(string) string` — applies legacy aliases
-- `ShouldPersistRequestLog(MessageDispatchMode) bool`
+- `NormalizeRetentionValue(string) string` — applies legacy aliases
+- `ShouldRetainRequestLog(MessageDispatchMode) bool` — sets `retained` column on insert (`true` for `memory_and_provider` and `provider_and_database`)
 
 ## Frontend types
 
@@ -64,4 +82,4 @@ Effective for the next outbound request after settings persist. No retroactive d
 type RetentionMode = "memory" | "memory_database" | "provider" | "provider_database"
 ```
 
-Replace `"both"` / `"providers"` in `settings.types.ts`.
+Legacy `both` / `providers` normalized on settings GET (backend).

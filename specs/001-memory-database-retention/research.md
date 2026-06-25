@@ -14,39 +14,42 @@
 
 **Decision**: Add `DispatchProviderAndDatabase` (`provider_and_database`) that reuses the `DispatchProviderOnly` code path in `gateway_service.dispatch` (extract shared provider-send helper).
 
-**Rationale**: User requires identical outbound behavior to Provider Only; only request logging differs. Sharing dispatch logic prevents behavioral drift.
+**Rationale**: User requires identical outbound behavior to Provider Only; only the `retained` flag on request logs differs. Sharing dispatch logic prevents behavioral drift.
 
 **Alternatives considered**:
 - Duplicate switch case — rejected; violates DRY.
-- Log gating solely from retention string in handler — acceptable but dispatch mode enum is cleaner for tests.
 
-## R3 — Request log gating location and success-only rule
+## R3 — Operational logging vs retention (Idea 3)
 
-**Decision**: Gate `SendHelper.RecordLog` (presentation layer) using resolved dispatch mode — log only for `memory_and_provider` and `provider_and_database`, and only on the success path (after `send(ctx)` returns without error). Remove `RecordLog` calls from validation, auth, and dispatch-error branches when retention would otherwise allow logging.
+**Decision**: Use a single table `message_request_logs` with a `retained BOOLEAN` column. Always insert on successful send (all modes) for **Recent Requests** / monitoring. Set `retained = true` only when `message_dispatch_mode` is `memory_and_provider` or `provider_and_database`.
 
-**Rationale**: `RecordLog` is centralized; gating here avoids touching every channel handler. Success-only rule matches 2026-06-24 clarification and reduces noise in audit table.
+**Rationale**: Gating inserts by retention mode broke Recent Requests, which reads from `message_request_logs`. Operational visibility and long-term retention are different concerns; one row with a flag avoids duplicate tables and duplicate writes.
 
 **Alternatives considered**:
-- Gate inside `GatewayService.RecordLog` — viable but mixes transport audit with domain dispatch.
-- Log failures too — rejected per spec FR-008/FR-010.
+- Gate inserts by mode (no rows for memory/provider only) — rejected; breaks Recent Requests.
+- Second table for retained rows only — viable (Idea 2) but more schema and dual-write complexity.
+- Recent Requests from in-memory source — rejected; no durable source for provider sends.
 
-## R4 — Memory Only / Provider Only database persistence
+## R4 — Message content vs request metadata
 
-**Decision**: No schema changes. Stop writing `message_request_logs` for `memory_only` and `provider_only`. Confirm inbox writer for memory modes remains in-process only (no Postgres message tables for memory capture).
+**Decision**: Retention policy continues to gate **message content** (inbox/DB) by mode. Request metadata always logs operationally; `retained` flag gates long-term policy storage.
 
-**Rationale**: Spec explicitly removes DB persistence for these modes; current unconditional `RecordLog` insert is the fix target.
+**Rationale**: Memory only and Provider only must not persist message bodies; operational request rows with `retained = false` satisfy portal monitoring without long-term retention commitment.
 
 ## R5 — Legacy retention value migration
 
-**Decision**: Read-time aliases only (`both` → `memory_database`, `providers` → `provider`); PATCH always writes canonical values. No SQL migration required.
+**Decision**: Read-time aliases only (`both` → `memory_database`, `providers` → `provider`); PATCH always writes canonical values. Normalize on `GetSettings` in portal service.
 
 **Rationale**: `workspace_settings` is key-value; alias normalization in domain layer is sufficient per spec FR-003.
 
 ## R6 — Keep DispatchMemoryAndProvider enum name
 
-**Decision**: Retain `DispatchMemoryAndProvider` (`memory_and_provider`) as the gateway dispatch mode for portal `memory_database` retention. Do not rename to `memory_and_database`. Map `memory_database` ↔ `memory_and_provider` in domain helpers only.
+**Decision**: Retain `DispatchMemoryAndProvider` (`memory_and_provider`) as the gateway dispatch mode for portal `memory_database` retention.
 
-**Rationale**: Existing code and tests already use `DispatchMemoryAndProvider`; renaming adds churn without functional benefit. Portal uses user-facing `memory_database`; gateway keeps stable runtime enum.
+**Rationale**: Existing code and tests already use `DispatchMemoryAndProvider`; renaming adds churn without functional benefit.
 
-**Alternatives considered**:
-- Rename to `memory_and_database` — rejected per product decision (2026-06-24).
+## R7 — Non-retained row lifecycle
+
+**Decision**: v1 ships with `retained` column only; optional TTL purge job for `retained = false` rows deferred unless product requests fixed retention window for operational logs.
+
+**Rationale**: Purge policy (7 vs 30 days) is a product/ops decision; schema supports it without blocking MVP.

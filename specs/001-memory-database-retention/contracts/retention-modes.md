@@ -8,12 +8,12 @@
 
 | Value | Meaning |
 | ----- | ------- |
-| `memory` | Memory only — no DB writes |
-| `memory_database` | Memory + Database — inbox + request logs (success only) |
-| `provider` | Provider only — dispatch only, no DB writes |
-| `provider_database` | Provider + Database — dispatch + request logs (success only) |
+| `memory` | Memory only — no message content in DB; request logs operational (`retained = false`) |
+| `memory_database` | Memory + Database — inbox + request logs with `retained = true` |
+| `provider` | Provider only — dispatch only; request logs operational (`retained = false`) |
+| `provider_database` | Provider + Database — dispatch + request logs with `retained = true` |
 
-**Legacy read aliases** (GET may return stored legacy value; UI normalizes):
+**Legacy read aliases** (GET normalizes via `NormalizeRetentionValue`):
 
 | Stored | Normalized |
 | ------ | ---------- |
@@ -43,14 +43,26 @@ Server MUST persist canonical value and sync `message_dispatch_mode` per mapping
 
 - `both` (as dispatch mode; maps to `memory_and_provider` on read)
 
-## Request log persistence rule
+## Request log persistence rule (Idea 3)
 
-`message_request_logs` INSERT occurs **if and only if**:
+### Insert (all modes)
 
-1. `message_dispatch_mode` ∈ `{ memory_and_provider, provider_and_database }`, **and**
-2. The outbound send completed successfully (dispatch returned without error; gateway responds with success).
+`message_request_logs` INSERT on **successful send only**:
+
+1. Outbound send completed without error; gateway responds with success.
+2. Populate all metadata fields.
+3. Set `retained = ShouldRetainRequestLog(message_dispatch_mode)`:
+   - `memory_and_provider`, `provider_and_database` → `true`
+   - `memory_only`, `provider_only` → `false`
 
 Failed validation (4xx), auth errors, and dispatch failures MUST NOT insert rows.
+
+### Read paths
+
+| Consumer | Query |
+| -------- | ----- |
+| **Recent Requests** (portal inbox/logs) | All rows for workspace (existing `ListWithSource`; no `retained` filter) |
+| **Retention export / compliance** (future) | `WHERE retained = true` |
 
 ## Channels
 
