@@ -1,7 +1,7 @@
 export interface WorkspaceSettings {
   owner_email?: string
   pin_code?: string
-  data_retention?: "memory" | "both" | "providers"
+  message_dispatch_mode?: MessageDispatchMode
   [key: string]: string | undefined
 }
 
@@ -17,4 +17,10 @@ export interface ApiKey {
 }
 
 export type SettingsTab = "general" | "developer" | "team" | "retention"
-export type RetentionMode = "memory" | "both" | "providers"
+
+/** Gateway dispatch mode values stored in workspace_settings.message_dispatch_mode */
+export type MessageDispatchMode =
+  | "memory_only"
+  | "memory_and_provider"
+  | "provider_only"
+  | "provider_and_database"

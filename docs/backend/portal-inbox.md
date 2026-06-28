@@ -76,8 +76,9 @@ Each workspace controls how its outbound messages are handled:
 | `memory_only` | Captured in RAM only, **no** external provider called. **Default.** |
 | `provider_only` | Sent through the connected integration, **no** memory copy. |
 | `memory_and_provider` | Stored in memory **and** sent through the integration. |
+| `provider_and_database` | Same dispatch as provider only; request logs have `retained = true`. |
 
-Set via REST (no Portal UI page yet):
+Set via Portal **Settings → Data Retention** or REST:
 
 ```bash
 PATCH /api/v1/workspaces/:wid/settings

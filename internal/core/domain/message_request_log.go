@@ -15,5 +15,6 @@ type MessageRequestLog struct {
 	RequestID    string    `json:"request_id,omitempty"`
 	DurationMs   int       `json:"duration_ms,omitempty"`
 	ErrorMessage string    `json:"error_message,omitempty"`
+	Retained     bool      `json:"retained"`
 	CreatedAt    time.Time `json:"created_at"`
 }

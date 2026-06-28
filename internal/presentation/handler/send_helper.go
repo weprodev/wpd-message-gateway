@@ -95,6 +95,7 @@ func (sh *SendHelper) RecordLog(
 		RequestID:    logger.GetRequestID(ctx),
 		DurationMs:   int(time.Since(start).Milliseconds()),
 		ErrorMessage: errMsg,
+		Retained:     sh.svc.ShouldRetainForWorkspace(ctx, workspaceID),
 	}
 	if err := sh.svc.RecordLog(ctx, entry); err != nil {
 		slog.ErrorContext(ctx, "message_request_log insert failed", "error", err)

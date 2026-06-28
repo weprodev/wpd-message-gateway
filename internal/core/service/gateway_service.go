@@ -154,7 +154,7 @@ func (s *GatewayService) dispatch(
 		slog.InfoContext(ctx, "message dispatched via memory only", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
 		return r, nil
 
-	case domain.DispatchProviderOnly:
+	case domain.DispatchProviderOnly, domain.DispatchProviderAndDatabase:
 		intg, err := s.activeIntegration(ctx, workspaceID, channel)
 		if err != nil {
 			slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
@@ -178,7 +178,7 @@ func (s *GatewayService) dispatch(
 			return nil, err
 		}
 		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
-		slog.InfoContext(ctx, "message dispatched via provider only", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID)
+		slog.InfoContext(ctx, "message dispatched via provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID, "dispatch_mode", mode)
 		return r, nil
 
 	case domain.DispatchMemoryAndProvider:
@@ -232,7 +232,17 @@ func (s *GatewayService) dispatch(
 	}
 }
 
-// resolveDispatchMode reads the workspace setting, defaulting gracefully.
+// ResolveDispatchMode reads the workspace setting for outbound dispatch behavior.
+func (s *GatewayService) ResolveDispatchMode(ctx context.Context, workspaceID string) domain.MessageDispatchMode {
+	return s.resolveDispatchMode(ctx, workspaceID)
+}
+
+// ShouldRetainForWorkspace reports whether request logs for the workspace should be marked retained.
+func (s *GatewayService) ShouldRetainForWorkspace(ctx context.Context, workspaceID string) bool {
+	return domain.ShouldRetainRequestLog(s.resolveDispatchMode(ctx, workspaceID))
+}
+
+// resolveDispatchMode reads message_dispatch_mode from workspace settings.
 func (s *GatewayService) resolveDispatchMode(ctx context.Context, workspaceID string) domain.MessageDispatchMode {
 	if s.settings == nil {
 		return domain.DefaultMessageDispatchMode()
@@ -241,8 +251,8 @@ func (s *GatewayService) resolveDispatchMode(ctx context.Context, workspaceID st
 	if err != nil || v == "" {
 		return domain.DefaultMessageDispatchMode()
 	}
-	if m, ok := domain.ParseMessageDispatchMode(v); ok {
-		return m
+	if mode, ok := domain.ParseMessageDispatchMode(v); ok {
+		return mode
 	}
 	return domain.DefaultMessageDispatchMode()
 }

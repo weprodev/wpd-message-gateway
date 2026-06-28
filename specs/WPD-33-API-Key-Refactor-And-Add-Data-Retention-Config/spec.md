@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-27
 
-**Status**: In Progress
+**Status**: Implemented
 
 **Input**: Add **Provider + Database** message dispatch mode; mark database-backed modes on request logs via a `retained` flag; rename backend `data_retention` to `message_dispatch_mode`; keep operational logging flow unchanged.
 

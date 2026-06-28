@@ -258,6 +258,7 @@ CREATE TABLE message_request_logs (
     request_id    VARCHAR(64),
     duration_ms   INT          CHECK (duration_ms >= 0),
     error_message TEXT,
+    retained      BOOLEAN      NOT NULL DEFAULT false,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 

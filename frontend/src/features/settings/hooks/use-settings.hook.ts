@@ -8,7 +8,21 @@ import {
   patchSettings,
   regenerateApiKey,
 } from "../settings.api"
-import type { ApiKey, RetentionMode, WorkspaceSettings } from "../settings.types"
+import type { ApiKey, MessageDispatchMode, WorkspaceSettings } from "../settings.types"
+
+const DISPATCH_MODES: MessageDispatchMode[] = [
+  "memory_only",
+  "memory_and_provider",
+  "provider_only",
+  "provider_and_database",
+]
+
+function normalizeMessageDispatchMode(raw: string | undefined): MessageDispatchMode {
+  if (raw && DISPATCH_MODES.includes(raw as MessageDispatchMode)) {
+    return raw as MessageDispatchMode
+  }
+  return "memory_only"
+}
 
 export function useSettings(workspaceId: string) {
   const [settings, setSettings] = useState<WorkspaceSettings>({})
@@ -66,12 +80,12 @@ export function useSettings(workspaceId: string) {
     return regenerateApiKey(workspaceId, keyId)
   }
 
-  const retentionMode = (settings.data_retention as RetentionMode | undefined) ?? "memory"
+  const messageDispatchMode = normalizeMessageDispatchMode(settings.message_dispatch_mode)
 
   return {
     settings,
     apiKeys,
-    retentionMode,
+    messageDispatchMode,
     isLoading,
     error,
     reload,

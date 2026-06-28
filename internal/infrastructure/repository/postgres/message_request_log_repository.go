@@ -22,8 +22,8 @@ func NewMessageRequestLogRepository(client *pgsql.PgClient) port.MessageRequestL
 
 func (r *MessageRequestLogRepository) Create(ctx context.Context, log *domain.MessageRequestLog) error {
 	query := `
-		INSERT INTO message_request_logs (workspace_id, api_key_id, channel_type, http_method, status_code, endpoint, provider_name, request_id, duration_ms, error_message)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO message_request_logs (workspace_id, api_key_id, channel_type, http_method, status_code, endpoint, provider_name, request_id, duration_ms, error_message, retained)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at
 	`
 	var apiKeyID interface{}
@@ -48,7 +48,7 @@ func (r *MessageRequestLogRepository) Create(ctx context.Context, log *domain.Me
 	}
 	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
 		log.WorkspaceID, apiKeyID, log.ChannelType, log.HTTPMethod, log.StatusCode, log.Endpoint,
-		provider, reqID, dur, errMsg,
+		provider, reqID, dur, errMsg, log.Retained,
 	).Scan(&log.ID, &log.CreatedAt)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "workspace_id", log.WorkspaceID, "endpoint", log.Endpoint)
@@ -98,7 +98,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	// fmt.Sprintf with validated integers is the correct approach here.
 	listQuery := fmt.Sprintf(`
 		SELECT l.id, l.workspace_id, l.api_key_id, l.channel_type, l.http_method, l.status_code, l.endpoint,
-			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.created_at,
+			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.retained, l.created_at,
 			COALESCE(k.name, ''), COALESCE(k.client_id, '')
 		FROM message_request_logs l
 		LEFT JOIN api_keys k ON k.id = l.api_key_id
@@ -123,7 +123,7 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 		var prov sql.NullString
 		if err := rows.Scan(
 			&row.ID, &row.WorkspaceID, &apiKeyID, &row.ChannelType, &row.HTTPMethod, &row.StatusCode, &row.Endpoint,
-			&prov, &reqID, &dur, &errMsg, &row.CreatedAt,
+			&prov, &reqID, &dur, &errMsg, &row.Retained, &row.CreatedAt,
 			&row.SourceName, &row.ClientID,
 		); err != nil {
 			slog.ErrorContext(ctx, "database error: failed to scan message request log", "error", err, "workspace_id", q.WorkspaceID)

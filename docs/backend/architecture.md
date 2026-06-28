@@ -239,13 +239,14 @@ The React Portal (`frontend/`) currently implements: auth, workspace list, **int
 
 Each workspace independently controls how outbound messages are handled:
 
-| Mode                  | Behavior                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. |
-| `provider_only`       | Sent through the connected integration only. No in-memory copy.                     |
-| `memory_and_provider` | Stored in memory AND sent through the integration.                                  |
+| Mode                  | Behavior                                                                            | Request log `retained` |
+| --------------------- | ----------------------------------------------------------------------------------- | ---------------------- |
+| `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. | `false`                |
+| `provider_only`       | Sent through the connected integration only. No in-memory copy.                     | `false`                |
+| `memory_and_provider` | Stored in memory AND sent through the integration.                                  | `true`                 |
+| `provider_and_database` | Same outbound path as `provider_only`; logs marked for long-term retention.       | `true`                 |
 
-Configured via `PATCH /api/v1/workspaces/:wid/settings` (REST — no Portal UI page yet):
+Configured via `PATCH /api/v1/workspaces/:wid/settings` (Portal **Settings → Data Retention**):
 
 ```
 PATCH /api/v1/workspaces/:wid/settings

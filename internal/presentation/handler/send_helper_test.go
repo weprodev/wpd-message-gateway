@@ -22,6 +22,25 @@ type mockLogRepo struct {
 	entries   []*domain.MessageRequestLog
 }
 
+type stubSettingsRepo struct {
+	values map[string]string
+}
+
+func (s *stubSettingsRepo) Get(ctx context.Context, workspaceID, key string) (string, error) {
+	if s.values == nil {
+		return "", nil
+	}
+	return s.values[key], nil
+}
+
+func (s *stubSettingsRepo) Set(ctx context.Context, workspaceID, key, value string) error {
+	return nil
+}
+
+func (s *stubSettingsRepo) GetAll(ctx context.Context, workspaceID string) (map[string]string, error) {
+	return nil, nil
+}
+
 func (m *mockLogRepo) Create(ctx context.Context, entry *domain.MessageRequestLog) error {
 	m.entries = append(m.entries, entry)
 	return m.createErr
@@ -85,6 +104,60 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		}
 		if log.StatusCode != http.StatusOK {
 			t.Errorf("expected log status code 200, got %d", log.StatusCode)
+		}
+		if log.Retained {
+			t.Error("expected retained false with default memory-only mode")
+		}
+	})
+
+	t.Run("retained true for provider_database setting", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		settings := &stubSettingsRepo{values: map[string]string{
+			domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderAndDatabase),
+		}}
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, settings, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{ID: "msg-111"}, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 {
+			t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
+		}
+		if !repo.entries[0].Retained {
+			t.Error("expected retained true for provider_database")
+		}
+	})
+
+	t.Run("retained false for provider_only setting", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		settings := &stubSettingsRepo{values: map[string]string{
+			domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
+		}}
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, settings, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{ID: "msg-111"}, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 || repo.entries[0].Retained {
+			t.Fatal("expected retained false for provider_only")
 		}
 	})
 
