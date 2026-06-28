@@ -55,20 +55,24 @@ func (sh *SendHelper) DispatchAndLog(
 	}
 
 	result, err := send(ctx)
+	providerName := ""
+	if sh.svc != nil {
+		providerName = sh.svc.ProviderNameForLog(ctx, workspaceID, channel, result)
+	}
 	if err != nil {
 		// Log the full error internally; never echo infrastructure details to the caller.
 		slog.ErrorContext(ctx, "send failed", "error", err)
 		sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-			http.StatusInternalServerError, endpoint, start, err.Error(), providerFromMeta(result))
+			http.StatusInternalServerError, endpoint, start, err.Error(), providerName)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "send failed"})
 	}
 
-	if provider := providerFromMeta(result); provider != "" {
-		ctx = logger.WithProvider(ctx, provider)
+	if providerName != "" {
+		ctx = logger.WithProvider(ctx, providerName)
 	}
 	slog.InfoContext(ctx, "send ok", "duration_ms", time.Since(start).Milliseconds())
 	sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-		http.StatusOK, endpoint, start, "", providerFromMeta(result))
+		http.StatusOK, endpoint, start, "", providerName)
 	return c.JSON(http.StatusOK, result)
 }
 
@@ -100,11 +104,4 @@ func (sh *SendHelper) RecordLog(
 	if err := sh.svc.RecordLog(ctx, entry); err != nil {
 		slog.ErrorContext(ctx, "message_request_log insert failed", "error", err)
 	}
-}
-
-func providerFromMeta(r *contracts.SendResult) string {
-	if r == nil || r.Meta == nil {
-		return ""
-	}
-	return r.Meta["provider_name"]
 }

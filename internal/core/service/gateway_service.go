@@ -251,7 +251,7 @@ func (s *GatewayService) resolveDispatchMode(ctx context.Context, workspaceID st
 	if err != nil || v == "" {
 		return domain.DefaultMessageDispatchMode()
 	}
-	if mode, ok := domain.ParseMessageDispatchMode(v); ok {
+	if mode, ok := domain.SettingValueToDispatchMode(v); ok {
 		return mode
 	}
 	return domain.DefaultMessageDispatchMode()
@@ -329,6 +329,34 @@ func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channe
 	if providerName != "" {
 		r.Meta["provider_name"] = providerName
 	}
+}
+
+// ProviderNameForLog returns the provider name to persist on message_request_logs.
+// It prefers dispatch metadata on the result and falls back to the active integration.
+func (s *GatewayService) ProviderNameForLog(ctx context.Context, workspaceID, channel string, result *contracts.SendResult) string {
+	if name := providerNameFromResult(result); name != "" {
+		return name
+	}
+	switch s.resolveDispatchMode(ctx, workspaceID) {
+	case domain.DispatchMemoryOnly:
+		return memoryProviderName
+	default:
+		if s.integrations == nil {
+			return ""
+		}
+		intg, err := s.activeIntegration(ctx, workspaceID, channel)
+		if err != nil {
+			return ""
+		}
+		return intg.ProviderName
+	}
+}
+
+func providerNameFromResult(r *contracts.SendResult) string {
+	if r == nil || r.Meta == nil {
+		return ""
+	}
+	return r.Meta["provider_name"]
 }
 
 // RecordLog persists a MessageRequestLog entry. Failures are logged with slog.

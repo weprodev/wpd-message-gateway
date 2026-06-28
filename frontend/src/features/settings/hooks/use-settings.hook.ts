@@ -18,10 +18,28 @@ const DISPATCH_MODES: MessageDispatchMode[] = [
 ]
 
 function normalizeMessageDispatchMode(raw: string | undefined): MessageDispatchMode {
-  if (raw && DISPATCH_MODES.includes(raw as MessageDispatchMode)) {
+  if (!raw) {
+    return "memory_only"
+  }
+
+  if (DISPATCH_MODES.includes(raw as MessageDispatchMode)) {
     return raw as MessageDispatchMode
   }
-  return "memory_only"
+
+  switch (raw) {
+    case "memory":
+      return "memory_only"
+    case "both":
+    case "memory_database":
+      return "memory_and_provider"
+    case "providers":
+    case "provider":
+      return "provider_only"
+    case "provider_database":
+      return "provider_and_database"
+    default:
+      return "memory_only"
+  }
 }
 
 export function useSettings(workspaceId: string) {

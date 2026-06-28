@@ -6,7 +6,7 @@
 
 **Status**: Implemented
 
-**Input**: Add **Provider + Database** message dispatch mode; mark database-backed modes on request logs via a `retained` flag; rename backend `data_retention` to `message_dispatch_mode`; keep operational logging flow unchanged.
+**Input**: Add **Provider + Database** message dispatch mode; mark database-backed modes on request logs via a `retained` flag; store dispatch mode under `message_dispatch_mode`; keep operational logging flow unchanged.
 
 ## Clarifications
 
@@ -15,7 +15,7 @@
 - Q: What does **Provider + Database** do compared to **Provider Only**? → A: Identical outbound dispatch and request-logging behavior as **Provider Only**; the only difference is `retained = true` on the request log row (no message content persistence).
 - Q: Which modes set `retained = true`? → A: **Memory + Database** and **Provider + Database** only.
 - Q: Should the request-log insert flow change by mode? → A: No — all modes continue saving request logs exactly as today; only the new `retained` column distinguishes database-backed retention from operational-only modes.
-- Q: What is the canonical backend setting key? → A: `message_dispatch_mode` (replace all backend uses of `data_retention`).
+- Q: What is the canonical backend setting key? → A: `message_dispatch_mode` (sole key for dispatch mode in API, Portal, and gateway).
 - Q: What are the canonical mode values? → A: `memory`, `memory_database`, `provider`, `provider_database` (legacy `both` → `memory_database`, `providers` → `provider` accepted on read only).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -70,7 +70,7 @@ An operator or compliance reviewer needs to tell which request logs belong to da
 
 - **FR-001**: System MUST expose four message dispatch modes: **Memory only**, **Memory + Database**, **Provider only**, and **Provider + Database**.
 - **FR-002**: System MUST persist dispatch mode per workspace using canonical values `memory`, `memory_database`, `provider`, and `provider_database` under the backend setting key `message_dispatch_mode`.
-- **FR-003**: System MUST replace all backend references to `data_retention` with `message_dispatch_mode`.
+- **FR-003**: System MUST store and read dispatch mode using the setting key `message_dispatch_mode` only.
 - **FR-004**: System MUST treat legacy values `both` as `memory_database` and `providers` as `provider` when reading settings; new writes MUST use canonical values only.
 - **FR-005**: **Memory only** MUST capture messages in process memory only and MUST NOT persist message content to the database.
 - **FR-006**: **Memory + Database** MUST persist message content for portal/database access and MUST mark request log rows with `retained = true`.
@@ -93,7 +93,7 @@ An operator or compliance reviewer needs to tell which request logs belong to da
 - **SC-001**: 100% of manual test scenarios across all four dispatch modes produce the correct combination of message content persistence, dispatch path, and `retained` flag.
 - **SC-002**: Recent Requests shows request log entries for all four dispatch modes without regression.
 - **SC-003**: Request logs under **Memory + Database** and **Provider + Database** have `retained = true`; logs under **Memory only** and **Provider only** have `retained = false`.
-- **SC-004**: No backend code or API contract continues to use `data_retention` as the setting key or identifier.
+- **SC-004**: API, Portal, and gateway use `message_dispatch_mode` as the sole setting key for dispatch mode.
 
 ## Assumptions
 

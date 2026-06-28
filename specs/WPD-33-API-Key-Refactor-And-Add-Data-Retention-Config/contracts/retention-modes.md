@@ -8,16 +8,7 @@
 
 ### GET `/api/v1/workspaces/:wid/settings`
 
-Response returns workspace settings as stored (pass-through). Either key may appear depending on what was saved:
-
-```json
-{
-  "data_retention": "both",
-  "owner_email": "admin@example.com"
-}
-```
-
-or:
+Response returns workspace settings as stored (pass-through):
 
 ```json
 {
@@ -27,20 +18,12 @@ or:
 ```
 
 **Normalization rules (GET)** — v1:
-- No key or value migration on read. Return keys and values from `workspace_settings` as persisted.
-- Legacy value alias mapping (`both` → `memory_database`, etc.) and `data_retention` → `message_dispatch_mode` consolidation are **deferred to a future refactor**.
+- Return keys and values from `workspace_settings` as persisted.
+- Legacy **value** alias mapping (`both` → `memory_database`, etc.) on read is **deferred to a future refactor**.
 
 ### PATCH `/api/v1/workspaces/:wid/settings`
 
-Request body (partial update). Either dispatch key is accepted:
-
-```json
-{
-  "data_retention": "provider_database"
-}
-```
-
-or:
+Request body (partial update):
 
 ```json
 {
@@ -50,9 +33,9 @@ or:
 
 **Write rules (PATCH)** — v1:
 - Accept any setting key/value pair the client sends; persist each entry to `workspace_settings` as given.
-- Both `data_retention` and `message_dispatch_mode` are valid for this feature — no rejection or silent ignore of either key.
-- Canonical value set for new **Provider + Database** mode: `provider_database` (plus existing portal values `memory`, `both`/`memory_database`, `providers`/`provider` as used today).
-- Stricter validation, single canonical key, and legacy alias normalization are **deferred to a future refactor**.
+- Dispatch mode MUST use the key `message_dispatch_mode` only.
+- Canonical value set: `memory`, `memory_database`, `provider`, `provider_database` (legacy values `both`, `providers` accepted on read via gateway mapping only).
+- Stricter validation and legacy value normalization on PATCH are **deferred to a future refactor**.
 
 ## Canonical Values
 
@@ -63,13 +46,16 @@ or:
 | Provider only | `provider` | `provider_only` |
 | Provider + Database | `provider_database` | `provider_and_database` |
 
+Portal UI may also persist gateway strings directly (`memory_only`, `provider_and_database`, etc.).
+
 ## Gateway Send Side Effects
 
 For all modes, on each API send handled by `SendHelper.DispatchAndLog`:
 
-1. Resolve dispatch mode from workspace settings (gateway reads `message_dispatch_mode`; portal may still persist `data_retention` until a future settings refactor).
-2. Execute dispatch per mode (unchanged insert conditions for logs).
-3. Insert `message_request_logs` row with `retained = ShouldRetainRequestLog(mode)`:
+1. Resolve dispatch mode from workspace settings (`message_dispatch_mode` key).
+2. Map setting value via `SettingValueToDispatchMode` (handles portal aliases and gateway strings).
+3. Execute dispatch per resolved mode (unchanged insert conditions for logs).
+4. Insert `message_request_logs` row with `retained = ShouldRetainRequestLog(mode)`:
 
 | Resolved gateway mode | `retained` |
 | --------------------- | ---------- |
@@ -109,8 +95,6 @@ ORDER BY created_at DESC;
 | Three portal retention options | Four options including **Provider + Database** (`provider_database`) |
 | No `retained` column | Required on all new inserts |
 | No `provider_and_database` gateway mode | New mode available |
-
-**Deferred (future refactor)**: consolidating `data_retention` → `message_dispatch_mode`, GET normalization, and PATCH validation.
 
 ## SDK / Public Package
 

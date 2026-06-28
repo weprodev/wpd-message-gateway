@@ -100,7 +100,7 @@ frontend/src/features/settings/
 
 ### Phase 0 — Research (`research.md`)
 
-Resolve naming (portal vs gateway dispatch strings), `retained` semantics, migration-in-place strategy, and settings key migration (`data_retention` → `message_dispatch_mode`).
+Resolve naming (portal vs gateway dispatch strings), `retained` semantics, migration-in-place strategy, and canonical `message_dispatch_mode` setting key.
 
 ### Phase 1 — Design
 
@@ -118,8 +118,8 @@ Generate `tasks.md` via `/speckit-tasks` when implementation starts. Expected wo
 2. **Domain** — four modes, legacy alias normalization, `ShouldRetainRequestLog(mode) bool`
 3. **Gateway** — `DispatchProviderAndDatabase` (same body as `DispatchProviderOnly`); keep existing `DispatchMemoryAndProvider` / `memory_and_provider`
 4. **Logging** — populate `Retained` in `send_helper.RecordLog` without changing insert conditions
-5. **Portal API** — GET returns canonical `message_dispatch_mode`; PATCH accepts legacy keys/values on read, writes canonical only
-6. **Portal UI** — four radio options; save `message_dispatch_mode` with canonical values
+5. **Portal API** — GET/PATCH use `message_dispatch_mode` key; gateway maps values via `SettingValueToDispatchMode`
+6. **Portal UI** — four radio options; save `message_dispatch_mode` with canonical portal or gateway values
 7. **Verification** — domain tests, Bruno, `make audit`
 
 ## Complexity Tracking

@@ -65,18 +65,18 @@ ORDER BY created_at DESC LIMIT 1;
 
 Compare Scenarios 3 and 4 side-by-side — dispatch metadata should match except `retained`.
 
-## Scenario 5 — Legacy alias read
+## Scenario 5 — Legacy value alias read
 
-1. Insert legacy setting directly (one-time test):
+1. Insert legacy **value** directly (one-time test):
 
 ```sql
 INSERT INTO workspace_settings (workspace_id, key, value)
-VALUES ('<WID>', 'data_retention', 'both')
+VALUES ('<WID>', 'message_dispatch_mode', 'both')
 ON CONFLICT (workspace_id, key) DO UPDATE SET value = EXCLUDED.value;
 ```
 
 2. GET settings via API.
-3. **Expected**: Response contains `"message_dispatch_mode": "memory_database"` (not `data_retention` / `both`).
+3. **Expected**: Response contains `"message_dispatch_mode": "both"` (pass-through). Gateway resolves `both` → `memory_and_provider` at dispatch time via `SettingValueToDispatchMode`.
 
 ## Scenario 6 — Recent Requests regression
 
@@ -108,6 +108,6 @@ cd tests/bruno && bru run --env memory
 | Provider + Database dispatch matches Provider only | ☐ |
 | Recent Requests works for all modes (no `retained` filter) | ☐ |
 | List API / SQL can read `retained` column on each row | ☐ |
-| Settings GET/PATCH pass-through (`data_retention` or `message_dispatch_mode`) | ☐ |
+| Settings GET/PATCH use `message_dispatch_mode` key | ☐ |
 
 See [spec.md](./spec.md) success criteria SC-001–SC-004.

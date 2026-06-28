@@ -57,17 +57,17 @@ Legacy read aliases: `both` → `memory_database`, `providers` → `provider`.
 
 ---
 
-## R4 — Settings key: `data_retention` → `message_dispatch_mode`
+## R4 — Settings key: `message_dispatch_mode`
 
-**Decision**: Backend stores and exposes `message_dispatch_mode` only. Portal UI PATCH/GET uses this key with canonical values. On GET, normalize legacy DB rows (`data_retention` key or legacy values) to canonical response.
+**Decision**: Backend, Portal, and API use `message_dispatch_mode` as the sole setting key. Portal UI PATCH/GET uses this key with canonical portal values (`memory`, `memory_database`, `provider`, `provider_database`) or gateway strings (`memory_only`, `provider_and_database`, etc.). Legacy **values** (`both`, `providers`) are mapped on read via `SettingValueToDispatchMode`; no alternate setting key is supported.
 
-**Rationale**: FR-003/SC-004; backend domain already defines `SettingKeyMessageDispatchMode`. Frontend currently saves `data_retention` — align to backend key to fix settings/gateway mismatch.
+**Rationale**: FR-003/SC-004; backend domain defines `SettingKeyMessageDispatchMode`. Single key avoids dual-source bugs between Portal and gateway.
 
 **Alternatives considered**:
 | Alternative | Rejected because |
 | ----------- | ---------------- |
-| Accept both keys indefinitely | Perpetuates dual-source bugs |
-| DB migration renaming keys in `workspace_settings` | Heavier; normalization on read + canonical write on PATCH is sufficient for v1 |
+| Accept multiple setting keys | Perpetuates dispatch-mode resolution bugs |
+| DB migration renaming legacy keys in `workspace_settings` | Not needed — greenfield uses `message_dispatch_mode` only |
 
 ---
 

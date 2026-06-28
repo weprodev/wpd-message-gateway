@@ -6,7 +6,7 @@
 
 **Tests**: Domain and handler unit tests included where they lock mapping and `retained` behavior (not full TDD).
 
-**Organization**: Tasks grouped by user story. Settings key consolidation (`data_retention` → `message_dispatch_mode` on GET/PATCH) is **out of scope** — deferred per contracts/retention-modes.md.
+**Organization**: Tasks grouped by user story. All settings read/write uses `message_dispatch_mode` only.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -45,11 +45,11 @@
 ### Implementation for User Story 1
 
 - [x] T007 [US1] Extract shared provider-dispatch helper and add `DispatchProviderAndDatabase` case (same logic as `DispatchProviderOnly`) in `internal/core/service/gateway_service.go` — keep `DispatchMemoryAndProvider` / `memory_and_provider` unchanged
-- [x] T008 [US1] Update `resolveDispatchMode` in `internal/core/service/gateway_service.go` to read `message_dispatch_mode` first, fall back to `data_retention`, and map portal values via `SettingValueToDispatchMode`
+- [x] T008 [US1] Update `resolveDispatchMode` in `internal/core/service/gateway_service.go` to read `message_dispatch_mode` and map values via `SettingValueToDispatchMode`
 - [x] T009 [US1] Include `retained` in INSERT in `internal/infrastructure/repository/postgres/message_request_log_repository.go`
 - [x] T010 [US1] Resolve workspace dispatch mode and set `entry.Retained` from `ShouldRetainRequestLog` in `internal/presentation/handler/send_helper.go` (add service helper on `GatewayService` if needed — e.g. `ResolveDispatchMode` / `ShouldRetainForWorkspace`)
 - [x] T011 [P] [US1] Add `provider_database` to `RetentionMode` in `frontend/src/features/settings/settings.types.ts`
-- [x] T012 [P] [US1] Add **Provider + Database** radio option in `frontend/src/features/settings/pages/settings.page.tsx` (continue saving via `data_retention` key per v1 contract)
+- [x] T012 [P] [US1] Add **Provider + Database** radio option in `frontend/src/features/settings/pages/settings.page.tsx` (save via `message_dispatch_mode` key)
 - [x] T013 [US1] Update legacy value display mapping (`both` → Memory + Database, `providers` → Provider only) in `frontend/src/features/settings/hooks/use-settings.hook.ts`
 - [x] T014 [P] [US1] Add gateway tests for `provider_and_database` dispatch in `internal/core/service/gateway_service_test.go`
 - [x] T015 [P] [US1] Assert `retained` true/false per mode in `internal/presentation/handler/send_helper_test.go`
@@ -149,7 +149,7 @@ internal/presentation/handler/send_helper_test.go
 ### Out of Scope (v1 — do not implement)
 
 - Renaming `memory_and_provider` → `memory_and_database`
-- GET/PATCH settings normalization or rejecting `data_retention`
+- GET/PATCH settings value normalization (legacy aliases returned as-is from DB)
 - TTL purge job for `retained = false`
 - Changes to `pkg/gateway` SDK
 
@@ -157,6 +157,6 @@ internal/presentation/handler/send_helper_test.go
 
 ## Notes
 
-- Portal continues using `data_retention` setting key; gateway must fall back to that key (T008).
+- Portal and gateway use `message_dispatch_mode` as the sole setting key.
 - Do **not** gate log inserts by mode — only set `retained` (FR-010).
 - `ListWithSource` must never filter by `retained` (Recent Requests).

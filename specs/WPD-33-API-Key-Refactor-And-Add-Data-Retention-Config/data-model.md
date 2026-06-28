@@ -23,14 +23,12 @@ Workspace
 | `key` | TEXT | `message_dispatch_mode` (canonical) |
 | `value` | TEXT | One of: `memory`, `memory_database`, `provider`, `provider_database` |
 
-**Legacy read normalization** (not stored on new writes):
+**Legacy value normalization on read** (not stored on new writes; mapped via `SettingValueToDispatchMode`):
 
 | Legacy value | Canonical value |
 | ------------ | --------------- |
 | `both` | `memory_database` |
 | `providers` | `provider` |
-
-**Legacy key** (read-only migration): if `data_retention` exists and `message_dispatch_mode` does not, treat as source for normalization on GET.
 
 ## Gateway Dispatch Mode (domain enum)
 
