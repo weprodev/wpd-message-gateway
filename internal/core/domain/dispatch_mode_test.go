@@ -42,7 +42,7 @@ func TestShouldRetainRequestLog(t *testing.T) {
 	}{
 		{DispatchMemoryOnly, false},
 		{DispatchProviderOnly, false},
-		{DispatchMemoryAndProvider, true},
+		{DispatchMemoryAndProvider, false},
 		{DispatchProviderAndDatabase, true},
 	}
 

@@ -77,7 +77,7 @@ type MessageRequestLog struct {
 | Setting value | Gateway mode | Message content in DB | Provider dispatch | `retained` on log insert |
 | ------------- | ------------ | ----------------------- | ----------------- | ------------------------ |
 | `memory` | `memory_only` | No (in-process inbox only) | No | `false` |
-| `memory_database` | `memory_and_provider` | Yes (inbox/DB path) | Yes (if integration connected) | `true` |
+| `memory_database` | `memory_and_provider` | Yes (inbox/DB path) | Yes (if integration connected) | `false` |
 | `provider` | `provider_only` | No | Yes | `false` |
 | `provider_database` | `provider_and_database` | No | Yes (identical to provider) | `true` |
 

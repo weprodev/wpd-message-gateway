@@ -13,7 +13,11 @@
 ### Session 2026-06-27
 
 - Q: What does **Provider + Database** do compared to **Provider Only**? → A: Identical outbound dispatch and request-logging behavior as **Provider Only**; the only difference is `retained = true` on the request log row (no message content persistence).
-- Q: Which modes set `retained = true`? → A: **Memory + Database** and **Provider + Database** only.
+- Q: Which modes set `retained = true`? → A: **Provider + Database** only.
+
+### Session 2026-06-29
+
+- Q: Should **Memory + Database** mark request logs as retained? → A: No — `retained = false`; only **Provider + Database** sets `retained = true`.
 - Q: Should the request-log insert flow change by mode? → A: No — all modes continue saving request logs exactly as today; only the new `retained` column distinguishes database-backed retention from operational-only modes.
 - Q: What is the canonical backend setting key? → A: `message_dispatch_mode` (sole key for dispatch mode in API, Portal, and gateway).
 - Q: What are the canonical mode values? → A: `memory`, `memory_database`, `provider`, `provider_database` (legacy `both` → `memory_database`, `providers` → `provider` accepted on read only).
@@ -32,7 +36,7 @@ A workspace admin opens **Settings → Data Retention** and chooses how outbound
 
 1. **Given** a workspace with no saved policy, **When** the admin opens Data Retention, **Then** **Memory only** is selected by default.
 2. **Given** **Memory only** is active, **When** a message is sent, **Then** it is captured in process memory only (no message content in the database) and any request log row created follows today's logging rules with `retained = false`.
-3. **Given** **Memory + Database** is active, **When** a message is sent, **Then** message content is persisted for portal inbox/database access and any request log row created has `retained = true`.
+3. **Given** **Memory + Database** is active, **When** a message is sent, **Then** message content is persisted for portal inbox/database access and any request log row created has `retained = false`.
 4. **Given** **Provider only** is active, **When** a message is sent, **Then** it is dispatched through the connected integration with no message content in the database and any request log row created has `retained = false`.
 5. **Given** **Provider + Database** is active, **When** a message is sent, **Then** dispatch behavior is identical to **Provider only** and any request log row created has `retained = true` (no message content persistence).
 6. **Given** a workspace saved with legacy value `both`, **When** settings are loaded, **Then** the UI shows **Memory + Database** selected.
@@ -50,8 +54,8 @@ An operator or compliance reviewer needs to tell which request logs belong to da
 
 **Acceptance Scenarios**:
 
-1. **Given** request logs from **Memory + Database** or **Provider + Database**, **When** filtered by `retained = true`, **Then** all matching rows are returned.
-2. **Given** request logs from **Memory only** or **Provider only**, **When** filtered by `retained = true`, **Then** no rows are returned.
+1. **Given** request logs from **Provider + Database**, **When** filtered by `retained = true`, **Then** all matching rows are returned.
+2. **Given** request logs from **Memory only**, **Memory + Database**, or **Provider only**, **When** filtered by `retained = true`, **Then** no rows are returned.
 3. **Given** any dispatch mode, **When** Recent Requests is opened, **Then** operational request logs appear regardless of `retained` value.
 
 ---
@@ -73,10 +77,10 @@ An operator or compliance reviewer needs to tell which request logs belong to da
 - **FR-003**: System MUST store and read dispatch mode using the setting key `message_dispatch_mode` only.
 - **FR-004**: System MUST treat legacy values `both` as `memory_database` and `providers` as `provider` when reading settings; new writes MUST use canonical values only.
 - **FR-005**: **Memory only** MUST capture messages in process memory only and MUST NOT persist message content to the database.
-- **FR-006**: **Memory + Database** MUST persist message content for portal/database access and MUST mark request log rows with `retained = true`.
+- **FR-006**: **Memory + Database** MUST persist message content for portal/database access and MUST mark request log rows with `retained = false`.
 - **FR-007**: **Provider only** MUST dispatch through the connected integration with the same behavior as today's provider-only path, MUST NOT persist message content, and MUST mark request log rows with `retained = false`.
 - **FR-008**: **Provider + Database** MUST dispatch identically to **Provider only**, MUST NOT persist message content, and MUST mark request log rows with `retained = true`.
-- **FR-009**: System MUST add a boolean `retained` column to request logs (`message_request_logs`): `true` for **Memory + Database** and **Provider + Database**; `false` for **Memory only** and **Provider only**.
+- **FR-009**: System MUST add a boolean `retained` column to request logs (`message_request_logs`): `true` for **Provider + Database** only; `false` for **Memory only**, **Memory + Database**, and **Provider only**.
 - **FR-010**: Request log creation MUST follow the existing save flow for all modes — no gating or skipping of inserts by dispatch mode; only the `retained` value differs.
 - **FR-011**: Portal **Recent Requests** MUST list request logs from all dispatch modes (not filtered by `retained`).
 - **FR-012**: Long-term retention queries and exports MUST filter request logs where `retained = true` only.
@@ -92,7 +96,7 @@ An operator or compliance reviewer needs to tell which request logs belong to da
 
 - **SC-001**: 100% of manual test scenarios across all four dispatch modes produce the correct combination of message content persistence, dispatch path, and `retained` flag.
 - **SC-002**: Recent Requests shows request log entries for all four dispatch modes without regression.
-- **SC-003**: Request logs under **Memory + Database** and **Provider + Database** have `retained = true`; logs under **Memory only** and **Provider only** have `retained = false`.
+- **SC-003**: Request logs under **Provider + Database** have `retained = true`; logs under **Memory only**, **Memory + Database**, and **Provider only** have `retained = false`.
 - **SC-004**: API, Portal, and gateway use `message_dispatch_mode` as the sole setting key for dispatch mode.
 
 ## Assumptions

@@ -243,7 +243,7 @@ Each workspace independently controls how outbound messages are handled:
 | --------------------- | ----------------------------------------------------------------------------------- | ---------------------- |
 | `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. | `false`                |
 | `provider_only`       | Sent through the connected integration only. No in-memory copy.                     | `false`                |
-| `memory_and_provider` | Stored in memory AND sent through the integration.                                  | `true`                 |
+| `memory_and_provider` | Stored in memory AND sent through the integration.                                  | `false`                |
 | `provider_and_database` | Same outbound path as `provider_only`; logs marked for long-term retention.       | `true`                 |
 
 Configured via `PATCH /api/v1/workspaces/:wid/settings` (Portal **Settings → Data Retention**):

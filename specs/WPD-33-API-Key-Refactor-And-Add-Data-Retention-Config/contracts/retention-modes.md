@@ -60,7 +60,7 @@ For all modes, on each API send handled by `SendHelper.DispatchAndLog`:
 | Resolved gateway mode | `retained` |
 | --------------------- | ---------- |
 | `memory_only` | `false` |
-| `memory_and_provider` | `true` |
+| `memory_and_provider` | `false` |
 | `provider_only` | `false` |
 | `provider_and_database` | `true` |
 

@@ -42,7 +42,7 @@
 | Portal / API setting value | Gateway `MessageDispatchMode` | `retained` |
 | -------------------------- | ----------------------------- | ---------- |
 | `memory` | `memory_only` | `false` |
-| `memory_database` | `memory_and_provider` | `true` |
+| `memory_database` | `memory_and_provider` | `false` |
 | `provider` | `provider_only` | `false` |
 | `provider_database` | `provider_and_database` | `true` |
 

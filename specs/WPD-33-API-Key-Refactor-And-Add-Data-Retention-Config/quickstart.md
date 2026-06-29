@@ -44,7 +44,7 @@ ORDER BY created_at DESC LIMIT 1;
 
 1. PATCH `message_dispatch_mode` → `memory_database`.
 2. Send test message.
-3. **Expected**: Message content persisted; log row `retained = true`.
+3. **Expected**: Message content persisted; log row `retained = false`.
 4. Portal **Recent Requests** shows the entry.
 
 ## Scenario 3 — Provider only
@@ -104,7 +104,7 @@ cd tests/bruno && bru run --env memory
 | Check | Pass |
 | ----- | ---- |
 | Four modes selectable in Portal | ☐ |
-| `retained` true only for `both`/`memory_database` and `provider_database` | ☐ |
+| `retained` true only for `provider_database` | ☐ |
 | Provider + Database dispatch matches Provider only | ☐ |
 | Recent Requests works for all modes (no `retained` filter) | ☐ |
 | List API / SQL can read `retained` column on each row | ☐ |

@@ -54,10 +54,5 @@ func SettingValueToDispatchMode(value string) (MessageDispatchMode, bool) {
 
 // ShouldRetainRequestLog reports whether request logs for this dispatch mode are long-term retained.
 func ShouldRetainRequestLog(mode MessageDispatchMode) bool {
-	switch mode {
-	case DispatchMemoryAndProvider, DispatchProviderAndDatabase:
-		return true
-	default:
-		return false
-	}
+	return mode == DispatchProviderAndDatabase
 }
