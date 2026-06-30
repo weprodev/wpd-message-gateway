@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils"
 import { ApiKeyRow } from "../components/api-key-row"
 import { RadioOption } from "../components/radio-option"
 import { useSettings } from "../hooks/use-settings.hook"
-import type { MessageDispatchMode, SettingsTab, WorkspaceSettings } from "../settings.types"
+import { dispatchConfigsEqual, toMessageDispatchApiValue } from "../message-dispatch-mode"
+import type { MessageDispatchConfig, SettingsTab, WorkspaceSettings } from "../settings.types"
 
 interface GeneralSettingsPanelProps {
   settings: WorkspaceSettings
@@ -81,18 +82,18 @@ function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
 }
 
 interface RetentionSettingsPanelProps {
-  initialMode: MessageDispatchMode
+  initialConfig: MessageDispatchConfig
   onSave: (patch: Record<string, string>) => Promise<void>
 }
 
-function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelProps) {
-  const [dispatchMode, setDispatchMode] = useState<MessageDispatchMode>(initialMode)
+function RetentionSettingsPanel({ initialConfig, onSave }: RetentionSettingsPanelProps) {
+  const [dispatchConfig, setDispatchConfig] = useState<MessageDispatchConfig>(initialConfig)
   const [isSaving, setIsSaving] = useState(false)
 
   async function handleSave() {
     setIsSaving(true)
     try {
-      await onSave({ message_dispatch_mode: dispatchMode })
+      await onSave({ message_dispatch_mode: toMessageDispatchApiValue(dispatchConfig) })
     } finally {
       setIsSaving(false)
     }
@@ -105,32 +106,32 @@ function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelP
         name="retention"
         label="Memory only"
         description="Store messages in memory for testing — no persistence."
-        checked={dispatchMode === "memory_only"}
-        onChange={() => setDispatchMode("memory_only")}
+        checked={dispatchConfigsEqual(dispatchConfig, { mode: "memory", storeInDb: false })}
+        onChange={() => setDispatchConfig({ mode: "memory", storeInDb: false })}
       />
       <RadioOption
         id="retention-both"
         name="retention"
         label="Memory + Database"
         description="Persist messages in the portal inbox and database."
-        checked={dispatchMode === "memory_and_provider"}
-        onChange={() => setDispatchMode("memory_and_provider")}
+        checked={dispatchConfigsEqual(dispatchConfig, { mode: "memory", storeInDb: true })}
+        onChange={() => setDispatchConfig({ mode: "memory", storeInDb: true })}
       />
       <RadioOption
         id="retention-providers"
         name="retention"
         label="Providers only"
         description="Send through providers without storing message content."
-        checked={dispatchMode === "provider_only"}
-        onChange={() => setDispatchMode("provider_only")}
+        checked={dispatchConfigsEqual(dispatchConfig, { mode: "provider", storeInDb: false })}
+        onChange={() => setDispatchConfig({ mode: "provider", storeInDb: false })}
       />
       <RadioOption
         id="retention-provider-database"
         name="retention"
         label="Provider + Database"
         description="Send through providers; The request will be saved in the database"
-        checked={dispatchMode === "provider_and_database"}
-        onChange={() => setDispatchMode("provider_and_database")}
+        checked={dispatchConfigsEqual(dispatchConfig, { mode: "provider", storeInDb: true })}
+        onChange={() => setDispatchConfig({ mode: "provider", storeInDb: true })}
       />
 
       <Button type="button" onClick={handleSave} disabled={isSaving} className="mt-2 w-fit">
@@ -145,7 +146,7 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general")
   const [busyKeyId, setBusyKeyId] = useState<string | null>(null)
 
-  const { settings, apiKeys, messageDispatchMode, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
+  const { settings, apiKeys, messageDispatchConfig, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
     useSettings(wid)
 
   async function handleCreateApiKey() {
@@ -265,7 +266,11 @@ export function SettingsPage() {
         </Tabs.Content>
 
         <Tabs.Content value="retention">
-          <RetentionSettingsPanel key={`${wid}-${messageDispatchMode}`} initialMode={messageDispatchMode} onSave={saveSettings} />
+          <RetentionSettingsPanel
+            key={`${wid}-${toMessageDispatchApiValue(messageDispatchConfig)}`}
+            initialConfig={messageDispatchConfig}
+            onSave={saveSettings}
+          />
         </Tabs.Content>
       </Tabs.Root>
 
