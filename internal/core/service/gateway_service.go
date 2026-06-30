@@ -148,7 +148,7 @@ func (s *GatewayService) dispatch(
 		r, err := writeToInbox()
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed", "error", err, "workspace_id", workspaceID, "channel", channel)
-			return nil, err
+			return resultWithProviderMeta(memoryProviderName), err
 		}
 		attachMeta(r, mode, channel, "", memoryProviderName)
 		slog.InfoContext(ctx, "message dispatched via memory only", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
@@ -165,7 +165,7 @@ func (s *GatewayService) dispatch(
 			r, err := writeToInbox()
 			if err != nil {
 				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-				return nil, err
+				return resultWithProviderMeta(intg.ProviderName), err
 			}
 			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
@@ -175,7 +175,7 @@ func (s *GatewayService) dispatch(
 		r, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
 			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
-			return nil, err
+			return resultWithProviderMeta(intg.ProviderName), err
 		}
 		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 		slog.InfoContext(ctx, "message dispatched via provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID, "dispatch_mode", mode)
@@ -192,7 +192,7 @@ func (s *GatewayService) dispatch(
 			r, err := writeToInbox()
 			if err != nil {
 				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-				return nil, err
+				return resultWithProviderMeta(intg.ProviderName), err
 			}
 			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
@@ -207,7 +207,7 @@ func (s *GatewayService) dispatch(
 		provResult, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
 			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
-			return nil, err
+			return resultWithProviderMeta(intg.ProviderName), err
 		}
 		if inboxResult != nil {
 			if provResult.Meta == nil {
@@ -225,7 +225,7 @@ func (s *GatewayService) dispatch(
 		r, err := writeToInbox()
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-			return nil, err
+			return resultWithProviderMeta(memoryProviderName), err
 		}
 		attachMeta(r, domain.DispatchMemoryOnly, channel, "", memoryProviderName)
 		return r, nil

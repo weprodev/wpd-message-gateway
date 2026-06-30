@@ -272,7 +272,7 @@ func TestSendHelper_DispatchAndLog_providerOnly_mailgun(t *testing.T) {
 	}
 }
 
-func TestSendHelper_DispatchAndLog_providerOnly_mailgun_withoutMeta(t *testing.T) {
+func TestSendHelper_DispatchAndLog_providerOnly_withoutMeta_leavesProviderEmpty(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"],"subject":"hi","html":"x"}`))
 	rec := httptest.NewRecorder()
@@ -302,7 +302,7 @@ func TestSendHelper_DispatchAndLog_providerOnly_mailgun_withoutMeta(t *testing.T
 	if len(repo.entries) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
 	}
-	if repo.entries[0].ProviderName != "mailgun" {
-		t.Fatalf("expected provider mailgun, got %q", repo.entries[0].ProviderName)
+	if repo.entries[0].ProviderName != "" {
+		t.Fatalf("expected empty provider without dispatch meta, got %q", repo.entries[0].ProviderName)
 	}
 }

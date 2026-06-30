@@ -55,10 +55,7 @@ func (sh *SendHelper) DispatchAndLog(
 	}
 
 	result, err := send(ctx)
-	providerName := ""
-	if sh.svc != nil {
-		providerName = sh.svc.ProviderNameForLog(ctx, workspaceID, channel, result)
-	}
+	providerName := contracts.ProviderNameFromResult(result)
 	if err != nil {
 		// Log the full error internally; never echo infrastructure details to the caller.
 		slog.ErrorContext(ctx, "send failed", "error", err)
