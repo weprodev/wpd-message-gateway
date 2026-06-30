@@ -148,7 +148,7 @@ func (s *GatewayService) dispatch(
 		r, err := writeToInbox()
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed", "error", err, "workspace_id", workspaceID, "channel", channel)
-			return resultWithProviderMeta(memoryProviderName), err
+			return attachMeta(nil, mode, channel, "", memoryProviderName), err
 		}
 		attachMeta(r, mode, channel, "", memoryProviderName)
 		slog.InfoContext(ctx, "message dispatched via memory only", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
@@ -165,7 +165,7 @@ func (s *GatewayService) dispatch(
 			r, err := writeToInbox()
 			if err != nil {
 				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-				return resultWithProviderMeta(intg.ProviderName), err
+				return attachMeta(nil, mode, channel, intg.ID, intg.ProviderName), err
 			}
 			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
@@ -175,7 +175,7 @@ func (s *GatewayService) dispatch(
 		r, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
 			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
-			return resultWithProviderMeta(intg.ProviderName), err
+			return attachMeta(nil, mode, channel, intg.ID, intg.ProviderName), err
 		}
 		attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 		slog.InfoContext(ctx, "message dispatched via provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID, "dispatch_mode", mode)
@@ -192,7 +192,7 @@ func (s *GatewayService) dispatch(
 			r, err := writeToInbox()
 			if err != nil {
 				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-				return resultWithProviderMeta(intg.ProviderName), err
+				return attachMeta(nil, mode, channel, intg.ID, intg.ProviderName), err
 			}
 			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
 			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
@@ -207,7 +207,7 @@ func (s *GatewayService) dispatch(
 		provResult, err := sendViaProvider(providerCtx, intg)
 		if err != nil {
 			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
-			return resultWithProviderMeta(intg.ProviderName), err
+			return attachMeta(nil, mode, channel, intg.ID, intg.ProviderName), err
 		}
 		if inboxResult != nil {
 			if provResult.Meta == nil {
@@ -225,7 +225,7 @@ func (s *GatewayService) dispatch(
 		r, err := writeToInbox()
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-			return resultWithProviderMeta(memoryProviderName), err
+			return attachMeta(nil, domain.DispatchMemoryOnly, channel, "", memoryProviderName), err
 		}
 		attachMeta(r, domain.DispatchMemoryOnly, channel, "", memoryProviderName)
 		return r, nil
@@ -312,11 +312,12 @@ func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID strin
 	return &contracts.SendResult{ID: id, StatusCode: 200, Message: "captured in memory"}, nil
 }
 
-// attachMeta stamps standard dispatch metadata onto a result without allocating
-// if Meta is already populated.
-func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID, providerName string) {
+// attachMeta stamps standard dispatch metadata onto r. When r is nil (error paths
+// with no provider payload), it allocates a minimal SendResult so callers can
+// still read provider_name via contracts.ProviderNameFromResult.
+func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channel, integrationID, providerName string) *contracts.SendResult {
 	if r == nil {
-		return
+		r = &contracts.SendResult{}
 	}
 	if r.Meta == nil {
 		r.Meta = make(map[string]string, 4)
@@ -329,34 +330,7 @@ func attachMeta(r *contracts.SendResult, mode domain.MessageDispatchMode, channe
 	if providerName != "" {
 		r.Meta["provider_name"] = providerName
 	}
-}
-
-// ProviderNameForLog returns the provider name to persist on message_request_logs.
-// It prefers dispatch metadata on the result and falls back to the active integration.
-func (s *GatewayService) ProviderNameForLog(ctx context.Context, workspaceID, channel string, result *contracts.SendResult) string {
-	if name := providerNameFromResult(result); name != "" {
-		return name
-	}
-	switch s.resolveDispatchMode(ctx, workspaceID) {
-	case domain.DispatchMemoryOnly:
-		return memoryProviderName
-	default:
-		if s.integrations == nil {
-			return ""
-		}
-		intg, err := s.activeIntegration(ctx, workspaceID, channel)
-		if err != nil {
-			return ""
-		}
-		return intg.ProviderName
-	}
-}
-
-func providerNameFromResult(r *contracts.SendResult) string {
-	if r == nil || r.Meta == nil {
-		return ""
-	}
-	return r.Meta["provider_name"]
+	return r
 }
 
 // RecordLog persists a MessageRequestLog entry. Failures are logged with slog.
