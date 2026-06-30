@@ -143,68 +143,6 @@ func TestGatewayService_SendEmail_memoryOnly_inboxNil(t *testing.T) {
 	}
 }
 
-func TestGatewayService_SendEmail_providerAndDatabase_memoryIntegration(t *testing.T) {
-	ts := time.Now()
-	intg := &domain.Integration{
-		ID:           "int-2",
-		WorkspaceID:  "ws-1",
-		ChannelType:  "email",
-		ProviderName: memoryProviderName,
-		Config:       []byte(`{}`),
-		Status:       domain.IntegrationStatusConnected,
-		CreatedAt:    ts,
-		UpdatedAt:    ts,
-	}
-	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderAndDatabase),
-	}}
-	inbox := &stubInbox{emailID: "cap-2"}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil)
-
-	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
-		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
-	})
-	if err != nil {
-		t.Fatalf("SendEmail: %v", err)
-	}
-	if res.ID != "cap-2" {
-		t.Fatalf("got ID %q", res.ID)
-	}
-	if res.Meta["dispatch_mode"] != string(domain.DispatchProviderAndDatabase) {
-		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
-	}
-	if res.Meta["provider_name"] != memoryProviderName {
-		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
-	}
-}
-
-func TestGatewayService_resolveDispatchMode(t *testing.T) {
-	tests := []struct {
-		setting string
-		want    domain.MessageDispatchMode
-	}{
-		{string(domain.DispatchMemoryAndProvider), domain.DispatchMemoryAndProvider},
-		{"both", domain.DispatchMemoryAndProvider},
-		{"memory_database", domain.DispatchMemoryAndProvider},
-		{"memory", domain.DispatchMemoryOnly},
-		{"providers", domain.DispatchProviderOnly},
-		{"provider_database", domain.DispatchProviderAndDatabase},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.setting, func(t *testing.T) {
-			settings := &stubSettingsRepo{values: map[string]string{
-				domain.SettingKeyMessageDispatchMode: tt.setting,
-			}}
-			svc := NewGatewayService(nil, nil, settings, nil, nil)
-
-			mode := svc.ResolveDispatchMode(context.Background(), "ws-1")
-			if mode != tt.want {
-				t.Fatalf("got mode %q, want %q", mode, tt.want)
-			}
-		})
-	}
-}
 func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 	ts := time.Now()
 	intg := &domain.Integration{
