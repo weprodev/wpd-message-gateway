@@ -4,11 +4,17 @@
 
 **Created**: 2026-06-29
 
-**Status**: In Progress
+**Status**: Draft
 
 **Input**: Refactor **Memory + Database** dispatch so it behaves like **Memory only** (no provider send) while marking request logs as retained in the database; rename legacy identifiers (`both`, `memory_and_provider`, etc.) to consistent `memory_database` / `memory_and_database` naming across the codebase.
 
 **Supersedes (partial)**: WPD-33 clarifications that set `retained = false` for **Memory + Database** — this feature changes that to `retained = true` and removes provider dispatch from the mode.
+
+## Clarifications
+
+### Session 2026-06-29
+
+- Q: Should the system accept legacy gateway string `memory_and_provider` when reading dispatch mode? → A: Yes — read-only alias mapping `memory_and_provider` → `memory_and_database`; new code MUST NOT write the legacy string.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -81,7 +87,7 @@ A compliance reviewer filters request logs by `retained = true` and sees entries
 - **FR-005**: **Memory only** and **Provider only** MUST continue to set `retained = false` on request log rows.
 - **FR-006**: System MUST rename gateway dispatch mode `memory_and_provider` to `memory_and_database` everywhere it is a canonical identifier (constants, enums, metadata, tests, docs).
 - **FR-007**: System MUST rename domain constant `DispatchMemoryAndProvider` to `DispatchMemoryAndDatabase` (or equivalent) mapping to string value `memory_and_database`.
-- **FR-008**: Setting/API canonical value `memory_database` MUST map to gateway mode `memory_and_database`; legacy setting value `both` MUST continue to resolve to **Memory + Database** on read only.
+- **FR-008**: Setting/API canonical value `memory_database` MUST map to gateway mode `memory_and_database`; legacy setting value `both` MUST continue to resolve to **Memory + Database** on read only; legacy gateway string `memory_and_provider` MUST resolve to `memory_and_database` on read only (never written).
 - **FR-009**: New writes of dispatch mode MUST use canonical setting values (`memory`, `memory_database`, `provider`, `provider_database`) — not `both` or `memory_and_provider`.
 - **FR-010**: `ShouldRetainRequestLog` (or equivalent) MUST return `true` for both `memory_and_database` and `provider_and_database` gateway modes.
 - **FR-011**: Request log creation MUST follow the existing save flow for all modes — no gating or skipping of inserts; only the `retained` value and dispatch path change for **Memory + Database**.
