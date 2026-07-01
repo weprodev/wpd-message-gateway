@@ -8,6 +8,7 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
+	"github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
 	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
 
@@ -17,10 +18,10 @@ func (s *stubMailgunSender) Send(ctx context.Context, email contracts.Email) (*c
 	return &contracts.SendResult{ID: "mg-1", StatusCode: 200, Message: "sent"}, nil
 }
 
-func (s *stubMailgunSender) Name() string { return "mailgun" }
+func (s *stubMailgunSender) Name() string { return mailgun.ProviderName }
 
 func init() {
-	registry.RegisterEmailProvider("mailgun", func(cfg registry.EmailConfig) (contracts.EmailSender, error) {
+	registry.RegisterEmailProvider(mailgun.ProviderName, func(cfg registry.EmailConfig) (contracts.EmailSender, error) {
 		return &stubMailgunSender{}, nil
 	})
 }
@@ -142,68 +143,6 @@ func TestGatewayService_SendEmail_memoryOnly_inboxNil(t *testing.T) {
 	}
 }
 
-func TestGatewayService_SendEmail_providerAndDatabase_memoryIntegration(t *testing.T) {
-	ts := time.Now()
-	intg := &domain.Integration{
-		ID:           "int-2",
-		WorkspaceID:  "ws-1",
-		ChannelType:  "email",
-		ProviderName: memoryProviderName,
-		Config:       []byte(`{}`),
-		Status:       domain.IntegrationStatusConnected,
-		CreatedAt:    ts,
-		UpdatedAt:    ts,
-	}
-	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderAndDatabase),
-	}}
-	inbox := &stubInbox{emailID: "cap-2"}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil)
-
-	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
-		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
-	})
-	if err != nil {
-		t.Fatalf("SendEmail: %v", err)
-	}
-	if res.ID != "cap-2" {
-		t.Fatalf("got ID %q", res.ID)
-	}
-	if res.Meta["dispatch_mode"] != string(domain.DispatchProviderAndDatabase) {
-		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
-	}
-	if res.Meta["provider_name"] != memoryProviderName {
-		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
-	}
-}
-
-func TestGatewayService_resolveDispatchMode(t *testing.T) {
-	tests := []struct {
-		setting string
-		want    domain.MessageDispatchMode
-	}{
-		{string(domain.DispatchMemoryAndProvider), domain.DispatchMemoryAndProvider},
-		{"both", domain.DispatchMemoryAndProvider},
-		{"memory_database", domain.DispatchMemoryAndProvider},
-		{"memory", domain.DispatchMemoryOnly},
-		{"providers", domain.DispatchProviderOnly},
-		{"provider_database", domain.DispatchProviderAndDatabase},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.setting, func(t *testing.T) {
-			settings := &stubSettingsRepo{values: map[string]string{
-				domain.SettingKeyMessageDispatchMode: tt.setting,
-			}}
-			svc := NewGatewayService(nil, nil, settings, nil, nil)
-
-			mode := svc.ResolveDispatchMode(context.Background(), "ws-1")
-			if mode != tt.want {
-				t.Fatalf("got mode %q, want %q", mode, tt.want)
-			}
-		})
-	}
-}
 func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 	ts := time.Now()
 	intg := &domain.Integration{
@@ -248,7 +187,7 @@ func TestGatewayService_SendEmail_providerOnly_mailgunIntegration(t *testing.T) 
 		ID:           "int-mg",
 		WorkspaceID:  "ws-1",
 		ChannelType:  "email",
-		ProviderName: "mailgun",
+		ProviderName: mailgun.ProviderName,
 		Config:       []byte(`{"api_key":"key","domain":"mg.example.com","from_email":"noreply@mg.example.com"}`),
 		Status:       domain.IntegrationStatusConnected,
 		CreatedAt:    ts,
@@ -268,7 +207,7 @@ func TestGatewayService_SendEmail_providerOnly_mailgunIntegration(t *testing.T) 
 	if res.ID != "mg-1" {
 		t.Fatalf("got ID %q", res.ID)
 	}
-	if res.Meta["provider_name"] != "mailgun" {
+	if res.Meta["provider_name"] != mailgun.ProviderName {
 		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
 	}
 }
@@ -279,7 +218,7 @@ func TestGatewayService_SendEmail_memoryAndProvider_mailgunIntegration(t *testin
 		ID:           "int-mg",
 		WorkspaceID:  "ws-1",
 		ChannelType:  "email",
-		ProviderName: "mailgun",
+		ProviderName: mailgun.ProviderName,
 		Config:       []byte(`{"api_key":"key","domain":"mg.example.com","from_email":"noreply@mg.example.com"}`),
 		Status:       domain.IntegrationStatusConnected,
 		CreatedAt:    ts,
@@ -297,31 +236,21 @@ func TestGatewayService_SendEmail_memoryAndProvider_mailgunIntegration(t *testin
 	if err != nil {
 		t.Fatalf("SendEmail: %v", err)
 	}
-	if res.Meta["provider_name"] != "mailgun" {
+	if res.Meta["provider_name"] != mailgun.ProviderName {
 		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
 	}
 }
 
-func TestGatewayService_ProviderNameForLog_fallsBackToIntegration(t *testing.T) {
-	intg := &domain.Integration{
-		ID: "int-mg", WorkspaceID: "ws-1", ChannelType: "email", ProviderName: "mailgun",
-	}
-	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
-	}}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, nil, nil)
-
-	name := svc.ProviderNameForLog(context.Background(), "ws-1", "email", &contracts.SendResult{ID: "x"})
-	if name != "mailgun" {
-		t.Fatalf("got provider %q, want mailgun", name)
-	}
-}
-
-func TestGatewayService_ProviderNameForLog_memoryOnlyDefault(t *testing.T) {
+func TestGatewayService_dispatch_errorResult_stampsProviderMeta(t *testing.T) {
 	svc := NewGatewayService(nil, nil, nil, nil, nil)
 
-	name := svc.ProviderNameForLog(context.Background(), "ws-1", "email", nil)
-	if name != memoryProviderName {
-		t.Fatalf("got provider %q, want memory", name)
+	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
+		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
+	})
+	if err == nil {
+		t.Fatal("expected inbox error")
+	}
+	if contracts.ProviderNameFromResult(res) != memoryProviderName {
+		t.Fatalf("provider_name: %q", contracts.ProviderNameFromResult(res))
 	}
 }

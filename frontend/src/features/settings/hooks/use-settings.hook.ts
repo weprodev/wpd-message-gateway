@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import { parseMessageDispatchConfig } from "../message-dispatch-mode"
 import {
   createApiKey,
   deleteApiKey,
@@ -8,39 +9,7 @@ import {
   patchSettings,
   regenerateApiKey,
 } from "../settings.api"
-import type { ApiKey, MessageDispatchMode, WorkspaceSettings } from "../settings.types"
-
-const DISPATCH_MODES: MessageDispatchMode[] = [
-  "memory_only",
-  "memory_and_provider",
-  "provider_only",
-  "provider_and_database",
-]
-
-function normalizeMessageDispatchMode(raw: string | undefined): MessageDispatchMode {
-  if (!raw) {
-    return "memory_only"
-  }
-
-  if (DISPATCH_MODES.includes(raw as MessageDispatchMode)) {
-    return raw as MessageDispatchMode
-  }
-
-  switch (raw) {
-    case "memory":
-      return "memory_only"
-    case "both":
-    case "memory_database":
-      return "memory_and_provider"
-    case "providers":
-    case "provider":
-      return "provider_only"
-    case "provider_database":
-      return "provider_and_database"
-    default:
-      return "memory_only"
-  }
-}
+import type { ApiKey, WorkspaceSettings } from "../settings.types"
 
 export function useSettings(workspaceId: string) {
   const [settings, setSettings] = useState<WorkspaceSettings>({})
@@ -98,12 +67,12 @@ export function useSettings(workspaceId: string) {
     return regenerateApiKey(workspaceId, keyId)
   }
 
-  const messageDispatchMode = normalizeMessageDispatchMode(settings.message_dispatch_mode)
+  const messageDispatchConfig = parseMessageDispatchConfig(settings.message_dispatch_mode)
 
   return {
     settings,
     apiKeys,
-    messageDispatchMode,
+    messageDispatchConfig,
     isLoading,
     error,
     reload,
