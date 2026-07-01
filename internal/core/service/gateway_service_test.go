@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -212,7 +213,17 @@ func TestGatewayService_SendEmail_providerOnly_mailgunIntegration(t *testing.T) 
 	}
 }
 
-func TestGatewayService_SendEmail_memoryAndProvider_mailgunIntegration(t *testing.T) {
+type countingIntegrationRepo struct {
+	stubIntegrationRepo
+	lookupCalls int
+}
+
+func (s *countingIntegrationRepo) GetActiveByWorkspaceAndChannel(ctx context.Context, workspaceID, channel string) (*domain.Integration, error) {
+	s.lookupCalls++
+	return s.stubIntegrationRepo.GetActiveByWorkspaceAndChannel(ctx, workspaceID, channel)
+}
+
+func TestGatewayService_SendEmail_memoryAndDatabase_inboxOnly(t *testing.T) {
 	ts := time.Now()
 	intg := &domain.Integration{
 		ID:           "int-mg",
@@ -225,10 +236,11 @@ func TestGatewayService_SendEmail_memoryAndProvider_mailgunIntegration(t *testin
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndProvider),
+		domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndDatabase),
 	}}
 	inbox := &stubInbox{emailID: "inbox-1"}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil)
+	integrations := &countingIntegrationRepo{stubIntegrationRepo: stubIntegrationRepo{active: intg}}
+	svc := NewGatewayService(integrations, nil, settings, inbox, nil)
 
 	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
 		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
@@ -236,8 +248,39 @@ func TestGatewayService_SendEmail_memoryAndProvider_mailgunIntegration(t *testin
 	if err != nil {
 		t.Fatalf("SendEmail: %v", err)
 	}
-	if res.Meta["provider_name"] != mailgun.ProviderName {
+	if res.ID != "inbox-1" {
+		t.Fatalf("got ID %q", res.ID)
+	}
+	if res.Meta["dispatch_mode"] != string(domain.DispatchMemoryAndDatabase) {
+		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
+	}
+	if res.Meta["provider_name"] != memoryProviderName {
 		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
+	}
+	if integrations.lookupCalls != 0 {
+		t.Fatalf("integration lookup calls = %d, want 0", integrations.lookupCalls)
+	}
+}
+
+func TestGatewayService_SendEmail_memoryAndDatabase_noIntegration(t *testing.T) {
+	settings := &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndDatabase),
+	}}
+	inbox := &stubInbox{emailID: "inbox-only"}
+	integrations := &countingIntegrationRepo{stubIntegrationRepo: stubIntegrationRepo{err: errors.New("no integration")}}
+	svc := NewGatewayService(integrations, nil, settings, inbox, nil)
+
+	res, err := svc.SendEmail(context.Background(), "ws-1", contracts.Email{
+		To: []string{"a@b.com"}, Subject: "s", HTML: "h",
+	})
+	if err != nil {
+		t.Fatalf("SendEmail: %v", err)
+	}
+	if res.ID != "inbox-only" {
+		t.Fatalf("got ID %q", res.ID)
+	}
+	if integrations.lookupCalls != 0 {
+		t.Fatalf("integration lookup calls = %d, want 0", integrations.lookupCalls)
 	}
 }
 

@@ -22,7 +22,7 @@ No Portal pages yet for: workspace create, API keys, templates, members, setting
 
 | Feature | Portal UI | Description |
 |---------|:---------:|-------------|
-| **Inbox capture** | | Messages stored in RAM (`memory_only` / `memory_and_provider`) — [Inbox API](#inbox-api-reference) |
+| **Inbox capture** | | Messages stored in RAM (`memory_only` / `memory_and_database`) — [Inbox API](#inbox-api-reference) |
 | **Internal ingest** | | Automation writes to inbox (requires Portal auth) |
 | **Workspace provisioning** | | Create workspace, API keys, settings — curl/Bruno/CI only; see [E2E bootstrap](./e2e-testing.md) |
 
@@ -44,7 +44,7 @@ Register (email + password), then sign in.
 
 ## Message Inbox (Memory Capture)
 
-When a workspace's **dispatch mode** is `memory_only` or `memory_and_provider`, outbound messages are captured in-process RAM and displayed in the Portal inbox.
+When a workspace's **dispatch mode** is `memory_only` or `memory_and_database`, outbound messages are captured in-process RAM and displayed in the Portal inbox.
 
 ```
 Your App
@@ -74,8 +74,8 @@ Each workspace controls how its outbound messages are handled:
 | `message_dispatch_mode` | Behavior |
 |------------------------|----------|
 | `memory_only` | Captured in RAM only, **no** external provider called. **Default.** |
+| `memory_and_database` | Captured in RAM only; request logs have `retained = true`. |
 | `provider_only` | Sent through the connected integration, **no** memory copy. |
-| `memory_and_provider` | Stored in memory **and** sent through the integration. |
 | `provider_and_database` | Same dispatch as provider only; request logs have `retained = true`. |
 
 Set via Portal **Settings → Data Retention** or REST:

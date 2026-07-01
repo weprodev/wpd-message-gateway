@@ -113,7 +113,7 @@ function RetentionSettingsPanel({ initialConfig, onSave }: RetentionSettingsPane
         id="retention-both"
         name="retention"
         label="Memory + Database"
-        description="Persist messages in the portal inbox and database."
+        description="Capture messages in the portal inbox; request logs are retained in the database."
         checked={dispatchConfigsEqual(dispatchConfig, { mode: "memory", storeInDb: true })}
         onChange={() => setDispatchConfig({ mode: "memory", storeInDb: true })}
       />

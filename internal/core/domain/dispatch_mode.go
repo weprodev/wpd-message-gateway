@@ -12,8 +12,8 @@ const (
 	DispatchProviderOnly MessageDispatchMode = "provider_only"
 	// DispatchProviderAndDatabase sends through the integration like provider_only; request logs are retained.
 	DispatchProviderAndDatabase MessageDispatchMode = "provider_and_database"
-	// DispatchMemoryAndProvider stores in memory and sends through the integration.
-	DispatchMemoryAndProvider MessageDispatchMode = "memory_and_provider"
+	// DispatchMemoryAndDatabase captures in RAM; request logs are retained.
+	DispatchMemoryAndDatabase MessageDispatchMode = "memory_and_database"
 	// DispatchMemoryOnly keeps messages in memory only; external providers are not called.
 	DispatchMemoryOnly MessageDispatchMode = "memory_only"
 )
@@ -26,7 +26,7 @@ func DefaultMessageDispatchMode() MessageDispatchMode {
 // ParseMessageDispatchMode returns the mode if s is a gateway dispatch string.
 func ParseMessageDispatchMode(s string) (MessageDispatchMode, bool) {
 	switch MessageDispatchMode(s) {
-	case DispatchProviderOnly, DispatchProviderAndDatabase, DispatchMemoryAndProvider, DispatchMemoryOnly:
+	case DispatchProviderOnly, DispatchProviderAndDatabase, DispatchMemoryAndDatabase, DispatchMemoryOnly:
 		return MessageDispatchMode(s), true
 	default:
 		return "", false
@@ -42,7 +42,7 @@ func SettingValueToDispatchMode(value string) (MessageDispatchMode, bool) {
 	case "memory":
 		return DispatchMemoryOnly, true
 	case "both", "memory_database":
-		return DispatchMemoryAndProvider, true
+		return DispatchMemoryAndDatabase, true
 	case "providers", "provider":
 		return DispatchProviderOnly, true
 	case "provider_database":
@@ -54,5 +54,5 @@ func SettingValueToDispatchMode(value string) (MessageDispatchMode, bool) {
 
 // ShouldRetainRequestLog reports whether request logs for this dispatch mode are long-term retained.
 func ShouldRetainRequestLog(mode MessageDispatchMode) bool {
-	return mode == DispatchProviderAndDatabase
+	return mode == DispatchMemoryAndDatabase || mode == DispatchProviderAndDatabase
 }

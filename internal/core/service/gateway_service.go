@@ -181,43 +181,15 @@ func (s *GatewayService) dispatch(
 		slog.InfoContext(ctx, "message dispatched via provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", r.ID, "dispatch_mode", mode)
 		return r, nil
 
-	case domain.DispatchMemoryAndProvider:
-		intg, err := s.activeIntegration(ctx, workspaceID, channel)
+	case domain.DispatchMemoryAndDatabase:
+		r, err := writeToInbox()
 		if err != nil {
-			slog.ErrorContext(ctx, "provider lookup failed", "error", err, "workspace_id", workspaceID, "channel", channel)
-			return nil, err
+			slog.ErrorContext(ctx, "inbox write failed", "error", err, "workspace_id", workspaceID, "channel", channel)
+			return attachMeta(nil, mode, channel, "", memoryProviderName), err
 		}
-		// If the integration is already memory, a single write is enough.
-		if intg.ProviderName == memoryProviderName {
-			r, err := writeToInbox()
-			if err != nil {
-				slog.ErrorContext(ctx, "inbox write failed (fallback)", "error", err, "workspace_id", workspaceID, "channel", channel)
-				return attachMeta(nil, mode, channel, intg.ID, intg.ProviderName), err
-			}
-			attachMeta(r, mode, channel, intg.ID, intg.ProviderName)
-			slog.InfoContext(ctx, "message dispatched via memory fallback", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
-			return r, nil
-		}
-		// Both paths: capture to inbox first (non-fatal), then send via provider.
-		inboxResult, err := writeToInbox()
-		if err != nil {
-			slog.WarnContext(ctx, "inbox write failed (non-fatal)", "error", err, "workspace_id", workspaceID, "channel", channel)
-		}
-		providerCtx := applogger.WithProvider(ctx, intg.ProviderName)
-		provResult, err := sendViaProvider(providerCtx, intg)
-		if err != nil {
-			slog.ErrorContext(ctx, "provider send failed", "error", err, "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName)
-			return attachMeta(nil, mode, channel, intg.ID, intg.ProviderName), err
-		}
-		if inboxResult != nil {
-			if provResult.Meta == nil {
-				provResult.Meta = make(map[string]string)
-			}
-			provResult.Meta["inbox_message_id"] = inboxResult.ID
-		}
-		attachMeta(provResult, mode, channel, intg.ID, intg.ProviderName)
-		slog.InfoContext(ctx, "message dispatched via memory and provider", "workspace_id", workspaceID, "channel", channel, "provider", intg.ProviderName, "message_id", provResult.ID)
-		return provResult, nil
+		attachMeta(r, mode, channel, "", memoryProviderName)
+		slog.InfoContext(ctx, "message dispatched via memory and database", "workspace_id", workspaceID, "channel", channel, "message_id", r.ID)
+		return r, nil
 
 	default:
 		// Undefined modes fall back to memory_only (safe default).

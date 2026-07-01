@@ -242,8 +242,8 @@ Each workspace independently controls how outbound messages are handled:
 | Mode                  | Behavior                                                                            | Request log `retained` |
 | --------------------- | ----------------------------------------------------------------------------------- | ---------------------- |
 | `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. | `false`                |
+| `memory_and_database` | Captured in-process RAM only. No external provider called. Logs marked for long-term retention. | `true`                 |
 | `provider_only`       | Sent through the connected integration only. No in-memory copy.                     | `false`                |
-| `memory_and_provider` | Stored in memory AND sent through the integration.                                  | `false`                |
 | `provider_and_database` | Same outbound path as `provider_only`; logs marked for long-term retention.       | `true`                 |
 
 Configured via `PATCH /api/v1/workspaces/:wid/settings` (Portal **Settings → Data Retention**):
@@ -283,12 +283,12 @@ GatewayService.SendEmail(ctx, workspaceID, email)
     │                        ▼
     │                  Portal Inbox (SSE + REST)
     │
+    ├── memory_and_database → inbox capture only; logs marked for long-term retention
+    │
     ├── provider_only → reads integrations table for workspace+channel
     │                  Decrypts AES config
     │                  Instantiates provider via registry
     │                  → sends to Mailgun/etc
-    │
-    └── memory_and_provider → both paths above
 ```
 
 ### SDK Mode — `gateway.New(config).SendEmail(...)`
@@ -442,8 +442,8 @@ Only create new files in pkg/provider/<name>/
 The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with `dispatch_mode`, you can:
 
 - Use `memory_only` for local development (captured messages via inbox REST API / Bruno)
+- Use `memory_and_database` for inbox capture with retained request logs
 - Use `provider_only` in production (messages go to real provider)
-- Use `memory_and_provider` to keep a local copy AND send to the real provider
 
 ### 6. Portal (always on)
 

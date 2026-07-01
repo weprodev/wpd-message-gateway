@@ -28,6 +28,6 @@ export interface MessageDispatchConfig {
 /** Gateway dispatch mode values stored in workspace_settings.message_dispatch_mode */
 export type MessageDispatchApiValue =
   | "memory_only"
-  | "memory_and_provider"
+  | "memory_and_database"
   | "provider_only"
   | "provider_and_database"

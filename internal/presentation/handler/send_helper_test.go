@@ -137,6 +137,60 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		}
 	})
 
+	t.Run("retained true for memory_and_database setting", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		settings := &stubSettingsRepo{values: map[string]string{
+			domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndDatabase),
+		}}
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, settings, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{ID: "msg-111"}, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 {
+			t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
+		}
+		if !repo.entries[0].Retained {
+			t.Error("expected retained true for memory_and_database")
+		}
+	})
+
+	t.Run("retained false for provider_only setting", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		settings := &stubSettingsRepo{values: map[string]string{
+			domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
+		}}
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, settings, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{ID: "msg-111"}, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 {
+			t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
+		}
+		if repo.entries[0].Retained {
+			t.Error("expected retained false for provider_only")
+		}
+	})
+
 	t.Run("repository error logged without failing dispatch", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
 		rec := httptest.NewRecorder()

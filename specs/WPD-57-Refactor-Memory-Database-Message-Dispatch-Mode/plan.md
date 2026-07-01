@@ -32,7 +32,7 @@ Correct **Memory + Database** dispatch so it matches **Memory only** (inbox capt
 - Recent Requests must not filter by `retained`
 - Legacy read aliases (`both`, `memory_and_provider`) must not break existing workspaces or log metadata
 
-**Scale/Scope**: One dispatch-mode refactor × four channels; ~12 source/doc files; supersedes WPD-33 `retained = false` for `memory_database`
+**Scale/Scope**: One dispatch-mode refactor × four channels; ~12 source/doc files; `retained` by mode — **Provider only** `false`, **Provider + Database** `true`, **Memory only** `false`, **Memory + Database** `true` (supersedes WPD-33 `retained = false` for `memory_database` only)
 
 ## Constitution Check
 
@@ -41,10 +41,10 @@ Correct **Memory + Database** dispatch so it matches **Memory only** (inbox capt
 | Gate | Status | Notes |
 | ---- | ------ | ----- |
 | Layer boundaries (Handler → Service → Port ← Repository) | Pass | Dispatch change in `gateway_service`; retention in `dispatch_mode` domain |
-| `pkg/` isolation | Pass | No `pkg/` changes unless string parity needed (out of scope v1) |
+| `pkg/` isolation | Pass | Change `pkg/` only if naming must be updated; otherwise propose with a valid reason and wait for approval before editing |
 | Verification chain (lint → smell → audit) | Pass | Required before merge |
 | Docs sync with code | Pass | Update `architecture.md`, `portal-inbox.md`, `usage.md` |
-| KISS / minimal diff | Pass | Reuse `memory_only` dispatch body; rename + retention flag update |
+| KISS / minimal diff | Pass | Reuse `memory_only` dispatch body for **Memory + Database**; rename + set `retained = true` for that mode only — **Memory only** stays `retained = false` (no change) |
 
 **Post-design re-check**: Pass — no new abstractions; delete provider branch from memory+database case.
 

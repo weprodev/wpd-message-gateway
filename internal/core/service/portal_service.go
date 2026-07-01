@@ -364,6 +364,7 @@ func (s *PortalService) RegenerateAPIKey(ctx context.Context, workspaceID, keyID
 	return secret, nil
 }
 
+// ListLogs returns operational request logs for Recent Requests — never filtered by retained.
 func (s *PortalService) ListLogs(ctx context.Context, q port.MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error) {
 	return s.logs.ListWithSource(ctx, q)
 }

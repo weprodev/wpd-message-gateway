@@ -8,14 +8,8 @@ func TestSettingValueToDispatchMode(t *testing.T) {
 		want  MessageDispatchMode
 		ok    bool
 	}{
-		{"memory", DispatchMemoryOnly, true},
-		{"both", DispatchMemoryAndProvider, true},
-		{"memory_database", DispatchMemoryAndProvider, true},
-		{"providers", DispatchProviderOnly, true},
-		{"provider", DispatchProviderOnly, true},
-		{"provider_database", DispatchProviderAndDatabase, true},
 		{"memory_only", DispatchMemoryOnly, true},
-		{"memory_and_provider", DispatchMemoryAndProvider, true},
+		{"memory_and_database", DispatchMemoryAndDatabase, true},
 		{"provider_only", DispatchProviderOnly, true},
 		{"provider_and_database", DispatchProviderAndDatabase, true},
 		{"unknown", "", false},
@@ -42,7 +36,7 @@ func TestShouldRetainRequestLog(t *testing.T) {
 	}{
 		{DispatchMemoryOnly, false},
 		{DispatchProviderOnly, false},
-		{DispatchMemoryAndProvider, false},
+		{DispatchMemoryAndDatabase, true},
 		{DispatchProviderAndDatabase, true},
 	}
 

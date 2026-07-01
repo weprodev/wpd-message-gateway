@@ -429,8 +429,8 @@ See [Portal inbox](./portal-inbox.md) for mode behavior.
 | Mode | Behavior | Use Case | `retained` on request logs |
 |------|----------|----------|----------------------------|
 | `memory_only` | In-process RAM only, **not sent** | Development, testing | `false` |
+| `memory_and_database` | Captured in RAM only | Staging with retained audit trail | `true` |
 | `provider_only` | Sent to real provider, no local copy | Production | `false` |
-| `memory_and_provider` | Both — local copy + real send | Staging, debugging | `false` |
 | `provider_and_database` | Same dispatch as `provider_only` | Production + retained audit trail | `true` |
 
 Portal UI saves the same gateway values via **Settings → Data Retention**.
