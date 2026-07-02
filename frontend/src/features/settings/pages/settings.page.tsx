@@ -243,6 +243,16 @@ export function SettingsPage() {
 
         <Tabs.Content value="general">
           <GeneralSettingsPanel key={wid} settings={settings} onSave={saveSettings} />
+
+          <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+            <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              Permanently delete this workspace and all associated data.
+            </p>
+            <Button type="button" variant="destructive" className="mt-4" disabled>
+              Delete workspace
+            </Button>
+          </section>
         </Tabs.Content>
 
         <Tabs.Content value="developer" className="flex flex-col gap-4">
@@ -294,16 +304,6 @@ export function SettingsPage() {
           />
         </Tabs.Content>
       </Tabs.Root>
-
-      <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-        <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          Permanently delete this workspace and all associated data.
-        </p>
-        <Button type="button" variant="destructive" className="mt-4" disabled>
-          Delete workspace
-        </Button>
-      </section>
     </div>
   )
 }
