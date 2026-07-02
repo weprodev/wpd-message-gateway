@@ -116,7 +116,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		settings := &stubSettingsRepo{values: map[string]string{
-			domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderAndDatabase),
+			domain.SettingKeyMessageDispatchMode: string(domain.APIProviderAndDatabase),
 		}}
 		repo := &mockLogRepo{}
 		svc := service.NewGatewayService(nil, nil, settings, nil, repo)
@@ -143,7 +143,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		settings := &stubSettingsRepo{values: map[string]string{
-			domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndDatabase),
+			domain.SettingKeyMessageDispatchMode: string(domain.APIMemoryAndDatabase),
 		}}
 		repo := &mockLogRepo{}
 		svc := service.NewGatewayService(nil, nil, settings, nil, repo)
@@ -170,7 +170,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		settings := &stubSettingsRepo{values: map[string]string{
-			domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
+			domain.SettingKeyMessageDispatchMode: string(domain.APIProviderOnly),
 		}}
 		repo := &mockLogRepo{}
 		svc := service.NewGatewayService(nil, nil, settings, nil, repo)

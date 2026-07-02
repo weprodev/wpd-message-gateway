@@ -124,7 +124,7 @@ func TestGatewayService_SendEmail_memoryOnly(t *testing.T) {
 	if res.ID != "mem-1" {
 		t.Fatalf("got ID %q", res.ID)
 	}
-	if res.Meta["dispatch_mode"] != string(domain.DispatchMemoryOnly) {
+	if res.Meta["dispatch_mode"] != string(domain.APIMemoryOnly) {
 		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
 	}
 	if res.Meta["channel"] != "email" {
@@ -157,7 +157,7 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
+		domain.SettingKeyMessageDispatchMode: string(domain.APIProviderOnly),
 	}}
 	inbox := &stubInbox{emailID: "cap-1"}
 	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, inbox, nil)
@@ -171,7 +171,7 @@ func TestGatewayService_SendEmail_providerOnly_memoryIntegration(t *testing.T) {
 	if res.ID != "cap-1" {
 		t.Fatalf("got ID %q", res.ID)
 	}
-	if res.Meta["dispatch_mode"] != string(domain.DispatchProviderOnly) {
+	if res.Meta["dispatch_mode"] != string(domain.APIProviderOnly) {
 		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
 	}
 	if res.Meta["integration_id"] != "int-1" {
@@ -195,7 +195,7 @@ func TestGatewayService_SendEmail_providerOnly_mailgunIntegration(t *testing.T) 
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProviderOnly),
+		domain.SettingKeyMessageDispatchMode: string(domain.APIProviderOnly),
 	}}
 	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, settings, nil, nil)
 
@@ -236,7 +236,7 @@ func TestGatewayService_SendEmail_memoryAndDatabase_inboxOnly(t *testing.T) {
 		UpdatedAt:    ts,
 	}
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndDatabase),
+		domain.SettingKeyMessageDispatchMode: string(domain.APIMemoryAndDatabase),
 	}}
 	inbox := &stubInbox{emailID: "inbox-1"}
 	integrations := &countingIntegrationRepo{stubIntegrationRepo: stubIntegrationRepo{active: intg}}
@@ -251,7 +251,7 @@ func TestGatewayService_SendEmail_memoryAndDatabase_inboxOnly(t *testing.T) {
 	if res.ID != "inbox-1" {
 		t.Fatalf("got ID %q", res.ID)
 	}
-	if res.Meta["dispatch_mode"] != string(domain.DispatchMemoryAndDatabase) {
+	if res.Meta["dispatch_mode"] != string(domain.APIMemoryAndDatabase) {
 		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
 	}
 	if res.Meta["provider_name"] != memoryProviderName {
@@ -264,7 +264,7 @@ func TestGatewayService_SendEmail_memoryAndDatabase_inboxOnly(t *testing.T) {
 
 func TestGatewayService_SendEmail_memoryAndDatabase_noIntegration(t *testing.T) {
 	settings := &stubSettingsRepo{values: map[string]string{
-		domain.SettingKeyMessageDispatchMode: string(domain.DispatchMemoryAndDatabase),
+		domain.SettingKeyMessageDispatchMode: string(domain.APIMemoryAndDatabase),
 	}}
 	inbox := &stubInbox{emailID: "inbox-only"}
 	integrations := &countingIntegrationRepo{stubIntegrationRepo: stubIntegrationRepo{err: errors.New("no integration")}}

@@ -8,53 +8,80 @@ const SettingKeyMessageDispatchMode = "message_dispatch_mode"
 type MessageDispatchMode string
 
 const (
-	// DispatchProviderOnly sends only through the connected integration; nothing is kept in process memory.
-	DispatchProviderOnly MessageDispatchMode = "provider_only"
-	// DispatchProviderAndDatabase sends through the integration like provider_only; request logs are retained.
-	DispatchProviderAndDatabase MessageDispatchMode = "provider_and_database"
-	// DispatchMemoryAndDatabase captures in RAM; request logs are retained.
-	DispatchMemoryAndDatabase MessageDispatchMode = "memory_and_database"
-	// DispatchMemoryOnly keeps messages in memory only; external providers are not called.
-	DispatchMemoryOnly MessageDispatchMode = "memory_only"
+	// DispatchMemory captures messages in process memory (portal inbox); external providers are not called.
+	DispatchMemory MessageDispatchMode = "memory"
+	// DispatchProvider sends through the connected integration.
+	DispatchProvider MessageDispatchMode = "provider"
 )
 
-// DefaultMessageDispatchMode is used when workspace_settings has no value (matches portal “safe dev” default).
-func DefaultMessageDispatchMode() MessageDispatchMode {
-	return DispatchMemoryOnly
+// MessageDispatchAPIValue is the canonical gateway string stored in settings and stamped in response meta.
+type MessageDispatchAPIValue string
+
+const (
+	APIMemoryOnly          MessageDispatchAPIValue = "memory_only"
+	APIMemoryAndDatabase   MessageDispatchAPIValue = "memory_and_database"
+	APIProviderOnly        MessageDispatchAPIValue = "provider_only"
+	APIProviderAndDatabase MessageDispatchAPIValue = "provider_and_database"
+)
+
+// MessageDispatchConfig pairs dispatch path with request-log retention.
+type MessageDispatchConfig struct {
+	Mode             MessageDispatchMode
+	RetainRequestLog bool
 }
 
-// ParseMessageDispatchMode returns the mode if s is a gateway dispatch string.
-func ParseMessageDispatchMode(s string) (MessageDispatchMode, bool) {
-	switch MessageDispatchMode(s) {
-	case DispatchProviderOnly, DispatchProviderAndDatabase, DispatchMemoryAndDatabase, DispatchMemoryOnly:
-		return MessageDispatchMode(s), true
-	default:
-		return "", false
+// DefaultMessageDispatchConfig is used when workspace_settings has no value (matches portal “safe dev” default).
+func DefaultMessageDispatchConfig() MessageDispatchConfig {
+	return MessageDispatchConfig{Mode: DispatchMemory, RetainRequestLog: false}
+}
+
+// APIValue returns the canonical gateway string for this config (settings + response meta).
+func (c MessageDispatchConfig) APIValue() MessageDispatchAPIValue {
+	if c.Mode == DispatchMemory {
+		if c.RetainRequestLog {
+			return APIMemoryAndDatabase
+		}
+		return APIMemoryOnly
 	}
+	if c.RetainRequestLog {
+		return APIProviderAndDatabase
+	}
+	return APIProviderOnly
 }
 
-// SettingValueToDispatchMode maps workspace_settings.message_dispatch_mode to MessageDispatchMode.
+// ParseMessageDispatchConfig parses a gateway API string or legacy setting alias.
+func ParseMessageDispatchConfig(s string) (MessageDispatchConfig, bool) {
+	switch MessageDispatchAPIValue(s) {
+	case APIMemoryOnly:
+		return MessageDispatchConfig{Mode: DispatchMemory, RetainRequestLog: false}, true
+	case APIMemoryAndDatabase:
+		return MessageDispatchConfig{Mode: DispatchMemory, RetainRequestLog: true}, true
+	case APIProviderOnly:
+		return MessageDispatchConfig{Mode: DispatchProvider, RetainRequestLog: false}, true
+	case APIProviderAndDatabase:
+		return MessageDispatchConfig{Mode: DispatchProvider, RetainRequestLog: true}, true
+	}
+	return legacySettingToDispatchConfig(s)
+}
+
+// SettingValueToDispatchConfig maps workspace_settings.message_dispatch_mode to MessageDispatchConfig.
 // Canonical stored values are the four gateway strings (memory_only, memory_and_database, …).
 // Short legacy aliases (memory, memory_database, both, provider, …) are accepted on read only.
-func SettingValueToDispatchMode(value string) (MessageDispatchMode, bool) {
-	if mode, ok := ParseMessageDispatchMode(value); ok {
-		return mode, true
-	}
-	switch value {
-	case "memory":
-		return DispatchMemoryOnly, true
-	case "both", "memory_database":
-		return DispatchMemoryAndDatabase, true
-	case "providers", "provider":
-		return DispatchProviderOnly, true
-	case "provider_database":
-		return DispatchProviderAndDatabase, true
-	default:
-		return "", false
-	}
+func SettingValueToDispatchConfig(value string) (MessageDispatchConfig, bool) {
+	return ParseMessageDispatchConfig(value)
 }
 
-// ShouldRetainRequestLog reports whether request logs for this dispatch mode are long-term retained.
-func ShouldRetainRequestLog(mode MessageDispatchMode) bool {
-	return mode == DispatchMemoryAndDatabase || mode == DispatchProviderAndDatabase
+func legacySettingToDispatchConfig(value string) (MessageDispatchConfig, bool) {
+	switch value {
+	case "memory":
+		return MessageDispatchConfig{Mode: DispatchMemory, RetainRequestLog: false}, true
+	case "both", "memory_database", "memory_and_provider":
+		return MessageDispatchConfig{Mode: DispatchMemory, RetainRequestLog: true}, true
+	case "providers", "provider":
+		return MessageDispatchConfig{Mode: DispatchProvider, RetainRequestLog: false}, true
+	case "provider_database":
+		return MessageDispatchConfig{Mode: DispatchProvider, RetainRequestLog: true}, true
+	default:
+		return MessageDispatchConfig{}, false
+	}
 }

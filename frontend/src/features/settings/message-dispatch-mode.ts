@@ -58,6 +58,10 @@ export function parseMessageDispatchConfig(raw?: string): MessageDispatchConfig 
     return API_VALUE_TO_CONFIG[value as MessageDispatchApiValue]
   }
 
+  if (value && value in LEGACY_VALUE_TO_CONFIG) {
+    return LEGACY_VALUE_TO_CONFIG[value]
+  }
+
   return {
     mode: normalizeDispatchMode(value),
     storeInDb: normalizeStoreInDb(value),
