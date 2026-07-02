@@ -177,7 +177,9 @@ func (h *PortalHandler) PatchSettings(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
 	if err := h.svc.PatchSettings(c.Request().Context(), wid, body); err != nil {
-		slog.ErrorContext(c.Request().Context(), "failed to patch settings", "error", err, "workspace_id", wid)
+		if !errors.Is(err, port.ErrInvalidInput) {
+			slog.ErrorContext(c.Request().Context(), "failed to patch settings", "error", err, "workspace_id", wid)
+		}
 		return safeHTTPError(err, http.StatusBadRequest, "failed to patch settings")
 	}
 	return c.NoContent(http.StatusNoContent)

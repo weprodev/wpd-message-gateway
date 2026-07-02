@@ -11,6 +11,7 @@ import (
 	"github.com/weprodev/go-pkg/crypto"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
+	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 )
 
 type contextKey string
@@ -76,14 +77,14 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			}
 
 			if err := apiKeyRepo.UpdateLastUsedAt(c.Request().Context(), apiKey.ID); err != nil {
-				// Non-fatal: continue request
-				_ = err
+				slog.WarnContext(c.Request().Context(), "failed to update API key last_used_at", "error", err, "api_key_id", apiKey.ID)
 			}
 
 			ctx := c.Request().Context()
 			ctx = context.WithValue(ctx, WorkspaceIDKey, apiKey.WorkspaceID)
 			ctx = context.WithValue(ctx, APIKeyIDKey, apiKey.ID)
 			ctx = context.WithValue(ctx, APIKeyNameKey, apiKey.Name)
+			ctx = applogger.WithWorkspace(ctx, apiKey.WorkspaceID, apiKey.ID)
 			c.SetRequest(c.Request().WithContext(ctx))
 			return next(c)
 		}

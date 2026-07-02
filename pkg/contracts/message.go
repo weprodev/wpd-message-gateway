@@ -15,3 +15,11 @@ type SendResult struct {
 	Message    string            `json:"message"`
 	Meta       map[string]string `json:"meta,omitempty"`
 }
+
+// ProviderNameFromResult returns provider_name from dispatch metadata when present.
+func ProviderNameFromResult(r *SendResult) string {
+	if r == nil || r.Meta == nil {
+		return ""
+	}
+	return r.Meta["provider_name"]
+}

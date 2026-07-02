@@ -138,7 +138,7 @@ gw.SendEmail(ctx, &contracts.Email{
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │   GatewayService                                         │   │
 │  │   SendEmail() · SendSMS() · SendPush() · SendChat()      │   │
-│  │   Reads dispatch_mode from workspace_settings            │   │
+│  │   Reads message_dispatch_mode from workspace_settings    │   │
 │  │   Reads provider credentials from integrations table     │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -231,26 +231,34 @@ Provider credentials are stored AES-encrypted in the `integrations` table. Confi
 
 ### Portal UI coverage
 
-The React Portal (`frontend/`) currently implements: auth, workspace list, **integrations**, message **logs**, and **send test**. API keys, templates, members, settings, and memory inbox browsing are REST/Bruno only.
+The React Portal (`frontend/`) implements: auth, workspace list, **integrations**, **settings** (general, API keys, message dispatch), message **logs**, and **send test**. Templates, members, and inbox browsing remain REST/Bruno only.
 
 ---
 
-## Message Dispatch Modes
+## Message Dispatch & Content Storage
 
-Each workspace independently controls how outbound messages are handled:
+Each workspace controls outbound routing and inbox content capture with **two orthogonal settings**:
 
-| Mode                  | Behavior                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. |
-| `provider_only`       | Sent through the connected integration only. No in-memory copy.                     |
-| `memory_and_provider` | Stored in memory AND sent through the integration.                                  |
+| Setting | Values | Purpose |
+| ------- | ------ | ------- |
+| `message_dispatch_mode` | `memory` (default) \| `provider` | Where the message is routed |
+| `store_message_content` | `false` (default) \| `true` | Whether message bodies are captured in the portal inbox (in-process) |
 
-Configured via `PATCH /api/v1/workspaces/:wid/settings` (REST — no Portal UI page yet):
+Portal **Settings → Message Dispatch** exposes two controls that map directly to these keys:
+
+| UI control | Setting key | Values |
+| ---------- | ----------- | ------ |
+| Dispatch mode (radio) | `message_dispatch_mode` | `memory` \| `provider` |
+| Store message content (checkbox) | `store_message_content` | `false` (off) \| `true` (on) |
+
+Configured via `PATCH /api/v1/workspaces/:wid/settings` (Portal **Settings → Message Dispatch**):
 
 ```
 PATCH /api/v1/workspaces/:wid/settings
-{ "message_dispatch_mode": "provider_only" }
+{ "message_dispatch_mode": "provider", "store_message_content": "true" }
 ```
+
+**Request logs**: Every API send appends a row to `message_request_logs` (operational tracing with correlation `request_id`).
 
 ---
 
@@ -275,19 +283,19 @@ GatewayHandler.HandleSendEmail()
     │ Reads workspace_id from context
     ▼
 GatewayService.SendEmail(ctx, workspaceID, email)
-    │ Reads workspace_settings.message_dispatch_mode from DB
+    │ Reads message_dispatch_mode + store_message_content from DB
     │
-    ├── memory_only  → Memory Provider (in-process RAM)
-    │                        │
-    │                        ▼
-    │                  Portal Inbox (SSE + REST)
+    ├── memory  → Memory Provider (in-process RAM)
+    │                  │
+    │                  ▼
+    │            Portal Inbox (SSE + REST)
     │
-    ├── provider_only → reads integrations table for workspace+channel
-    │                  Decrypts AES config
-    │                  Instantiates provider via registry
-    │                  → sends to Mailgun/etc
+    ├── provider → reads integrations table for workspace+channel
+    │             Decrypts AES config
+    │             Instantiates provider via registry
+    │             → sends to Mailgun/etc
     │
-    └── memory_and_provider → both paths above
+    └── store_message_content=true → also persists content via inbox writer
 ```
 
 ### SDK Mode — `gateway.New(config).SendEmail(...)`
@@ -322,7 +330,7 @@ Workspace "myapp"
 ├── Integrations (provider credentials per channel)
 │   ├── email: mailgun { api_key: "...", domain: "..." }
 │   └── sms: (not configured)
-├── Settings { message_dispatch_mode: "provider_only" }
+├── Settings { message_dispatch_mode: "provider", store_message_content: "false" }
 ├── Templates (email HTML templates)
 └── Message Logs (request audit trail)
 ```
@@ -438,19 +446,19 @@ Only create new files in pkg/provider/<name>/
 
 ### 5. Memory Provider & Dispatch Modes
 
-The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with `dispatch_mode`, you can:
+The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with workspace settings, you can:
 
-- Use `memory_only` for local development (captured messages via inbox REST API / Bruno)
-- Use `provider_only` in production (messages go to real provider)
-- Use `memory_and_provider` to keep a local copy AND send to the real provider
+- Use `message_dispatch_mode=memory` for local development (captured messages via inbox REST API / Bruno)
+- Use `message_dispatch_mode=provider` in production (messages go to the real provider)
+- Set `store_message_content=true` to persist message bodies regardless of routing mode
 
 ### 6. Portal (always on)
 
 The React Portal runs at `portal.ui_port` (default **10104**) when the server starts.
 
-**Portal UI today:** sign in, list workspaces, manage **integrations**, view message logs, send test messages.
+**Portal UI today:** sign in, list workspaces, manage **integrations**, **settings** (general, API keys, message dispatch), view message logs, send test messages.
 
-**REST only (no UI pages yet):** workspace create, API keys, templates, members, settings, memory inbox browser.
+**REST only (no UI pages yet):** workspace create, templates, members, memory inbox browser.
 
 ---
 
@@ -459,9 +467,9 @@ The React Portal runs at `portal.ui_port` (default **10104**) when the server st
 To enable robust trace tracking across all layers, the gateway employs an end-to-end correlation ID pipeline:
 
 1. **Correlation Generation**: Echo's `RequestID` middleware generates a unique request UUID for every incoming HTTP request, placing it in the `X-Request-ID` header.
-2. **Context Propagation**: A custom correlation middleware extracts this request ID and injects it into the standard Go `context.Context` (accessible via `logger.GetRequestID(ctx)`).
-3. **Structured slog Hooking**: An application-wide custom `ContextHandler` intercepts all standard `slog.InfoContext` / `slog.ErrorContext` calls. It transparently extracts the `request_id`, `workspace_id`, `api_key_id`, `channel`, and `provider` attributes from the context and automatically appends them to printed log records without requiring manual logging boilerplate.
-4. **Audit Trail Tracking**: The presentation-layer `SendHelper` automatically populates the `request_id` column on the `message_request_logs` PostgreSQL table, linking individual requests directly to database audit trails.
+2. **Context Propagation**: Router middleware copies the request ID into `context.Context` via `logger.WithRequestID`. API key auth also calls `logger.WithWorkspace` so `workspace_id` and `api_key_id` appear on all `/v1/*` logs. Send handlers add `channel` and `provider`.
+3. **Structured slog**: go-pkg `ContextExtractors` append correlation fields to every `slog.*Context` record (`request_id`, `workspace_id`, `api_key_id`, `channel`, `provider`).
+4. **Audit Trail**: `SendHelper` persists `request_id` on every row in `message_request_logs`, linking HTTP requests to the operational audit trail.
 
 ---
 

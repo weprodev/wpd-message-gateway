@@ -410,27 +410,29 @@ MESSAGE_CONFIG_ENCRYPTION_KEY=your-32-byte-key-here
 
 ---
 
-## Message Dispatch Modes
+## Message Dispatch & Content Storage
 
-Control how messages are handled per workspace. Default is `memory_only`.
+Control how messages are routed and whether bodies are captured in the portal inbox.
 
-Set via REST (no Portal UI page yet):
+Defaults: `message_dispatch_mode=memory`, `store_message_content=false`.
+
+Invalid values for dispatch settings return **400 Bad Request** on PATCH.
+
+Set via Portal **Settings → Message Dispatch** or REST:
 
 ```bash
 PATCH /api/v1/workspaces/:wid/settings
 Authorization: Bearer <portal-jwt>
 Content-Type: application/json
 
-{ "message_dispatch_mode": "provider_only" }
+{ "message_dispatch_mode": "provider", "store_message_content": "true" }
 ```
 
-See [Portal inbox](./portal-inbox.md) for mode behavior.
+Portal UI: select **Memory** or **Provider**, then check **Store message content in inbox** on or off.
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| `memory_only` | In-process RAM only, **not sent** | Development, testing |
-| `provider_only` | Sent to real provider, no local copy | Production |
-| `memory_and_provider` | Both — local copy + real send | Staging, debugging |
+See [Portal inbox](./portal-inbox.md) for routing behavior.
+
+Every send also creates a `message_request_logs` row for operational tracing (correlation via `request_id`).
 
 ---
 
@@ -445,7 +447,7 @@ Using a Mailgun Sandbox Domain:
 
 ### Provider Not Sending
 
-Check workspace `message_dispatch_mode` via `GET /api/v1/workspaces/:wid/settings`. If it is `memory_only`, messages are captured locally — not sent to the provider.
+Check workspace settings via `GET /api/v1/workspaces/:wid/settings`. If `message_dispatch_mode` is `memory`, messages are captured locally — not sent to the provider.
 
 ### API Key Rejected
 

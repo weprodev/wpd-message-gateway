@@ -17,7 +17,7 @@ Use the Message Gateway to capture and verify all messages your app sends during
 ## Architecture
 
 ```
-Your App                 Gateway (memory_only)        Test
+Your App                 Gateway (memory dispatch)        Test
    │                          │                        │
    │  POST /v1/email ─────────▶│ captured in RAM        │
    │  POST /v1/email ─────────▶│ captured in RAM        │
@@ -104,7 +104,7 @@ KEY_JSON=$(curl -sS -X POST "$BASE/workspaces/$WORKSPACE_ID/api-keys" \
 API_CLIENT_ID=$(echo "$KEY_JSON"   | jq -r .client_id)
 API_CLIENT_SECRET=$(echo "$KEY_JSON" | jq -r .client_secret)
 
-# 4) Dispatch mode defaults to memory_only — nothing to configure
+# 4) Dispatch defaults to memory — nothing to configure
 echo "PORTAL_JWT=$PORTAL_JWT"           >> $GITHUB_ENV
 echo "WORKSPACE_ID=$WORKSPACE_ID"      >> $GITHUB_ENV
 echo "WORKSPACE_UK=$UK"                >> $GITHUB_ENV

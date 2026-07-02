@@ -510,11 +510,45 @@ func (s *PortalService) GetSettings(ctx context.Context, workspaceID string) (ma
 }
 
 func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, kv map[string]string) error {
+	keys := make([]string, 0, len(kv))
+	for k := range kv {
+		keys = append(keys, k)
+	}
+	slog.InfoContext(ctx, "patching workspace settings", "workspace_id", workspaceID, "keys", keys)
+
 	for k, v := range kv {
+		if err := domain.ValidateWorkspaceSettingValue(k, v); err != nil {
+			slog.WarnContext(ctx, "settings patch rejected: invalid value",
+				"workspace_id", workspaceID,
+				"key", k,
+				"error", err,
+			)
+			return fmt.Errorf("%w: %w", port.ErrInvalidInput, err)
+		}
+
+		if k == domain.SettingKeyMessageDispatchMode && v == string(domain.DispatchProvider) {
+			list, err := s.integrations.ListByWorkspace(ctx, workspaceID)
+			if err != nil {
+				return fmt.Errorf("failed to check integrations for provider enablement: %w", err)
+			}
+			hasConnected := false
+			for _, intg := range list {
+				if intg.ProviderName != domain.ProviderNameMemory && intg.Status == domain.IntegrationStatusConnected {
+					hasConnected = true
+					break
+				}
+			}
+			if !hasConnected {
+				return fmt.Errorf("%w: first configure a provider then you can enable it", port.ErrInvalidInput)
+			}
+		}
+
 		if err := s.settings.Set(ctx, workspaceID, k, v); err != nil {
 			return err
 		}
 	}
+
+	slog.InfoContext(ctx, "workspace settings patched successfully", "workspace_id", workspaceID, "keys", keys)
 	return nil
 }
 

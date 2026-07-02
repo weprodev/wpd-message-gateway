@@ -1,19 +1,17 @@
 import { apiFetch } from "@/core/api/client"
 
-import type { ApiKey, WorkspaceSettings } from "./settings.types"
+import { parseWorkspaceSettings } from "./settings.schema"
+import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "./settings.types"
 
 export async function getSettings(workspaceId: string): Promise<WorkspaceSettings> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`)
   if (!res.ok) {
     throw new Error("Failed to load settings")
   }
-  return (await res.json()) as WorkspaceSettings
+  return parseWorkspaceSettings(await res.json())
 }
 
-export async function patchSettings(
-  workspaceId: string,
-  body: Record<string, string>,
-): Promise<void> {
+export async function patchSettings(workspaceId: string, body: WorkspaceSettingsPatch): Promise<void> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

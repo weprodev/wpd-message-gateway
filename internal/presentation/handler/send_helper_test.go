@@ -88,12 +88,37 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		}
 	})
 
-	t.Run("repository error logged without failing dispatch", func(t *testing.T) {
+	t.Run("missing workspace returns unauthorized", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		repo := &mockLogRepo{createErr: errors.New("db error")}
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{ID: "msg-111"}, nil
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+		if len(repo.entries) != 0 {
+			t.Fatalf("expected no log entry without workspace, got %d", len(repo.entries))
+		}
+	})
+
+	t.Run("invalid JSON returns bad request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{invalid`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		repo := &mockLogRepo{}
 		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
 		helper := NewSendHelper(svc)
 
@@ -105,9 +130,33 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rec.Code)
+		}
+	})
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("expected status OK, got %d", rec.Code)
+	t.Run("send failure returns 500 and logs error", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return nil, errors.New("dispatch failed")
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("expected status 500, got %d", rec.Code)
+		}
+		if len(repo.entries) != 1 || repo.entries[0].StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected error log entry, got %+v", repo.entries)
 		}
 	})
 }

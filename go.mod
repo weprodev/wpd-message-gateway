@@ -36,7 +36,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/weprodev/go-pkg v1.1.2
+	github.com/weprodev/go-pkg v1.1.3
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect

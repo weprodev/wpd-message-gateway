@@ -114,12 +114,8 @@ func New(env string, extraHandlers ...slog.Handler) (*pkglogger.Logger, error) {
 		return nil, err
 	}
 
-	// Wrap handler with ContextHandler to automatically capture request details
-	wrappedLogger := slog.New(NewContextHandler(log.Handler()))
-
-	// All slog.X() calls throughout the process now use this logger.
-	slog.SetDefault(wrappedLogger)
-	log.Logger = wrappedLogger
+	// ContextExtractors append correlation fields; avoid also wrapping ContextHandler (duplicate attrs).
+	slog.SetDefault(log.Logger)
 
 	return log, nil
 }
@@ -142,9 +138,7 @@ func WithProvider(ctx context.Context, provider string) context.Context {
 	return context.WithValue(ctx, keyProvider, provider)
 }
 
-// Attrs extracts all gateway-specific attributes from ctx into slog key-value pairs.
-// Note: Handlers wrapping standard slog logging now use ContextHandler to extract
-// these fields automatically; Attrs remains for manual or backwards-compatible usage.
+// Attrs extracts gateway correlation fields from ctx for go-pkg ContextExtractors.
 func Attrs(ctx context.Context) []any {
 	attrs := make([]any, 0, 10)
 	if v, _ := ctx.Value(keyWorkspaceID).(string); v != "" {

@@ -1,9 +1,15 @@
+export type MessageDispatchMode = "memory" | "provider"
+
+export type StoreMessageContentSetting = "true" | "false"
+
 export interface WorkspaceSettings {
   owner_email?: string
   pin_code?: string
-  data_retention?: "memory" | "both" | "providers"
-  [key: string]: string | undefined
+  message_dispatch_mode?: MessageDispatchMode
+  store_message_content?: StoreMessageContentSetting
 }
+
+export type WorkspaceSettingsPatch = Partial<Record<keyof WorkspaceSettings, string>>
 
 export interface ApiKey {
   id: string
@@ -16,5 +22,9 @@ export interface ApiKey {
   expires_at?: string | null
 }
 
-export type SettingsTab = "general" | "developer" | "team" | "retention"
-export type RetentionMode = "memory" | "both" | "providers"
+export type SettingsTab = "general" | "developer" | "team" | "dispatch"
+
+export interface MessageDispatchConfig {
+  mode: MessageDispatchMode
+  storeMessageContent: boolean
+}

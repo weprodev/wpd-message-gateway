@@ -110,3 +110,99 @@ func TestAuthService_Login_masksInfrastructureErrors(t *testing.T) {
 		t.Fatalf("expected invalid email or password error, got %v", err)
 	}
 }
+
+type fakeSettingsRepo struct {
+	values map[string]string
+}
+
+func (f *fakeSettingsRepo) Get(ctx context.Context, workspaceID, key string) (string, error) {
+	return f.values[key], nil
+}
+
+func (f *fakeSettingsRepo) Set(ctx context.Context, workspaceID, key, value string) error {
+	if f.values == nil {
+		f.values = make(map[string]string)
+	}
+	f.values[key] = value
+	return nil
+}
+
+func (f *fakeSettingsRepo) GetAll(ctx context.Context, workspaceID string) (map[string]string, error) {
+	return f.values, nil
+}
+
+type fakeIntegrationRepo struct {
+	integrations []domain.Integration
+}
+
+func (f *fakeIntegrationRepo) Create(ctx context.Context, intg *domain.Integration) error { return nil }
+func (f *fakeIntegrationRepo) ListByWorkspace(ctx context.Context, workspaceID string) ([]domain.Integration, error) {
+	return f.integrations, nil
+}
+func (f *fakeIntegrationRepo) Upsert(ctx context.Context, intg *domain.Integration) error { return nil }
+func (f *fakeIntegrationRepo) GetByID(ctx context.Context, id string) (*domain.Integration, error) {
+	return nil, port.ErrNotFound
+}
+func (f *fakeIntegrationRepo) Delete(ctx context.Context, id string) error { return nil }
+func (f *fakeIntegrationRepo) ListProviders(ctx context.Context) ([]domain.Provider, error) {
+	return nil, nil
+}
+func (f *fakeIntegrationRepo) GetProviderFields(ctx context.Context, name string) ([]domain.ProviderConfigField, error) {
+	return nil, nil
+}
+func (f *fakeIntegrationRepo) GetActiveByWorkspaceAndChannel(ctx context.Context, workspaceID, channel string) (*domain.Integration, error) {
+	return nil, nil
+}
+
+func TestPortalService_PatchSettings_rejectsInvalidDispatchMode(t *testing.T) {
+	svc := NewPortalService(PortalDeps{Settings: &fakeSettingsRepo{}})
+
+	err := svc.PatchSettings(context.Background(), "ws-1", map[string]string{
+		domain.SettingKeyMessageDispatchMode: "invalid",
+	})
+	if !errors.Is(err, port.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestPortalService_PatchSettings_rejectsProviderWithoutIntegration(t *testing.T) {
+	repo := &fakeSettingsRepo{}
+	intgRepo := &fakeIntegrationRepo{
+		integrations: []domain.Integration{},
+	}
+	svc := NewPortalService(PortalDeps{
+		Settings:     repo,
+		Integrations: intgRepo,
+	})
+
+	err := svc.PatchSettings(context.Background(), "ws-1", map[string]string{
+		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProvider),
+	})
+	if !errors.Is(err, port.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestPortalService_PatchSettings_persistsValidDispatchSettings(t *testing.T) {
+	repo := &fakeSettingsRepo{}
+	intgRepo := &fakeIntegrationRepo{
+		integrations: []domain.Integration{
+			{ProviderName: "mailgun", Status: domain.IntegrationStatusConnected},
+		},
+	}
+	svc := NewPortalService(PortalDeps{
+		Settings:     repo,
+		Integrations: intgRepo,
+	})
+
+	err := svc.PatchSettings(context.Background(), "ws-1", map[string]string{
+		domain.SettingKeyMessageDispatchMode: string(domain.DispatchProvider),
+		domain.SettingKeyStoreMessageContent: "true",
+	})
+	if err != nil {
+		t.Fatalf("PatchSettings: %v", err)
+	}
+	if repo.values[domain.SettingKeyMessageDispatchMode] != string(domain.DispatchProvider) {
+		t.Fatalf("mode not saved: %+v", repo.values)
+	}
+}

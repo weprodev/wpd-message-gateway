@@ -8,7 +8,9 @@ import {
   patchSettings,
   regenerateApiKey,
 } from "../settings.api"
-import type { ApiKey, RetentionMode, WorkspaceSettings } from "../settings.types"
+import { parseMessageDispatchConfig } from "../message-dispatch-mode"
+import { parseWorkspaceSettings } from "../settings.schema"
+import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "../settings.types"
 
 export function useSettings(workspaceId: string) {
   const [settings, setSettings] = useState<WorkspaceSettings>({})
@@ -46,9 +48,9 @@ export function useSettings(workspaceId: string) {
     }
   }, [workspaceId, trigger])
 
-  async function saveSettings(patch: Record<string, string>) {
+  async function saveSettings(patch: WorkspaceSettingsPatch) {
     await patchSettings(workspaceId, patch)
-    setSettings((prev) => ({ ...prev, ...patch }))
+    setSettings((prev) => parseWorkspaceSettings({ ...prev, ...patch }))
   }
 
   async function addApiKey(name: string) {
@@ -66,12 +68,12 @@ export function useSettings(workspaceId: string) {
     return regenerateApiKey(workspaceId, keyId)
   }
 
-  const retentionMode = (settings.data_retention as RetentionMode | undefined) ?? "memory"
+  const messageDispatchConfig = parseMessageDispatchConfig(settings.message_dispatch_mode, settings.store_message_content)
 
   return {
     settings,
     apiKeys,
-    retentionMode,
+    messageDispatchConfig,
     isLoading,
     error,
     reload,
