@@ -13,6 +13,17 @@ const API_VALUE_TO_CONFIG: Record<MessageDispatchApiValue, MessageDispatchConfig
   provider_and_database: { mode: "provider", storeInDb: true },
 }
 
+/** Legacy setting values still stored in workspace_settings (read-only). */
+const LEGACY_VALUE_TO_CONFIG: Record<string, MessageDispatchConfig> = {
+  memory: { mode: "memory", storeInDb: false },
+  both: { mode: "memory", storeInDb: true },
+  memory_database: { mode: "memory", storeInDb: true },
+  memory_and_provider: { mode: "memory", storeInDb: true },
+  provider: { mode: "provider", storeInDb: false },
+  providers: { mode: "provider", storeInDb: false },
+  provider_database: { mode: "provider", storeInDb: true },
+}
+
 export function normalizeDispatchMode(raw?: string): MessageDispatchMode {
   switch (raw?.toLowerCase()) {
     case "provider_only":

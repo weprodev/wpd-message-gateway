@@ -33,7 +33,9 @@ func ParseMessageDispatchMode(s string) (MessageDispatchMode, bool) {
 	}
 }
 
-// SettingValueToDispatchMode maps portal/API setting values (and gateway strings) to MessageDispatchMode.
+// SettingValueToDispatchMode maps workspace_settings.message_dispatch_mode to MessageDispatchMode.
+// Canonical stored values are the four gateway strings (memory_only, memory_and_database, …).
+// Short legacy aliases (memory, memory_database, both, provider, …) are accepted on read only.
 func SettingValueToDispatchMode(value string) (MessageDispatchMode, bool) {
 	if mode, ok := ParseMessageDispatchMode(value); ok {
 		return mode, true

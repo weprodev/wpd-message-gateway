@@ -15,9 +15,9 @@ portal:
 database:
   host: localhost
   port: 5432
-  user: wpdmg
-  password: wpdmg@1234
-  dbname: mg
+  user: gateway
+  password: secret
+  dbname: gateway
   sslmode: disable
 
 providers:
