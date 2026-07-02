@@ -139,19 +139,16 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
       </div>
 
       <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
-        <label htmlFor="store-message-content" className={cn("flex flex-1 cursor-pointer flex-col gap-1", mode === "memory" && "opacity-50 cursor-not-allowed")}>
+        <label htmlFor="store-message-content" className="flex flex-1 cursor-pointer flex-col gap-1">
           <span className="text-sm font-medium text-foreground">Store message content in inbox</span>
           <span className="text-sm text-text-secondary">
-            {mode === "memory" 
-              ? "Message bodies are always captured in Memory mode." 
-              : "When enabled, message bodies are captured in the portal inbox for review."}
+            When enabled, message bodies are captured in the portal inbox for review.
           </span>
         </label>
         <Checkbox
           id="store-message-content"
-          checked={mode === "memory" ? true : storeMessageContent}
+          checked={storeMessageContent}
           onCheckedChange={(checked) => setStoreMessageContent(checked === true)}
-          disabled={mode === "memory"}
         />
       </div>
 
