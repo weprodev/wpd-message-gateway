@@ -300,11 +300,19 @@ docker-check:
 dev: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway, database, and Portal UI via Docker...$(RESET)\n"
-	@docker compose up -d --build
+	@docker compose up -d --build --renew-anon-volumes
 	@printf "$(GREEN)✅ All services started!$(RESET)\n"
 	@printf "\n"
-	@printf "   $(BOLD)Gateway API:$(RESET)  http://localhost:10101\n"
-	@printf "   $(BOLD)Portal UI:$(RESET)    http://localhost:10104\n"
+	@printf "   ╭───────────────────────────────────────────────────╮\n"
+	@printf "   │                                                   │\n"
+	@printf "   │  $(BOLD)Gateway API:$(RESET)  http://localhost:10101             │\n"
+	@printf "   │  $(BOLD)Portal UI:$(RESET)    http://localhost:10104             │\n"
+	@printf "   │                                                   │\n"
+	@printf "   │  $(BOLD)Demo Account$(RESET)                                     │\n"
+	@printf "   │  Email:    demo@weprodev.com                      │\n"
+	@printf "   │  Password: secret                                 │\n"
+	@printf "   │                                                   │\n"
+	@printf "   ╰───────────────────────────────────────────────────╯\n"
 	@printf "\n"
 
 ## Stop Docker Compose
