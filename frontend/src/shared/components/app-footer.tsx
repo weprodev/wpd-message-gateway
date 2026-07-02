@@ -10,13 +10,7 @@ export function AppFooter({ variant = "default" }: AppFooterProps) {
 
   return (
     <footer className="w-full shrink-0 border-t border-divider bg-card">
-      <div
-        className={
-          variant === "dashboard"
-            ? "flex h-16 items-center px-12 py-6"
-            : "flex h-16 items-center justify-between px-12 py-6"
-        }
-      >
+      <div className="flex h-16 items-center justify-between px-12 py-6">
         <p className="text-sm text-text-secondary">
           Developed by{" "}
           <a
@@ -28,9 +22,7 @@ export function AppFooter({ variant = "default" }: AppFooterProps) {
             WeProDev
           </a>
         </p>
-        {variant === "default" ? (
-          <p className="text-sm text-text-tertiary">We develop for grow with growth in mind.</p>
-        ) : null}
+        <p className="text-sm text-text-tertiary">We develop for growth, with growth in mind!</p>
       </div>
     </footer>
   )
