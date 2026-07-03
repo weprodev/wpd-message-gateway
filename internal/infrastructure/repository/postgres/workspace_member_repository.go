@@ -76,7 +76,8 @@ func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, us
 
 func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error) {
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
-		SELECT wm.workspace_id, wm.user_id, r.name, wm.joined_at, u.email, COALESCE(u.display_name, '')
+		SELECT wm.workspace_id, wm.user_id, r.name, wm.joined_at, u.email,
+			COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email)
 		FROM workspace_members wm
 		JOIN roles r ON r.id = wm.role_id
 		INNER JOIN users u ON u.id = wm.user_id

@@ -97,20 +97,39 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
   const [mode, setMode] = useState<MessageDispatchMode>(initialConfig.mode)
   const [storeMessageContent, setStoreMessageContent] = useState(initialConfig.storeMessageContent)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   const currentConfig: MessageDispatchConfig = { mode, storeMessageContent }
   const isDirty = !dispatchConfigsEqual(currentConfig, initialConfig)
 
   async function handleSave() {
     setIsSaving(true)
+    setSaveError(null)
+    setSaveSuccess(false)
     try {
       await onSave({
         message_dispatch_mode: mode,
         store_message_content: toStoreMessageContentSetting(storeMessageContent),
       })
+      setSaveSuccess(true)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings")
     } finally {
       setIsSaving(false)
     }
+  }
+
+  function handleModeChange(nextMode: MessageDispatchMode) {
+    setMode(nextMode)
+    setSaveError(null)
+    setSaveSuccess(false)
+  }
+
+  function handleStoreContentChange(checked: boolean) {
+    setStoreMessageContent(checked)
+    setSaveError(null)
+    setSaveSuccess(false)
   }
 
   return (
@@ -125,7 +144,7 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
             label="Memory"
             description="Capture messages in memory for development and testing."
             checked={mode === "memory"}
-            onChange={() => setMode("memory")}
+            onChange={() => handleModeChange("memory")}
           />
           <RadioOption
             id="dispatch-provider"
@@ -133,7 +152,7 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
             label="Provider"
             description="Send messages through the connected channel integration."
             checked={mode === "provider"}
-            onChange={() => setMode("provider")}
+            onChange={() => handleModeChange("provider")}
           />
         </div>
       </div>
@@ -148,9 +167,21 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
         <Checkbox
           id="store-message-content"
           checked={storeMessageContent}
-          onCheckedChange={(checked) => setStoreMessageContent(checked === true)}
+          onCheckedChange={(checked) => handleStoreContentChange(checked === true)}
         />
       </div>
+
+      {saveError ? (
+        <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {saveError}
+        </p>
+      ) : null}
+
+      {saveSuccess ? (
+        <p className="rounded-lg border border-primary-brand/20 bg-primary-brand/5 p-3 text-sm text-primary-brand">
+          Dispatch settings saved.
+        </p>
+      ) : null}
 
       <Button type="button" onClick={handleSave} disabled={isSaving || !isDirty} className="w-fit">
         {isSaving ? "Saving…" : "Save dispatch settings"}
@@ -295,7 +326,7 @@ export function SettingsPage() {
 
         <Tabs.Content value="dispatch">
           <DispatchSettingsPanel
-            key={`${wid}-${messageDispatchConfig.mode}-${messageDispatchConfig.storeMessageContent}`}
+            key={wid}
             initialConfig={messageDispatchConfig}
             onSave={saveSettings}
           />

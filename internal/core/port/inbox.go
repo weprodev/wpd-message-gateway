@@ -39,10 +39,18 @@ type StoredChat struct {
 	Chat        contracts.ChatMessage `json:"chat"`
 }
 
+// InboxEmailPage is a paginated slice of captured emails (newest first).
+type InboxEmailPage struct {
+	Items      []StoredEmail `json:"items"`
+	NextCursor string        `json:"next_cursor,omitempty"`
+	HasMore    bool          `json:"has_more"`
+}
+
 // InboxReader is the read side of the in-process message capture store.
 type InboxReader interface {
 	StatsForWorkspace(workspaceID string) map[string]int
 	EmailsForWorkspace(workspaceID string) []StoredEmail
+	ListEmailsForWorkspace(workspaceID string, limit int, cursor string) InboxEmailPage
 	EmailByIDForWorkspace(id, workspaceID string) (StoredEmail, bool)
 	DeleteEmailByIDForWorkspace(id, workspaceID string) bool
 	SMSForWorkspace(workspaceID string) []StoredSMS

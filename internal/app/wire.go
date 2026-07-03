@@ -66,7 +66,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	if err := gateEngine.LoadPolicy(startCtx); err != nil {
 		return nil, fmt.Errorf("load RBAC policies: %w", err)
 	}
-	authGate := authgate.NewGoGateAdapter(gateEngine)
+	authGate := authgate.NewGoGateAdapter(gateEngine, pgClient.GetDB(startCtx))
 
 	// ── Encryption service ──────────────────────────────────────────────────
 	encKey := cfg.EncryptionKey
@@ -125,6 +125,12 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	inboxStore := inbox.NewStore()
 	memoryStore := memory.GetStore()
 
+	var portalInboxHandler *handler.PortalInboxHandler
+	inboxWriter := inbox.NewNotifyingWriter(inboxStore, inbox.PublishFunc(func(workspaceID, eventType string, data any) {
+		portalInboxHandler.PublishInboxEvent(workspaceID, eventType, data)
+	}))
+	portalInboxHandler = handler.NewPortalInboxHandler(inboxStore, inboxWriter)
+
 	// ── Auth service ──────────────────────────────────────────────────────
 	authService := service.NewAuthService(
 		userRepo,
@@ -137,7 +143,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	)
 
 	// ── Gateway service ─────────────────────────────────────────────────────
-	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxStore, logRepo)
+	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxWriter, logRepo)
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
@@ -146,7 +152,6 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	portalWorkspaceHandler := handler.NewPortalWorkspaceHandler(portalSvc)
 	portalIntegrationHandler := handler.NewPortalIntegrationHandler(portalSvc)
 	portalTemplateHandler := handler.NewPortalTemplateHandler(portalSvc)
-	portalInboxHandler := handler.NewPortalInboxHandler(inboxStore, inboxStore)
 	gatewayHandler := handler.NewGatewayHandler(gatewaySvc)
 
 	// ── Router ──────────────────────────────────────────────────────────────

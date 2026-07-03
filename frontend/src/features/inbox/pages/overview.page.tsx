@@ -88,10 +88,10 @@ export function OverviewPage({ channel }: OverviewPageProps) {
   const filteredLogs = logs.filter((log) => {
     const q = searchQuery.toLowerCase()
     return (
-      log.endpoint.toLowerCase().includes(q) ||
-      log.http_method.toLowerCase().includes(q) ||
-      String(log.status_code).includes(q) ||
-      (log.source_name && log.source_name.toLowerCase().includes(q))
+      (log.endpoint ?? "").toLowerCase().includes(q) ||
+      (log.http_method ?? "").toLowerCase().includes(q) ||
+      String(log.status_code ?? "").includes(q) ||
+      (log.source_name ?? "").toLowerCase().includes(q)
     )
   })
 

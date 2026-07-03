@@ -140,11 +140,13 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 	query := `
 		SELECT DISTINCT w.id, w.name, w.slug, u.email, w.status,
 		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
-		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at
+		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at,
+		       COALESCE(r.name, '')
 		FROM workspaces w
 		INNER JOIN users u ON u.id = w.owner_id
-		LEFT JOIN workspace_members wm ON wm.workspace_id = w.id
-		WHERE (wm.user_id = $1 OR w.is_private = false) AND w.status = 'active'
+		LEFT JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
+		LEFT JOIN roles r ON r.id = wm.role_id
+		WHERE (wm.user_id IS NOT NULL OR w.is_private = false) AND w.status = 'active'
 		ORDER BY w.name ASC
 	`
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, query, userID)
@@ -156,7 +158,7 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 
 	out := []domain.Workspace{}
 	for rows.Next() {
-		w, err := scanWorkspace(rows)
+		w, err := scanWorkspaceWithRole(rows)
 		if err != nil {
 			slog.ErrorContext(ctx, "database error: failed to scan workspace in list", "error", err, "user_id", userID)
 			return nil, err
@@ -168,4 +170,27 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 		return nil, err
 	}
 	return out, nil
+}
+
+func scanWorkspaceWithRole(scanner interface {
+	Scan(dest ...any) error
+}) (domain.Workspace, error) {
+	var w domain.Workspace
+	var hashedPin, iconKey sql.NullString
+	var role sql.NullString
+	err := scanner.Scan(&w.ID, &w.Name, &w.Slug, &w.AdminEmail, &w.Status, &w.Visibility,
+		&hashedPin, &iconKey, &w.CreatedAt, &w.UpdatedAt, &role)
+	if err != nil {
+		return w, err
+	}
+	if hashedPin.Valid {
+		w.HashedPin = hashedPin.String
+	}
+	if iconKey.Valid {
+		w.IconKey = iconKey.String
+	}
+	if role.Valid {
+		w.Role = role.String
+	}
+	return w, nil
 }

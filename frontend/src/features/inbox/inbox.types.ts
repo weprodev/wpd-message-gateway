@@ -35,9 +35,10 @@ export interface StoredEmail {
   }
 }
 
-export type InboxCredentials = {
-  clientId: string
-  clientSecret: string
+export type InboxEmailPage = {
+  items: StoredEmail[]
+  next_cursor?: string
+  has_more: boolean
 }
 
 export type EmailTemplate = {

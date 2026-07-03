@@ -1,12 +1,6 @@
 import { apiFetch, getToken } from "@/core/api/client"
-import type { EmailTemplate, InboxCredentials, LogRow, StoredEmail } from "./inbox.types"
-
-function inboxAuthHeaders(creds: InboxCredentials): HeadersInit {
-  return {
-    "X-Api-Client-Id": creds.clientId,
-    "X-Api-Client-Secret": creds.clientSecret,
-  }
-}
+import type { EmailTemplate, InboxEmailPage, LogRow, StoredEmail } from "./inbox.types"
+import { parseLogsResponse } from "./logs.schema"
 
 export async function fetchLogs(
   workspaceId: string,
@@ -29,8 +23,8 @@ export async function fetchLogs(
       const err = (await res.json().catch(() => ({}))) as { message?: string }
       return { ok: false, message: err.message ?? "Failed to fetch logs" }
     }
-    const data = (await res.json()) as { items: LogRow[]; total: number }
-    return { ok: true, items: data.items || [], total: data.total || 0 }
+    const data = parseLogsResponse(await res.json())
+    return { ok: true, items: data.items, total: data.total }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Failed to fetch logs" }
   }
@@ -57,36 +51,70 @@ export async function sendTestRequest(
   }
 }
 
+async function parseApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const err = (await res.json()) as { message?: string; error?: string }
+    return err.message ?? err.error ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export async function fetchInboxEmails(
   workspaceId: string,
-  creds: InboxCredentials
-): Promise<{ ok: true; items: StoredEmail[] } | { ok: false; message?: string }> {
+  params: { limit?: number; cursor?: string } = {}
+): Promise<{ ok: true; page: InboxEmailPage } | { ok: false; message?: string }> {
   try {
-    const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inbox/emails`, {
-      headers: inboxAuthHeaders(creds),
-    })
-    if (!res.ok) {
-      return { ok: false, message: "Failed to fetch email inbox messages" }
+    const query = new URLSearchParams()
+    if (params.limit !== undefined) {
+      query.set("limit", String(params.limit))
     }
-    const data = (await res.json()) as StoredEmail[]
-    const sorted = [...data].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-    return { ok: true, items: sorted }
+    if (params.cursor) {
+      query.set("cursor", params.cursor)
+    }
+    const qs = query.toString()
+    const path = `/api/v1/workspaces/${workspaceId}/inbox/emails${qs ? `?${qs}` : ""}`
+    const res = await apiFetch(path)
+    if (!res.ok) {
+      return { ok: false, message: await parseApiError(res, "Failed to fetch email inbox messages") }
+    }
+    const raw = await res.json()
+    const page: InboxEmailPage = Array.isArray(raw)
+      ? { items: raw, has_more: false }
+      : {
+          items: raw.items ?? [],
+          next_cursor: raw.next_cursor,
+          has_more: raw.has_more ?? false,
+        }
+    return { ok: true, page }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Failed to load emails" }
   }
 }
 
+export async function fetchInboxEmailById(
+  workspaceId: string,
+  messageId: string
+): Promise<{ ok: true; item: StoredEmail } | { ok: false; message?: string }> {
+  try {
+    const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inbox/emails/${messageId}`)
+    if (!res.ok) {
+      return { ok: false, message: "Failed to fetch email" }
+    }
+    const item = (await res.json()) as StoredEmail
+    return { ok: true, item }
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Failed to fetch email" }
+  }
+}
+
 export async function deleteInboxEmail(
   workspaceId: string,
-  messageId: string,
-  creds: InboxCredentials
+  messageId: string
 ): Promise<{ ok: true } | { ok: false; message?: string }> {
   try {
     const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/inbox/emails/${messageId}`, {
       method: "DELETE",
-      headers: inboxAuthHeaders(creds),
     })
     if (!res.ok) {
       return { ok: false, message: "Failed to delete email message" }
@@ -97,15 +125,10 @@ export async function deleteInboxEmail(
   }
 }
 
-export function buildInboxEventsUrl(
-  workspaceId: string,
-  creds: InboxCredentials
-): string {
+export function buildInboxEventsUrl(workspaceId: string): string {
   const token = getToken()
   const params = new URLSearchParams({
     access_token: token ?? "",
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
   })
   return `/api/v1/workspaces/${workspaceId}/inbox/events?${params.toString()}`
 }

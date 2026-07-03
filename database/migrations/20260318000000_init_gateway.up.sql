@@ -62,6 +62,9 @@ CREATE TRIGGER trg_workspaces_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE INDEX idx_workspaces_owner_id ON workspaces(owner_id);
+CREATE INDEX idx_workspaces_active_list
+    ON workspaces (status, is_private, name)
+    WHERE status = 'active';
 
 -- ==============================================================================
 -- 3. ROLES TABLE (RBAC)
@@ -217,6 +220,8 @@ CREATE UNIQUE INDEX idx_integrations_default_per_channel
 
 CREATE INDEX idx_integrations_provider_id ON integrations(provider_id);
 CREATE INDEX idx_integrations_workspace_channel ON integrations(workspace_id, channel_type);
+CREATE INDEX idx_integrations_workspace_channel_status
+    ON integrations (workspace_id, channel_type, status, is_default DESC, created_at DESC);
 
 CREATE TRIGGER trg_integrations_set_updated_at
     BEFORE UPDATE ON integrations
@@ -241,6 +246,7 @@ CREATE TABLE api_keys (
 );
 
 CREATE INDEX idx_api_keys_workspace_id ON api_keys(workspace_id);
+CREATE INDEX idx_api_keys_workspace_created ON api_keys (workspace_id, created_at DESC);
 
 -- ==============================================================================
 -- 11. MESSAGE_REQUEST_LOGS TABLE (Append-only)
@@ -271,6 +277,9 @@ CREATE INDEX idx_message_request_logs_api_key
 CREATE INDEX idx_message_request_logs_workspace_api_created
     ON message_request_logs (workspace_id, api_key_id, created_at DESC)
     WHERE api_key_id IS NOT NULL;
+
+CREATE INDEX idx_message_request_logs_workspace_channel_created
+    ON message_request_logs (workspace_id, channel_type, created_at DESC);
 
 -- ==============================================================================
 -- 11.5. MESSAGE_REQUEST_PAYLOADS TABLE (Append-only body storage)

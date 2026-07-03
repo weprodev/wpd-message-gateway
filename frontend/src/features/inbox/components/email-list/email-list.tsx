@@ -1,5 +1,6 @@
 import { useState } from "react"
 import type { StoredEmail } from "../../inbox.types"
+import { Button } from "@/components/ui/button"
 import { SearchInput } from "@/components/ui/search-input"
 import { EmailItem } from "../email-item"
 
@@ -7,9 +8,19 @@ interface EmailListProps {
   messages: StoredEmail[]
   selectedMessageId: string | null
   onSelectMessage: (messageId: string) => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
 }
 
-export function EmailList({ messages, selectedMessageId, onSelectMessage }: EmailListProps) {
+export function EmailList({
+  messages,
+  selectedMessageId,
+  onSelectMessage,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
+}: EmailListProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const filtered = messages.filter((msg) => {
@@ -49,6 +60,21 @@ export function EmailList({ messages, selectedMessageId, onSelectMessage }: Emai
         {filtered.length === 0 && (
           <div className="text-center text-xs text-text-tertiary py-12 px-4">
             {searchQuery ? "No messages match your search." : "Your inbox is empty."}
+          </div>
+        )}
+
+        {hasMore && !searchQuery && onLoadMore && (
+          <div className="p-3 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={isLoadingMore}
+              onClick={onLoadMore}
+            >
+              {isLoadingMore ? "Loading..." : "Load more"}
+            </Button>
           </div>
         )}
       </div>

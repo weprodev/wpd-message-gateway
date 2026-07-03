@@ -51,6 +51,7 @@ export function useSettings(workspaceId: string) {
   async function saveSettings(patch: WorkspaceSettingsPatch) {
     await patchSettings(workspaceId, patch)
     setSettings((prev) => parseWorkspaceSettings({ ...prev, ...patch }))
+    setError(null)
   }
 
   async function addApiKey(name: string) {

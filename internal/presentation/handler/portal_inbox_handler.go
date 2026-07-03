@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/labstack/echo/v4"
@@ -16,7 +17,7 @@ import (
 )
 
 // PortalInboxHandler serves REST + SSE for the workspace-scoped message inbox (memory provider preview).
-// Routes require JWT + workspace membership + workspace API key (see middleware).
+// Routes require JWT + workspace membership (see middleware).
 type PortalInboxHandler struct {
 	reader      port.InboxReader
 	writer      port.InboxWriter
@@ -41,7 +42,10 @@ func (h *PortalInboxHandler) HandleStats(c echo.Context) error {
 }
 
 func (h *PortalInboxHandler) HandleGetEmails(c echo.Context) error {
-	return c.JSON(http.StatusOK, h.reader.EmailsForWorkspace(workspaceIDParam(c)))
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	cursor := c.QueryParam("cursor")
+	page := h.reader.ListEmailsForWorkspace(workspaceIDParam(c), limit, cursor)
+	return c.JSON(http.StatusOK, page)
 }
 
 func (h *PortalInboxHandler) HandleGetEmailByID(c echo.Context) error {
@@ -146,7 +150,6 @@ func (h *PortalInboxHandler) HandleIngestEmail(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store email"})
 	}
 
-	h.broadcast(w, "email_received", map[string]string{"id": id})
 	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
@@ -161,7 +164,6 @@ func (h *PortalInboxHandler) HandleIngestSMS(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store sms"})
 	}
 
-	h.broadcast(workspaceIDParam(c), "sms_received", map[string]string{"id": id})
 	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
@@ -176,7 +178,6 @@ func (h *PortalInboxHandler) HandleIngestPush(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store push"})
 	}
 
-	h.broadcast(workspaceIDParam(c), "push_received", map[string]string{"id": id})
 	return c.JSON(http.StatusCreated, map[string]string{"id": id})
 }
 
@@ -191,8 +192,12 @@ func (h *PortalInboxHandler) HandleIngestChat(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store chat"})
 	}
 
-	h.broadcast(workspaceIDParam(c), "chat_received", map[string]string{"id": id})
 	return c.JSON(http.StatusCreated, map[string]string{"id": id})
+}
+
+// PublishInboxEvent notifies SSE subscribers of an inbox change.
+func (h *PortalInboxHandler) PublishInboxEvent(workspaceID, eventType string, data any) {
+	h.broadcast(workspaceID, eventType, data)
 }
 
 // HandleSSE streams Server-Sent Events for the workspace inbox (one connection per workspace).

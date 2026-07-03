@@ -44,4 +44,5 @@ type AuthorizationGate interface {
 	RemoveRole(ctx context.Context, modelType, modelID, teamID, roleName string) error
 	GetRoleNames(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
 	GetAllPermissions(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
+	GetPermissionsForTeams(ctx context.Context, modelType, modelID string, teamIDs []string) (map[string][]string, error)
 }

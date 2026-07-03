@@ -3,6 +3,16 @@ import { apiFetch } from "@/core/api/client"
 import { parseWorkspaceSettings } from "./settings.schema"
 import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "./settings.types"
 
+async function readApiErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { message?: string }
+    const message = body.message?.trim()
+    return message || fallback
+  } catch {
+    return fallback
+  }
+}
+
 export async function getSettings(workspaceId: string): Promise<WorkspaceSettings> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`)
   if (!res.ok) {
@@ -18,7 +28,7 @@ export async function patchSettings(workspaceId: string, body: WorkspaceSettings
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error("Failed to save settings")
+    throw new Error(await readApiErrorMessage(res, "Failed to save settings"))
   }
 }
 

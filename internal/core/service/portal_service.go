@@ -208,32 +208,39 @@ func (s *PortalService) ListWorkspaces(ctx context.Context, userID string) ([]do
 		return nil, err
 	}
 
+	memberWorkspaceIDs := make([]string, 0, len(workspaces))
 	for i := range workspaces {
 		w := &workspaces[i]
-		// Get role in this workspace
-		role, err := s.members.GetRole(ctx, w.ID, userID)
-		if err != nil {
-			// If not a member, check if it's public
-			if w.Visibility == "public" {
-				w.Role = "viewer"
-				w.Permissions = []string{
-					domain.PermissionWorkspacesRead,
-					domain.PermissionMembersRead,
-					domain.PermissionAPIKeysRead,
-					domain.PermissionLogsRead,
-					domain.PermissionIntegrationsRead,
-					domain.PermissionTemplatesRead,
-					domain.PermissionSettingsRead,
-					domain.PermissionInvitationsRead,
-				}
-			}
+		if w.Role != "" {
+			memberWorkspaceIDs = append(memberWorkspaceIDs, w.ID)
 			continue
 		}
+		if w.Visibility == "public" {
+			w.Role = "viewer"
+			w.Permissions = []string{
+				domain.PermissionWorkspacesRead,
+				domain.PermissionMembersRead,
+				domain.PermissionAPIKeysRead,
+				domain.PermissionLogsRead,
+				domain.PermissionIntegrationsRead,
+				domain.PermissionTemplatesRead,
+				domain.PermissionSettingsRead,
+				domain.PermissionInvitationsRead,
+			}
+		}
+	}
 
-		w.Role = role
-		// Get permissions from gogate
-		perms, err := s.gate.GetAllPermissions(ctx, "users", userID, w.ID)
-		if err == nil {
+	permsByTeam, err := s.gate.GetPermissionsForTeams(ctx, "users", userID, memberWorkspaceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load workspace permissions: %w", err)
+	}
+
+	for i := range workspaces {
+		w := &workspaces[i]
+		if w.Role == "" {
+			continue
+		}
+		if perms, ok := permsByTeam[w.ID]; ok {
 			w.Permissions = perms
 		}
 	}
@@ -539,7 +546,7 @@ func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, k
 				}
 			}
 			if !hasConnected {
-				return fmt.Errorf("%w: first configure a provider then you can enable it", port.ErrInvalidInput)
+				return fmt.Errorf("%w: configure a provider in Integrations before switching to provider mode", port.ErrInvalidInput)
 			}
 		}
 
