@@ -49,7 +49,7 @@ func (sh *SendHelper) DispatchAndLog(
 	if err := json.NewDecoder(c.Request().Body).Decode(dst); err != nil {
 		slog.WarnContext(ctx, "send rejected: invalid JSON body", "endpoint", endpoint, "error", err)
 		sh.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-			http.StatusBadRequest, endpoint, start, "invalid JSON body", "")
+			http.StatusBadRequest, endpoint, start, "invalid JSON body", "", nil, nil)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 	}
 
@@ -64,13 +64,13 @@ func (sh *SendHelper) DispatchAndLog(
 	if err != nil {
 		slog.ErrorContext(ctx, "send failed", "error", err, "endpoint", endpoint, "duration_ms", time.Since(start).Milliseconds())
 		sh.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-			http.StatusInternalServerError, endpoint, start, err.Error(), providerName)
+			http.StatusInternalServerError, endpoint, start, err.Error(), providerName, dst, result)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "send failed"})
 	}
 
 	slog.InfoContext(ctx, "send ok", "endpoint", endpoint, "duration_ms", time.Since(start).Milliseconds())
 	sh.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-		http.StatusOK, endpoint, start, "", providerName)
+		http.StatusOK, endpoint, start, "", providerName, dst, result)
 	return c.JSON(http.StatusOK, result)
 }
 
@@ -81,6 +81,8 @@ func (sh *SendHelper) recordLog(
 	endpoint string,
 	start time.Time,
 	errMsg, providerName string,
+	reqBody any,
+	result *contracts.SendResult,
 ) {
 	if sh.svc == nil || workspaceID == "" {
 		return
@@ -97,6 +99,29 @@ func (sh *SendHelper) recordLog(
 		DurationMs:   int(time.Since(start).Milliseconds()),
 		ErrorMessage: errMsg,
 	}
+
+	if contracts.StoreContentFromResult(result) {
+		var requestBody, responseBody string
+		if reqBody != nil {
+			if b, err := json.Marshal(reqBody); err != nil {
+				slog.WarnContext(ctx, "failed to marshal request body for log payload", "error", err, "endpoint", endpoint)
+			} else {
+				requestBody = string(b)
+			}
+		}
+		if b, err := json.Marshal(result); err != nil {
+			slog.WarnContext(ctx, "failed to marshal response body for log payload", "error", err, "endpoint", endpoint)
+		} else {
+			responseBody = string(b)
+		}
+		if requestBody != "" || responseBody != "" {
+			entry.Payload = &domain.MessageRequestPayload{
+				RequestBody:  requestBody,
+				ResponseBody: responseBody,
+			}
+		}
+	}
+
 	if err := sh.svc.RecordLog(ctx, entry); err != nil {
 		slog.WarnContext(ctx, "failed to persist message request log", "error", err, "endpoint", endpoint)
 	}

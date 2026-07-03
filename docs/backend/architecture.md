@@ -258,7 +258,7 @@ PATCH /api/v1/workspaces/:wid/settings
 { "message_dispatch_mode": "provider", "store_message_content": "true" }
 ```
 
-**Request logs**: Every API send appends a row to `message_request_logs` (operational tracing with correlation `request_id`).
+**Request logs**: Every API send appends a row to `message_request_logs` (operational tracing with correlation `request_id`). Payload bodies are stored in a separate table (`message_request_payloads`) to prevent table bloat and enforce independent data privacy/retention policies.
 
 ---
 

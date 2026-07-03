@@ -273,6 +273,17 @@ CREATE INDEX idx_message_request_logs_workspace_api_created
     WHERE api_key_id IS NOT NULL;
 
 -- ==============================================================================
+-- 11.5. MESSAGE_REQUEST_PAYLOADS TABLE (Append-only body storage)
+-- ==============================================================================
+
+CREATE TABLE message_request_payloads (
+    log_id        UUID        PRIMARY KEY REFERENCES message_request_logs(id) ON DELETE CASCADE,
+    request_body  TEXT,
+    response_body TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ==============================================================================
 -- 12. TEMPLATES TABLE
 -- ==============================================================================
 

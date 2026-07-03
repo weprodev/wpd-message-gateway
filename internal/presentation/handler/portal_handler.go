@@ -135,6 +135,42 @@ func (h *PortalHandler) RegenerateAPIKey(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"client_secret": secret})
 }
 
+type messageRequestLogDTO struct {
+	ID           string    `json:"id"`
+	WorkspaceID  string    `json:"workspace_id"`
+	APIKeyID     string    `json:"api_key_id,omitempty"`
+	ChannelType  string    `json:"channel_type"`
+	HTTPMethod   string    `json:"http_method"`
+	StatusCode   int       `json:"status_code"`
+	Endpoint     string    `json:"endpoint"`
+	ProviderName string    `json:"provider_name,omitempty"`
+	RequestID    string    `json:"request_id,omitempty"`
+	DurationMs   int       `json:"duration_ms,omitempty"`
+	ErrorMessage string    `json:"error_message,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	SourceName   string    `json:"source_name"`
+	ClientID     string    `json:"client_id,omitempty"`
+}
+
+func toMessageRequestLogDTO(l domain.MessageRequestLogWithSource) messageRequestLogDTO {
+	return messageRequestLogDTO{
+		ID:           l.ID,
+		WorkspaceID:  l.WorkspaceID,
+		APIKeyID:     l.APIKeyID,
+		ChannelType:  l.ChannelType,
+		HTTPMethod:   l.HTTPMethod,
+		StatusCode:   l.StatusCode,
+		Endpoint:     l.Endpoint,
+		ProviderName: l.ProviderName,
+		RequestID:    l.RequestID,
+		DurationMs:   l.DurationMs,
+		ErrorMessage: l.ErrorMessage,
+		CreatedAt:    l.CreatedAt,
+		SourceName:   l.SourceName,
+		ClientID:     l.ClientID,
+	}
+}
+
 func (h *PortalHandler) ListLogs(c echo.Context) error {
 	wid := c.Param("wid")
 	q := port.MessageLogQuery{WorkspaceID: wid}
@@ -156,7 +192,11 @@ func (h *PortalHandler) ListLogs(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to list logs", "error", err)
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to list logs")
 	}
-	return c.JSON(http.StatusOK, map[string]any{"items": rows, "total": total})
+	out := make([]messageRequestLogDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, toMessageRequestLogDTO(r))
+	}
+	return c.JSON(http.StatusOK, map[string]any{"items": out, "total": total})
 }
 
 func (h *PortalHandler) GetSettings(c echo.Context) error {

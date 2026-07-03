@@ -163,7 +163,7 @@ func (s *GatewayService) dispatch(
 	if config.RoutesViaProvider() {
 		intg, errLookup := s.requireProviderIntegration(ctx, workspaceID, channel)
 		if errLookup != nil {
-			return attachMeta(nil, effectiveMode, channel, integrationID, providerName), errLookup
+			return attachMeta(nil, effectiveMode, config.StoreMessageContent, channel, integrationID, providerName), errLookup
 		}
 
 		integrationID = intg.ID
@@ -173,7 +173,7 @@ func (s *GatewayService) dispatch(
 		provResult, err = sendViaProvider(providerCtx, *intg)
 		if err != nil {
 			slog.WarnContext(providerCtx, "provider dispatch failed", "error", err, "integration_id", integrationID)
-			return attachMeta(nil, effectiveMode, channel, integrationID, providerName), err
+			return attachMeta(nil, effectiveMode, config.StoreMessageContent, channel, integrationID, providerName), err
 		}
 		slog.InfoContext(providerCtx, "message dispatched via provider", "message_id", provResult.ID)
 	}
@@ -183,7 +183,7 @@ func (s *GatewayService) dispatch(
 		if err != nil {
 			slog.ErrorContext(ctx, "inbox write failed", "error", err, "dispatch_mode", effectiveMode, "store_content", config.StoreMessageContent)
 			if effectiveMode == domain.DispatchMemory {
-				return attachMeta(nil, effectiveMode, channel, integrationID, providerName), err
+				return attachMeta(nil, effectiveMode, config.StoreMessageContent, channel, integrationID, providerName), err
 			}
 			slog.WarnContext(ctx, "inbox capture failed after provider dispatch", "dispatch_mode", effectiveMode)
 		} else {
@@ -201,7 +201,7 @@ func (s *GatewayService) dispatch(
 		finalResult.Meta["inbox_message_id"] = inboxResult.ID
 	}
 
-	return attachMeta(finalResult, effectiveMode, channel, integrationID, providerName), nil
+	return attachMeta(finalResult, effectiveMode, config.StoreMessageContent, channel, integrationID, providerName), nil
 }
 
 // ResolveDispatchConfig reads the workspace setting for outbound dispatch behavior.
@@ -323,20 +323,21 @@ func (s *GatewayService) writeChatToInbox(ctx context.Context, workspaceID strin
 // attachMeta stamps standard dispatch metadata onto r. When r is nil (error paths
 // with no provider payload), it allocates a minimal SendResult so callers can
 // still read provider_name via contracts.ProviderNameFromResult.
-func attachMeta(r *contracts.SendResult, effectiveMode domain.MessageDispatchMode, channel, integrationID, providerName string) *contracts.SendResult {
+func attachMeta(r *contracts.SendResult, effectiveMode domain.MessageDispatchMode, storeContent bool, channel, integrationID, providerName string) *contracts.SendResult {
 	if r == nil {
 		r = &contracts.SendResult{}
 	}
 	if r.Meta == nil {
-		r.Meta = make(map[string]string, 4)
+		r.Meta = make(map[string]string, 5)
 	}
 	r.Meta["dispatch_mode"] = string(effectiveMode)
+	contracts.SetStoreContentMeta(r, storeContent)
 	r.Meta["channel"] = channel
 	if integrationID != "" {
 		r.Meta["integration_id"] = integrationID
 	}
 	if providerName != "" {
-		r.Meta["provider_name"] = providerName
+		r.Meta[contracts.MetaKeyProviderName] = providerName
 	}
 	return r
 }

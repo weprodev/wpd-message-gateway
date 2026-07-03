@@ -88,6 +88,69 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		}
 	})
 
+	t.Run("store_content persists request and response payloads", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"],"subject":"hi"}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			r := &contracts.SendResult{ID: "msg-111", StatusCode: 200, Message: "sent"}
+			contracts.SetStoreContentMeta(r, true)
+			r.Meta[contracts.MetaKeyProviderName] = "mailgun"
+			return r, nil
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 {
+			t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
+		}
+
+		log := repo.entries[0]
+		if log.Payload == nil {
+			t.Fatal("expected payload on log entry")
+		}
+		if !strings.Contains(log.Payload.RequestBody, "test@example.com") {
+			t.Errorf("request body missing recipient: %q", log.Payload.RequestBody)
+		}
+		if !strings.Contains(log.Payload.ResponseBody, "msg-111") {
+			t.Errorf("response body missing message id: %q", log.Payload.ResponseBody)
+		}
+	})
+
+	t.Run("store_content off skips payload", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			r := &contracts.SendResult{ID: "msg-111"}
+			contracts.SetStoreContentMeta(r, false)
+			return r, nil
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 {
+			t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
+		}
+		if repo.entries[0].Payload != nil {
+			t.Fatalf("expected no payload when store_content is false, got %+v", repo.entries[0].Payload)
+		}
+	})
+
 	t.Run("missing workspace returns unauthorized", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
 		rec := httptest.NewRecorder()

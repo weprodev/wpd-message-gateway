@@ -46,14 +46,34 @@ func (r *MessageRequestLogRepository) Create(ctx context.Context, log *domain.Me
 	if log.ProviderName != "" {
 		provider = log.ProviderName
 	}
-	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
-		log.WorkspaceID, apiKeyID, log.ChannelType, log.HTTPMethod, log.StatusCode, log.Endpoint,
-		provider, reqID, dur, errMsg,
-	).Scan(&log.ID, &log.CreatedAt)
-	if err != nil {
-		slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "endpoint", log.Endpoint)
-	}
-	return err
+	return r.client.RunInTransaction(ctx, func(ctx context.Context) error {
+		err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
+			log.WorkspaceID, apiKeyID, log.ChannelType, log.HTTPMethod, log.StatusCode, log.Endpoint,
+			provider, reqID, dur, errMsg,
+		).Scan(&log.ID, &log.CreatedAt)
+		if err != nil {
+			slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "endpoint", log.Endpoint)
+			return err
+		}
+
+		if log.Payload != nil {
+			log.Payload.LogID = log.ID
+			payloadQuery := `
+				INSERT INTO message_request_payloads (log_id, request_body, response_body)
+				VALUES ($1, $2, $3)
+				RETURNING created_at
+			`
+			err = r.client.GetDB(ctx).QueryRowContext(ctx, payloadQuery,
+				log.Payload.LogID, log.Payload.RequestBody, log.Payload.ResponseBody,
+			).Scan(&log.Payload.CreatedAt)
+			if err != nil {
+				slog.ErrorContext(ctx, "database error: failed to create message request payload", "error", err, "log_id", log.ID)
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port.MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error) {

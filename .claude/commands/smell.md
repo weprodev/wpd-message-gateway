@@ -101,7 +101,7 @@ Router → Middleware → Handler → Service → Port ← Repository / Provider
 
 | Area | Violation |
 | ---- | --------- |
-| `internal/core/domain/` | Imports Echo, HTTP, infra, or presentation |
+| `internal/core/domain/` | Imports Echo, HTTP, infra, presentation, or contains struct tags (`json`, `db`) |
 | `internal/core/port/` | Contains implementation instead of interfaces |
 | `internal/core/service/` | Direct SQL/HTTP; missing `ctx`; orchestration left in handler |
 | `internal/infrastructure/` | Business rules; bypasses port interfaces |
@@ -219,6 +219,7 @@ Do not invent issues. If the diff is clean, say so.
 | -- | ------- |
 | DDD.LAYER | Business rule or orchestration in the wrong layer (handler/UI/infra) |
 | DDD.BOUNDARY | Bounded context violated (feature↔feature, `pkg`→`internal`, shared→feature) |
+| DDD.DOMAIN-LEAK | Domain object returned directly from handler without DTO mapping, or containing presentation tags (`json`) |
 | DDD.VALUE-TYPE | Domain concept as raw string/number — use typed constant in domain + API/FE mirror |
 
 **General — SOLID**
