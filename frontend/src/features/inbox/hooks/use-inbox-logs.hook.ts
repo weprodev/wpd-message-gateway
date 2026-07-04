@@ -16,6 +16,7 @@ export function useInboxLogs(workspaceId: string | undefined, channel?: string) 
         setError(res.message ?? "Failed to load request logs")
         return
       }
+      setError(null)
       setLogs(res.items)
       setTotal(res.total)
     },

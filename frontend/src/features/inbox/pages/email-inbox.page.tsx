@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -9,99 +9,32 @@ import {
   buildInboxEventsUrl,
   deleteInboxEmail,
   fetchInboxEmailById,
-  fetchInboxEmails,
 } from "../inbox.api"
 import { EmailList } from "../components/email-list"
 import { EmailContent } from "../components/email-content"
-import type { StoredEmail } from "../inbox.types"
-
-const PAGE_SIZE = 50
+import { useInboxEmails } from "../hooks/use-inbox-emails.hook"
 
 export function EmailInboxPage() {
   const navigate = useNavigate()
   const { wid } = useParams<{ wid: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const deepLinkMessageId = searchParams.get("message")
-
-  const [messages, setMessages] = useState<StoredEmail[]>([])
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [nextCursor, setNextCursor] = useState<string | undefined>()
-  const [hasMore, setHasMore] = useState(false)
 
-  const fetchEmails = useCallback(async () => {
-    if (!wid) return
-    setError(null)
-    setIsLoading(true)
-
-    const result = await fetchInboxEmails(wid, { limit: PAGE_SIZE })
-    if (!result.ok) {
-      setError(result.message ?? "Failed to load emails")
-      setIsLoading(false)
-      return
-    }
-
-    setMessages(result.page.items ?? [])
-    setNextCursor(result.page.next_cursor)
-    setHasMore(result.page.has_more)
-    if ((result.page.items ?? []).length > 0) {
-      setSelectedMessageId((prev) => prev ?? (result.page.items ?? [])[0].id)
-    }
-    setIsLoading(false)
-  }, [wid])
-
-  const loadMoreEmails = useCallback(async () => {
-    if (!wid || !nextCursor || isLoadingMore) return
-    setIsLoadingMore(true)
-
-    const result = await fetchInboxEmails(wid, { limit: PAGE_SIZE, cursor: nextCursor })
-    if (!result.ok) {
-      setError(result.message ?? "Failed to load more emails")
-      setIsLoadingMore(false)
-      return
-    }
-
-    setMessages((prev) => [...(prev ?? []), ...(result.page.items ?? [])])
-    setNextCursor(result.page.next_cursor)
-    setHasMore(result.page.has_more)
-    setIsLoadingMore(false)
-  }, [wid, nextCursor, isLoadingMore])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      if (!wid) {
-        setIsLoading(false)
-        return
-      }
-      setError(null)
-      setIsLoading(true)
-
-      const result = await fetchInboxEmails(wid, { limit: PAGE_SIZE })
-      if (cancelled) return
-
-      if (!result.ok) {
-        setError(result.message ?? "Failed to load emails")
-        setIsLoading(false)
-        return
-      }
-
-      setMessages(result.page.items ?? [])
-      setNextCursor(result.page.next_cursor)
-      setHasMore(result.page.has_more)
-      if ((result.page.items ?? []).length > 0) {
-        setSelectedMessageId((prev) => prev ?? (result.page.items ?? [])[0].id)
-      }
-      setIsLoading(false)
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [wid])
+  const {
+    messages,
+    selectedMessageId,
+    setSelectedMessageId,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    reload,
+    loadMore,
+    prependMessage,
+    removeMessage,
+    clearMessages,
+  } = useInboxEmails(wid)
 
   useEffect(() => {
     if (!wid || !deepLinkMessageId) return
@@ -112,10 +45,7 @@ export function EmailInboxPage() {
       if (cancelled) return
 
       if (result.ok) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === result.item.id)) return prev
-          return [result.item, ...prev]
-        })
+        prependMessage(result.item)
         setSelectedMessageId(deepLinkMessageId)
       }
 
@@ -129,7 +59,7 @@ export function EmailInboxPage() {
     return () => {
       cancelled = true
     }
-  }, [wid, deepLinkMessageId, setSearchParams])
+  }, [wid, deepLinkMessageId, setSearchParams, prependMessage, setSelectedMessageId])
 
   useEffect(() => {
     if (!wid) return
@@ -154,10 +84,7 @@ export function EmailInboxPage() {
             if (!id) return
             void fetchInboxEmailById(wid, id).then((result) => {
               if (!result.ok) return
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === result.item.id)) return prev
-                return [result.item, ...prev]
-              })
+              prependMessage(result.item)
               setSelectedMessageId((current) => current ?? id)
             })
             return
@@ -166,24 +93,12 @@ export function EmailInboxPage() {
           if (parsed.type === "email_deleted") {
             const id = typeof parsed.data === "string" ? parsed.data : undefined
             if (!id) return
-            setMessages((prev) => {
-              const remaining = prev.filter((m) => m.id !== id)
-              setSelectedMessageId((current) => {
-                if (current === id) {
-                  return remaining.length > 0 ? remaining[0].id : null
-                }
-                return current
-              })
-              return remaining
-            })
+            removeMessage(id)
             return
           }
 
           if (parsed.type === "messages_cleared") {
-            setMessages([])
-            setSelectedMessageId(null)
-            setNextCursor(undefined)
-            setHasMore(false)
+            clearMessages()
           }
         } catch (err) {
           console.error("Failed to parse SSE event data:", err)
@@ -196,7 +111,7 @@ export function EmailInboxPage() {
     return () => {
       eventSource?.close()
     }
-  }, [wid])
+  }, [wid, prependMessage, removeMessage, clearMessages, setSelectedMessageId])
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!wid) return
@@ -208,16 +123,7 @@ export function EmailInboxPage() {
       return
     }
 
-    setMessages((prev) => {
-      const remaining = prev.filter((m) => m.id !== messageId)
-      setSelectedMessageId((current) => {
-        if (current === messageId) {
-          return remaining.length > 0 ? remaining[0].id : null
-        }
-        return current
-      })
-      return remaining
-    })
+    removeMessage(messageId)
     setIsDeleting(false)
   }
 
@@ -227,7 +133,8 @@ export function EmailInboxPage() {
     }
   }
 
-  const activeMessage = (messages ?? []).find((m) => m.id === selectedMessageId) ?? null
+  const activeMessage = messages.find((m) => m.id === selectedMessageId) ?? null
+  const showLoading = Boolean(wid) && isLoading
 
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-160px)] min-h-[500px]">
@@ -242,8 +149,8 @@ export function EmailInboxPage() {
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
-          <Button type="button" variant="outline" size="sm" onClick={() => void fetchEmails()} disabled={isLoading} className="h-10">
-            <Icon name="refresh" size="sm" data-icon="inline-start" className={isLoading ? "animate-spin" : undefined} />
+          <Button type="button" variant="outline" size="sm" onClick={() => void reload()} disabled={showLoading} className="h-10">
+            <Icon name="refresh" size="sm" data-icon="inline-start" className={showLoading ? "animate-spin" : undefined} />
             Refresh
           </Button>
           <Button type="button" size="sm" onClick={handleManageTemplates} className="h-10">
@@ -259,16 +166,16 @@ export function EmailInboxPage() {
           <p className="text-xs text-text-secondary max-w-sm mt-1 mb-4">
             {error}
           </p>
-          <Button variant="outline" size="sm" onClick={() => void fetchEmails()}>
+          <Button variant="outline" size="sm" onClick={() => void reload()}>
             Try again
           </Button>
         </div>
-      ) : isLoading ? (
+      ) : showLoading ? (
         <div className="flex-1 bg-card border border-border rounded-2xl flex flex-col items-center justify-center gap-3">
           <Spinner size="lg" />
           <span className="text-sm text-text-secondary">Loading simulated inbox...</span>
         </div>
-      ) : (messages ?? []).length === 0 ? (
+      ) : messages.length === 0 ? (
         <div className="flex-1 bg-card border border-border rounded-2xl flex flex-col items-center justify-center p-8 text-center">
           <div className="mb-4 flex size-16 items-center justify-center rounded-full border border-border bg-muted/40 text-text-tertiary">
             <Icon name="mail" size="lg" />
@@ -281,12 +188,12 @@ export function EmailInboxPage() {
       ) : (
         <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-sm min-h-0">
           <EmailList
-            messages={messages ?? []}
+            messages={messages}
             selectedMessageId={selectedMessageId}
             onSelectMessage={setSelectedMessageId}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
-            onLoadMore={() => void loadMoreEmails()}
+            onLoadMore={() => void loadMore()}
           />
           {activeMessage ? (
             <EmailContent

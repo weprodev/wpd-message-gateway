@@ -25,10 +25,12 @@ const logsResponseSchema = z.object({
   total: z.number(),
 })
 
-export function parseLogsResponse(raw: unknown): { items: LogRow[]; total: number } {
+export function parseLogsResponse(
+  raw: unknown,
+): { ok: true; items: LogRow[]; total: number } | { ok: false; message: string } {
   const parsed = logsResponseSchema.safeParse(raw)
   if (!parsed.success) {
-    throw new Error("Invalid logs response from server")
+    return { ok: false, message: "Invalid logs response from server" }
   }
-  return parsed.data
+  return { ok: true, items: parsed.data.items, total: parsed.data.total }
 }

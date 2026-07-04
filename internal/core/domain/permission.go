@@ -39,6 +39,6 @@ const (
 	PermissionInvitationsRead  = "invitations.read"
 	PermissionInvitationsWrite = "invitations.write"
 
-	// Testing/Operations
-	PermissionSendTest = "send.test"
+	// Inbox
+	PermissionInboxWrite = "inbox.write"
 )

@@ -31,13 +31,10 @@ func (s *GatewayService) enrichEmailFromIntegration(ctx context.Context, workspa
 	}
 
 	intg, err := s.integrations.GetActiveByWorkspaceAndChannel(ctx, workspaceID, channelEmail)
-	if err != nil {
-		if !errors.Is(err, port.ErrNotFound) {
+	if err != nil || intg == nil {
+		if err != nil && !errors.Is(err, port.ErrNotFound) {
 			slog.WarnContext(ctx, "failed to load email integration for sender enrichment", "error", err)
 		}
-		return email
-	}
-	if intg == nil {
 		return email
 	}
 

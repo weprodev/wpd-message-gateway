@@ -40,7 +40,7 @@ Router → Middleware → Handler → Service → Port ← Repository / Provider
 | `MGW.ARCH-PKG-INTERNAL` | `pkg/` imports `internal/` |
 | `MGW.ARCH-HANDLER-SQL` | SQL or provider SDK in handlers |
 | `MGW.ARCH-SERVICE-HTTP` | Echo/HTTP types in services |
-| `MGW.ARCH-PROVIDER-INTERNAL` | New provider under `internal/infrastructure/provider/` |
+| `MGW.ARCH-PROVIDER-INTERNAL` | New provider under `internal/` instead of `pkg/provider/<name>/` |
 | `MGW.ARCH-FAT-HANDLER` | Handler > ~200 lines or business logic in handler |
 
 **Prefer:** split handlers by portal concern (`portal_auth_handler`, `portal_workspace_handler`, …). Keep handlers thin — decode, call service, map response.

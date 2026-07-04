@@ -2,6 +2,15 @@ import { apiFetch, getToken } from "@/core/api/client"
 import type { EmailTemplate, InboxEmailPage, LogRow, StoredEmail } from "./inbox.types"
 import { parseLogsResponse } from "./logs.schema"
 
+async function parseApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const err = (await res.json()) as { message?: string; error?: string }
+    return err.message ?? err.error ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export async function fetchLogs(
   workspaceId: string,
   params: { channel?: string; limit?: number; offset?: number } = {}
@@ -20,22 +29,15 @@ export async function fetchLogs(
   try {
     const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/logs?${query.toString()}`)
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { message?: string }
-      return { ok: false, message: err.message ?? "Failed to fetch logs" }
+      return { ok: false, message: await parseApiError(res, "Failed to fetch logs") }
     }
-    const data = parseLogsResponse(await res.json())
-    return { ok: true, items: data.items, total: data.total }
+    const parsed = parseLogsResponse(await res.json())
+    if (!parsed.ok) {
+      return { ok: false, message: parsed.message }
+    }
+    return { ok: true, items: parsed.items, total: parsed.total }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Failed to fetch logs" }
-  }
-}
-
-async function parseApiError(res: Response, fallback: string): Promise<string> {
-  try {
-    const err = (await res.json()) as { message?: string; error?: string }
-    return err.message ?? err.error ?? fallback
-  } catch {
-    return fallback
   }
 }
 

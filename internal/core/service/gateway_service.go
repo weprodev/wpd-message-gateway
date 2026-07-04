@@ -170,7 +170,7 @@ func (s *GatewayService) dispatch(
 		providerName = intg.ProviderName
 
 		providerCtx := applogger.WithProvider(ctx, providerName)
-		provResult, err = sendViaProvider(providerCtx, *intg)
+		provResult, err = sendViaProvider(providerCtx, intg)
 		if err != nil {
 			slog.WarnContext(providerCtx, "provider dispatch failed", "error", err, "integration_id", integrationID)
 			return attachMeta(nil, effectiveMode, config.StoreMessageContent, channel, integrationID, providerName), err
@@ -232,7 +232,7 @@ func (s *GatewayService) resolveDispatchConfig(ctx context.Context, workspaceID 
 }
 
 // requireProviderIntegration loads and validates the workspace integration for provider dispatch.
-func (s *GatewayService) requireProviderIntegration(ctx context.Context, workspaceID, channel string) (*domain.Integration, error) {
+func (s *GatewayService) requireProviderIntegration(ctx context.Context, workspaceID, channel string) (domain.Integration, error) {
 	if s.integrations == nil {
 		err := fmt.Errorf("integration repository not configured: %w", port.ErrInternal)
 		slog.ErrorContext(ctx, "provider dispatch blocked",
@@ -240,7 +240,7 @@ func (s *GatewayService) requireProviderIntegration(ctx context.Context, workspa
 			"channel", channel,
 			"error", err,
 		)
-		return nil, err
+		return domain.Integration{}, err
 	}
 
 	intg, err := s.integrations.GetActiveByWorkspaceAndChannel(ctx, workspaceID, channel)
@@ -256,7 +256,16 @@ func (s *GatewayService) requireProviderIntegration(ctx context.Context, workspa
 			"channel", channel,
 			"error", err,
 		)
-		return nil, fmt.Errorf("provider integration for %s channel: %w", channel, err)
+		return domain.Integration{}, fmt.Errorf("provider integration for %s channel: %w", channel, err)
+	}
+	if intg == nil {
+		err := fmt.Errorf("provider integration for %s channel: %w", channel, port.ErrNotFound)
+		slog.WarnContext(ctx, "provider dispatch blocked",
+			"reason", "no_active_integration",
+			"channel", channel,
+			"error", err,
+		)
+		return domain.Integration{}, err
 	}
 
 	if err := domain.ValidateProviderIntegration(*intg); err != nil {
@@ -268,10 +277,10 @@ func (s *GatewayService) requireProviderIntegration(ctx context.Context, workspa
 			"status", intg.Status,
 			"error", err,
 		)
-		return nil, err
+		return domain.Integration{}, err
 	}
 
-	return intg, nil
+	return *intg, nil
 }
 
 // inbox write helpers — each converts a domain error into meaningful context.

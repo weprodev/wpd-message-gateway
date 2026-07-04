@@ -186,7 +186,7 @@ Portal accounts use **email + password** (passwords are stored hashed). All mana
 The core service layer decouples from `wpd-gogate` by depending on the `port.AuthorizationGate` interface. The implementation adapter lives in `internal/infrastructure/authgate/gate_adapter.go`.
 
 - **admin**: Full read/write access to settings, integrations, templates, API keys, and member removal. Assigned automatically to the creator of a workspace.
-- **member**: Read-only access to workspaces, settings, templates, API keys, plus inbox management (`send.test`).
+- **member**: Read-only access to workspaces, settings, templates, API keys, and logs, plus inbox mutations (`inbox.write`).
 
 Public workspaces (`is_private = false`) are dynamically accessible to any authenticated user as a `"viewer"` with read-only permissions (i.e. `*.read` operations are bypassed and approved automatically without requiring explicit membership or Casbin checks). All write operations on public workspaces remain strictly restricted to workspace admins.
 
@@ -200,7 +200,7 @@ Authorization: Bearer <workspace-jwt-token>
     OR
 X-Api-Client-Id: wk_abc123
 X-Api-Client-Secret: <secret>
-X-Workspace-Key: <workspace-unique-key>
+X-Workspace-Key: <workspace-id-or-slug>
 ```
 
 ### Dual Authorization Design
@@ -231,7 +231,18 @@ Provider credentials are stored AES-encrypted in the `integrations` table. Confi
 
 ### Portal UI coverage
 
-The React Portal (`frontend/`) implements: auth, workspace list, **integrations**, **settings** (general, API keys, message dispatch), message **logs**, and **send test**. Templates, members, and inbox browsing remain REST/Bruno only.
+The React Portal (`frontend/`) includes:
+
+| Area | Pages |
+| ---- | ----- |
+| **Auth** | Register, sign in |
+| **Workspaces** | List, create, join |
+| **Logs** | Overview (all channels) + per-channel tabs (SMS, push, chat) |
+| **Email** | Captured inbox browser, templates, Get started curl guide |
+| **Integrations** | Connect and manage providers |
+| **Settings** | General, API keys, message dispatch |
+
+**API-only today:** team invites/members UI (placeholder), SMS/push/chat captured-message browsers (email inbox only), internal inbox ingest.
 
 ---
 
@@ -271,12 +282,12 @@ HTTP Client (your app)
     │
     │ POST /v1/email
     │ Authorization: Bearer <workspace-jwt>
-    │ X-Workspace-Key: myapp
+    │ X-Workspace-Key: <workspace-uuid>
     │ { "to": [...], "subject": "...", "html": "..." }
     ▼
 APIKeyAuthMiddleware
     │ Validates workspace-jwt OR client_id+secret
-    │ Resolves workspace UUID from X-Workspace-Key
+    │ Resolves workspace from X-Workspace-Key (UUID or slug)
     │ Sets workspace_id in request context
     ▼
 GatewayHandler.HandleSendEmail()
@@ -456,9 +467,9 @@ The **memory provider** captures messages in process RAM. It's always available 
 
 The React Portal runs at `portal.ui_port` (default **10104**) when the server starts.
 
-**Portal UI today:** sign in, list workspaces, manage **integrations**, **settings** (general, API keys, message dispatch), view message logs, browse captured **email inbox**.
+**Portal UI:** sign in, manage workspaces, view request logs, browse the **email** captured inbox, manage **email templates**, configure **integrations** and **settings** (general, API keys, message dispatch).
 
-**REST only (no UI pages yet):** workspace create, templates, members, SMS/push/chat inbox browser.
+**API-only:** team member management, SMS/push/chat captured-message browsers, internal inbox ingest.
 
 ---
 

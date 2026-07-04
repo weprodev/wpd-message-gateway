@@ -42,7 +42,7 @@ Sender interfaces (`EmailSender`, `SMSSender`, …) live in **`pkg/contracts/`**
 2. Register via `init()` in `register.go` → `pkg/registry`
 3. Blank-import in **`internal/app/imports.go`** (server mode only)
 
-Do **not** add providers under `internal/infrastructure/provider/` (deprecated).
+Add providers only under **`pkg/provider/<name>/`** (registered via `pkg/registry`, blank-imported in `internal/app/imports.go`).
 
 ---
 

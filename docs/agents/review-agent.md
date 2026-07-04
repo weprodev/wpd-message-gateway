@@ -88,7 +88,7 @@ Derived from [frontend-engineer.md](../frontend/frontend-engineer.md) and [conve
 
 - [ ] **Architecture Check**: If a new layer or directory was created, does it align with the documented architecture? Are docs updated?
 - [ ] **Anti-patterns**: Ensure new patterns introduced do not conflict with existing boundaries.
-- [ ] **No stale docs**: Portal capability claims match code (remove “REST only” when UI exists).
+- [ ] **No stale docs**: Portal capability claims match code (UI pages, permissions, and API tables stay in sync with `frontend/src/core/router/` and `internal/presentation/router.go`).
 
 ## 6. Severity guidance & Reporting
 

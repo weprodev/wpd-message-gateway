@@ -108,12 +108,12 @@ Seeded on first DB init. Reset anytime: `make seed-demo`.
 |--|--|
 | Portal | `demo@weprodev.com` / `secret` |
 | API key | `demo-client-id` / `demo-secret` |
-| Workspace key | `demo` |
+| Workspace ID | `00000000-0000-0000-0000-000000000001` |
 
 ```bash
 curl -X POST http://localhost:10101/v1/email \
   -u "demo-client-id:demo-secret" \
-  -H "X-Workspace-Key: demo" \
+  -H "X-Workspace-Key: 00000000-0000-0000-0000-000000000001" \
   -H "Content-Type: application/json" \
   -d '{"to":["user@example.com"],"subject":"Hello","html":"<h1>World</h1>"}'
 ```

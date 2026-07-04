@@ -1,6 +1,6 @@
 import * as Tabs from "@radix-ui/react-tabs"
 import { useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -10,7 +10,9 @@ import { Spinner } from "@/components/ui/spinner"
 import { PageHeader } from "@/shared/components/page-header"
 import { cn } from "@/lib/utils"
 
+import { ApiKeyCreateDialog } from "../components/api-key-create-dialog"
 import { ApiKeyRow } from "../components/api-key-row"
+import { ApiKeySecretDialog } from "../components/api-key-secret-dialog"
 import { RadioOption } from "../components/radio-option"
 import { useSettings } from "../hooks/use-settings.hook"
 import { dispatchConfigsEqual, toStoreMessageContentSetting } from "../message-dispatch-mode"
@@ -21,6 +23,7 @@ import type {
   WorkspaceSettings,
   WorkspaceSettingsPatch,
 } from "../settings.types"
+import { settingsTabFromSearch } from "../settings.types"
 
 interface GeneralSettingsPanelProps {
   settings: WorkspaceSettings
@@ -192,22 +195,37 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
 
 export function SettingsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general")
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => settingsTabFromSearch(searchParams))
   const [busyKeyId, setBusyKeyId] = useState<string | null>(null)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [revealedSecret, setRevealedSecret] = useState<{
+    clientId?: string
+    clientSecret: string
+  } | null>(null)
 
   const { settings, apiKeys, messageDispatchConfig, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
     useSettings(wid)
 
-  async function handleCreateApiKey() {
-    const name = window.prompt("API key name")
-    if (!name?.trim()) return
-    await addApiKey(name.trim())
+  async function handleCreateApiKey(name: string) {
+    const created = await addApiKey(name)
+    if (created.client_secret) {
+      setRevealedSecret({
+        clientId: created.client_id,
+        clientSecret: created.client_secret,
+      })
+    }
   }
 
   async function handleRegenerate(keyId: string) {
     setBusyKeyId(keyId)
     try {
-      await rotateApiKey(keyId)
+      const result = await rotateApiKey(keyId)
+      const key = apiKeys.find((item) => item.id === keyId)
+      setRevealedSecret({
+        clientId: key?.client_id,
+        clientSecret: result.client_secret,
+      })
     } finally {
       setBusyKeyId(null)
     }
@@ -291,7 +309,7 @@ export function SettingsPage() {
                 Manage keys used to authenticate gateway requests.
               </p>
             </div>
-            <Button type="button" onClick={handleCreateApiKey}>
+            <Button type="button" onClick={() => setCreateDialogOpen(true)}>
               <Icon name="add" size="sm" />
               Generate key
             </Button>
@@ -332,6 +350,20 @@ export function SettingsPage() {
           />
         </Tabs.Content>
       </Tabs.Root>
+
+      <ApiKeyCreateDialog
+        key={createDialogOpen ? "open" : "closed"}
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreate={handleCreateApiKey}
+      />
+
+      <ApiKeySecretDialog
+        open={revealedSecret !== null}
+        clientId={revealedSecret?.clientId}
+        clientSecret={revealedSecret?.clientSecret ?? ""}
+        onClose={() => setRevealedSecret(null)}
+      />
     </div>
   )
 }

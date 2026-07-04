@@ -25,7 +25,7 @@ VALUES
     (gen_random_uuid(), 'settings.write', 'web'),
     (gen_random_uuid(), 'invitations.read', 'web'),
     (gen_random_uuid(), 'invitations.write', 'web'),
-    (gen_random_uuid(), 'send.test', 'web')
+    (gen_random_uuid(), 'inbox.write', 'web')
 ON CONFLICT (name, guard_name) DO NOTHING;
 
 -- 3. Bind permissions to 'admin' role
@@ -36,7 +36,7 @@ CROSS JOIN roles r
 WHERE r.name = 'admin'
 ON CONFLICT (permission_id, role_id) DO NOTHING;
 
--- 4. Bind permissions to 'member' role (read-only + send.test)
+-- 4. Bind permissions to 'member' role (read-only + inbox.write)
 INSERT INTO role_has_permissions (permission_id, role_id)
 SELECT p.id, r.id
 FROM permissions p
@@ -51,6 +51,6 @@ WHERE r.name = 'member'
     'templates.read',
     'settings.read',
     'invitations.read',
-    'send.test'
+    'inbox.write'
   )
 ON CONFLICT (permission_id, role_id) DO NOTHING;

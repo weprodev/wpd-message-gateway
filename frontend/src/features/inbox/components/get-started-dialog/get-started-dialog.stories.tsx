@@ -8,7 +8,7 @@ const meta = {
   component: GetStartedDialog,
   decorators: [
     (Story) => (
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/workspaces/ws-demo/overview"]}>
         <Story />
       </MemoryRouter>
     ),
@@ -22,6 +22,6 @@ export const Open: Story = {
   args: {
     open: true,
     onOpenChange: () => undefined,
-    workspaceId: "ws-demo",
+    workspaceId: "00000000-0000-0000-0000-000000000001",
   },
 }

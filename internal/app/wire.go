@@ -125,11 +125,16 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	inboxStore := inbox.NewStore()
 	memoryStore := memory.GetStore()
 
-	var portalInboxHandler *handler.PortalInboxHandler
+	var publishInboxEvent inbox.PublishFunc
 	inboxWriter := inbox.NewNotifyingWriter(inboxStore, inbox.PublishFunc(func(workspaceID, eventType string, data any) {
-		portalInboxHandler.PublishInboxEvent(workspaceID, eventType, data)
+		if publishInboxEvent != nil {
+			publishInboxEvent(workspaceID, eventType, data)
+		}
 	}))
-	portalInboxHandler = handler.NewPortalInboxHandler(inboxStore, inboxWriter)
+	portalInboxHandler := handler.NewPortalInboxHandler(inboxStore, inboxWriter)
+	publishInboxEvent = func(workspaceID, eventType string, data any) {
+		portalInboxHandler.PublishInboxEvent(workspaceID, eventType, data)
+	}
 
 	// ── Auth service ──────────────────────────────────────────────────────
 	authService := service.NewAuthService(

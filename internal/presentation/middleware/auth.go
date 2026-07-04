@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/go-pkg/crypto"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 )
@@ -23,9 +25,16 @@ const (
 	APIKeyIDKey contextKey = "api_key_id"
 	// APIKeyNameKey is the context key for the API key display name (product/service label).
 	APIKeyNameKey contextKey = "api_key_name"
-	// HeaderWorkspaceKey is the HTTP header carrying the workspace slug.
+	// HeaderWorkspaceKey is the HTTP header carrying the workspace ID or slug.
 	HeaderWorkspaceKey = "X-Workspace-Key"
 )
+
+func resolveWorkspaceByKey(ctx context.Context, repo port.WorkspaceRepository, key string) (*domain.Workspace, error) {
+	if _, err := uuid.Parse(key); err == nil {
+		return repo.GetByID(ctx, key)
+	}
+	return repo.GetBySlug(ctx, key)
+}
 
 // APIKeyAuthMiddleware validates client credentials, optional workspace binding via X-Workspace-Key,
 // and records last_used_at on the API key.
@@ -64,9 +73,9 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			wsKey := strings.TrimSpace(c.Request().Header.Get(HeaderWorkspaceKey))
 			if wsKey == "" {
 				slog.WarnContext(c.Request().Context(), "API key auth failed: missing workspace key header", "client_id", clientID)
-				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace slug)")
+				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace id or slug)")
 			}
-			ws, werr := workspaceRepo.GetBySlug(c.Request().Context(), wsKey)
+			ws, werr := resolveWorkspaceByKey(c.Request().Context(), workspaceRepo, wsKey)
 			if werr != nil || ws == nil {
 				slog.WarnContext(c.Request().Context(), "API key auth failed: unknown workspace key", "client_id", clientID, "workspace_key", wsKey)
 				return echo.NewHTTPError(http.StatusForbidden, "Unknown workspace key")

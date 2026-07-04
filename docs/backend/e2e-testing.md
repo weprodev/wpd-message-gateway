@@ -39,7 +39,7 @@ The inbox is protected. Every request to `/api/v1/workspaces/:wid/inbox/*` must 
 2. **Workspace membership** — user must be a member of the workspace
 3. **Workspace API key** — `X-Api-Client-Id` + `X-Api-Client-Secret` matching the workspace
 
-The **send** endpoint (`POST /v1/*`) uses API key + `X-Workspace-Key` (slug, not UUID).  
+The **send** endpoint (`POST /v1/*`) uses API key + `X-Workspace-Key` (workspace UUID preferred; slug also accepted).  
 The **inbox** endpoint uses the workspace **UUID** in the URL path.
 
 ---
@@ -303,7 +303,7 @@ func TestSignupEmail(t *testing.T) {
 ```bash
 curl -X POST http://localhost:10101/v1/email \
   -u "client_id:client_secret" \
-  -H "X-Workspace-Key: your_workspace_unique_key" \
+  -H "X-Workspace-Key: <workspace-uuid>" \
   -H "Content-Type: application/json" \
   -d '{"to":["user@example.com"],"subject":"Hello","html":"<p>World</p>"}'
 ```

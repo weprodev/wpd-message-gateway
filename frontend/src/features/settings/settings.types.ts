@@ -24,6 +24,14 @@ export interface ApiKey {
 
 export type SettingsTab = "general" | "developer" | "team" | "dispatch"
 
+export function settingsTabFromSearch(params: URLSearchParams): SettingsTab {
+  const tab = params.get("tab")
+  if (tab === "developer" || tab === "team" || tab === "dispatch" || tab === "general") {
+    return tab
+  }
+  return "general"
+}
+
 export interface MessageDispatchConfig {
   mode: MessageDispatchMode
   storeMessageContent: boolean
