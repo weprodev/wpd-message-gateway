@@ -201,13 +201,19 @@ jobs:
       # Wait for server
       - name: Wait for server to be ready
         run: |
+          ready=0
           for i in {1..30}; do
-            if curl -s http://localhost:10101/health > /dev/null 2>&1; then
+            if curl -sf http://localhost:10101/health > /dev/null 2>&1; then
               echo "Server ready"
+              ready=1
               break
             fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then
+            echo "Server did not become ready within 30s"
+            exit 1
+          fi
 
       - name: Install Bruno CLI
         run: npm install -g @usebruno/cli

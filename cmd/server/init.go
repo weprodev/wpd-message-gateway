@@ -9,13 +9,6 @@ import (
 	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 )
 
-// defaultConfigPath can be overridden at build time via -ldflags.
-var defaultConfigPath = "configs/local.yml"
-
-func getDefaultConfigPath() string {
-	return defaultConfigPath
-}
-
 func loadAppConfig(configPath string) (*app.Config, error) {
 	return app.LoadAppConfig(configPath)
 }

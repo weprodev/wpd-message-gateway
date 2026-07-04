@@ -20,7 +20,7 @@ func main() {
 }
 
 func run() error {
-	configPath := flag.String("config", getDefaultConfigPath(), "Path to config file")
+	configPath := flag.String("config", "", "Path to config file (default: CONFIG_PATH env or configs/local.yml)")
 	flag.Parse()
 
 	cfg, err := loadAppConfig(*configPath)

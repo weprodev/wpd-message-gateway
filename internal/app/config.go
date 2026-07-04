@@ -154,6 +154,7 @@ func resolveConfigPath(configPath string) string {
 		"/configs/local.yml",
 		"/configs/config.yml",
 		"configs/local.yml",
+		"configs/local.example.yml",
 	} {
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
