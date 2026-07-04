@@ -1,6 +1,7 @@
 import type { StoredEmail } from "../../inbox.types"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import { Permission, useWorkspaceAuthorization } from "@/core/auth"
 
 interface EmailContentProps {
   message: StoredEmail
@@ -25,6 +26,8 @@ function formatFullTime(dateStr: string) {
 }
 
 export function EmailContent({ message, onDelete, isDeleting = false }: EmailContentProps) {
+  const { can } = useWorkspaceAuthorization()
+  const canDeleteMessages = can(Permission.InboxWrite) && Boolean(onDelete)
   const sender = message.email.from_name
     ? `${message.email.from_name} <${message.email.from}>`
     : message.email.from || "Unknown sender"
@@ -52,16 +55,18 @@ export function EmailContent({ message, onDelete, isDeleting = false }: EmailCon
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="text-destructive border-destructive/20 hover:bg-destructive/10 shrink-0 h-9"
-        >
-          <Icon name="delete" size="sm" data-icon="inline-start" />
-          Delete
-        </Button>
+        {canDeleteMessages ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="text-destructive border-destructive/20 hover:bg-destructive/10 shrink-0 h-9"
+          >
+            <Icon name="delete" size="sm" data-icon="inline-start" />
+            Delete
+          </Button>
+        ) : null}
       </div>
 
       <div className="bg-muted/10 px-4 py-3 border-b border-border flex flex-col gap-1.5 shrink-0 font-mono text-[11px] leading-relaxed">

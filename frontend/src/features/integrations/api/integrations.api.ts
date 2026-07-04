@@ -1,6 +1,6 @@
 import { apiFetch } from "@/core/api/client"
 
-import type { Integration, IntegrationActionResult, IntegrationChannel, IntegrationStatus } from "./integrations.types"
+import type { Integration, IntegrationActionResult, IntegrationChannel, IntegrationStatus } from "../integrations.types"
 
 export async function listIntegrations(workspaceId: string): Promise<Integration[]> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/integrations`)

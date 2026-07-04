@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { ROUTES } from "@/core/router/routes"
-import { fetchWorkspaces } from "../workspaces.api"
+import { fetchWorkspaces } from "../api/workspaces.api"
 import type { Workspace } from "../workspace.types"
 
 type UseWorkspacesOptions = {

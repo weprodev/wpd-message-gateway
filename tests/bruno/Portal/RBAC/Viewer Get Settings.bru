@@ -1,0 +1,21 @@
+meta {
+  name: Viewer Get Settings
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/settings
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{viewerPortalJwt}}
+}
+
+tests {
+  test("viewer can read settings", function() {
+    expect(res.status).to.equal(200);
+  });
+}

@@ -1,26 +1,60 @@
 -- Demo workspace (idempotent — safe to re-run via init-db.sh, run_migrations.sh, or make seed-demo).
--- Portal: demo@weprodev.com / secret
--- API key: demo-client-id / demo-secret
 -- Requires 001_seed_permissions.sql and 002_seed_providers.sql first.
+--
+-- Portal accounts (password for all: secret)
+--   demo@weprodev.com   → admin  on Demo Workspace
+--   member@weprodev.com → member on Demo Workspace
+--   viewer@weprodev.com → viewer on Demo Workspace
+--
+-- API key: demo-client-id / demo-secret
+-- Workspace: demo (00000000-0000-0000-0000-000000000001)
 
--- Drop conflicting rows so fixed demo UUIDs stay stable after manual sign-up.
+-- Fixed demo UUIDs
+--   workspace : 00000000-0000-0000-0000-000000000001
+--   admin user: 00000000-0000-0000-0000-000000000010
+--   member    : 00000000-0000-0000-0000-000000000011
+--   viewer    : 00000000-0000-0000-0000-000000000012
+
+-- bcrypt hash for password "secret" (cost 14)
+-- Remove conflicting sign-ups so fixed UUIDs stay stable.
 DELETE FROM users
-WHERE email = 'demo@weprodev.com'
-  AND id <> '00000000-0000-0000-0000-000000000010';
+WHERE email IN ('demo@weprodev.com', 'member@weprodev.com', 'viewer@weprodev.com')
+  AND id NOT IN (
+    '00000000-0000-0000-0000-000000000010',
+    '00000000-0000-0000-0000-000000000011',
+    '00000000-0000-0000-0000-000000000012'
+  );
 
 DELETE FROM workspaces
 WHERE slug = 'demo'
   AND id <> '00000000-0000-0000-0000-000000000001';
 
 INSERT INTO users (id, email, password_hash, first_name, last_name, email_verified)
-VALUES (
-    '00000000-0000-0000-0000-000000000010',
-    'demo@weprodev.com',
-    '$2a$14$fBL/4GbbqSCMTVOYotuUa.Qx0DwnRMpkZaOHxkD3h1X4gMESUhjD.',
-    'Demo',
-    'User',
-    true
-)
+VALUES
+    (
+        '00000000-0000-0000-0000-000000000010',
+        'demo@weprodev.com',
+        '$2a$14$fBL/4GbbqSCMTVOYotuUa.Qx0DwnRMpkZaOHxkD3h1X4gMESUhjD.',
+        'Demo',
+        'Admin',
+        true
+    ),
+    (
+        '00000000-0000-0000-0000-000000000011',
+        'member@weprodev.com',
+        '$2a$14$fBL/4GbbqSCMTVOYotuUa.Qx0DwnRMpkZaOHxkD3h1X4gMESUhjD.',
+        'Demo',
+        'Member',
+        true
+    ),
+    (
+        '00000000-0000-0000-0000-000000000012',
+        'viewer@weprodev.com',
+        '$2a$14$fBL/4GbbqSCMTVOYotuUa.Qx0DwnRMpkZaOHxkD3h1X4gMESUhjD.',
+        'Demo',
+        'Viewer',
+        true
+    )
 ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     password_hash = EXCLUDED.password_hash,
@@ -46,22 +80,28 @@ ON CONFLICT (id) DO UPDATE SET
     status = EXCLUDED.status,
     is_private = EXCLUDED.is_private;
 
+-- Workspace membership + wpd-gogate role assignments (admin, member, viewer)
 INSERT INTO workspace_members (workspace_id, user_id, role_id)
-VALUES (
-    '00000000-0000-0000-0000-000000000001',
-    '00000000-0000-0000-0000-000000000010',
-    '00000000-0000-0000-0000-000000000020'
-)
+SELECT '00000000-0000-0000-0000-000000000001', seed.user_id, r.id
+FROM (
+    VALUES
+        ('00000000-0000-0000-0000-000000000010'::uuid, 'admin'),
+        ('00000000-0000-0000-0000-000000000011'::uuid, 'member'),
+        ('00000000-0000-0000-0000-000000000012'::uuid, 'viewer')
+) AS seed(user_id, role_name)
+JOIN roles r ON r.name = seed.role_name AND r.guard_name = 'msg_web'
 ON CONFLICT (workspace_id, user_id) DO UPDATE SET
     role_id = EXCLUDED.role_id;
 
 INSERT INTO model_has_roles (role_id, model_type, model_id, team_id)
-VALUES (
-    '00000000-0000-0000-0000-000000000020',
-    'users',
-    '00000000-0000-0000-0000-000000000010',
-    '00000000-0000-0000-0000-000000000001'
-)
+SELECT r.id, 'users', seed.user_id, '00000000-0000-0000-0000-000000000001'
+FROM (
+    VALUES
+        ('00000000-0000-0000-0000-000000000010'::uuid, 'admin'),
+        ('00000000-0000-0000-0000-000000000011'::uuid, 'member'),
+        ('00000000-0000-0000-0000-000000000012'::uuid, 'viewer')
+) AS seed(user_id, role_name)
+JOIN roles r ON r.name = seed.role_name AND r.guard_name = 'msg_web'
 ON CONFLICT (role_id, model_id, model_type, team_id) DO NOTHING;
 
 INSERT INTO workspace_channels (workspace_id, channel_type, enabled)

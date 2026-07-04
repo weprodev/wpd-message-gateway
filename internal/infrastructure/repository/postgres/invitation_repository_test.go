@@ -65,3 +65,22 @@ func TestInvitationRepository_ListPendingByWorkspace(t *testing.T) {
 		t.Fatalf("unexpected list: %+v", list)
 	}
 }
+
+func TestInvitationRepository_PendingInvitationExistsByEmail(t *testing.T) {
+	t.Parallel()
+
+	client, mock, _ := newMockPgClient(t)
+	repo := NewInvitationRepository(client)
+
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs("ws-1", "invitee@example.com").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+
+	exists, err := repo.PendingInvitationExistsByEmail(context.Background(), "ws-1", "invitee@example.com")
+	if err != nil {
+		t.Fatalf("PendingInvitationExistsByEmail: %v", err)
+	}
+	if !exists {
+		t.Fatal("expected pending invitation to exist")
+	}
+}

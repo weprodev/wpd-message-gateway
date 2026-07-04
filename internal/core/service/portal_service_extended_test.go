@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +30,35 @@ func (f *fakeInvitationRepo) Create(_ context.Context, inv *domain.Invitation) e
 
 func (f *fakeInvitationRepo) ListPendingByWorkspace(_ context.Context, workspaceID string) ([]domain.Invitation, error) {
 	return f.list, nil
+}
+
+func (f *fakeInvitationRepo) PendingInvitationExistsByEmail(_ context.Context, workspaceID, email string) (bool, error) {
+	for _, inv := range f.list {
+		if inv.WorkspaceID == workspaceID && strings.EqualFold(inv.Email, email) && inv.Status == "pending" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+type fakeMemberRepo struct {
+	emails map[string]struct{}
+}
+
+func (f *fakeMemberRepo) Add(context.Context, string, string, string) error { return nil }
+func (f *fakeMemberRepo) Remove(context.Context, string, string) error      { return nil }
+func (f *fakeMemberRepo) GetRole(context.Context, string, string) (string, error) {
+	return "", port.ErrNotFound
+}
+func (f *fakeMemberRepo) ListMembers(context.Context, string) ([]domain.WorkspaceMember, error) {
+	return nil, nil
+}
+func (f *fakeMemberRepo) MemberExistsByEmail(_ context.Context, workspaceID, email string) (bool, error) {
+	if f.emails == nil {
+		return false, nil
+	}
+	_, ok := f.emails[strings.ToLower(strings.TrimSpace(email))]
+	return ok, nil
 }
 
 type fakeAPIKeyRepo struct {
@@ -117,7 +148,7 @@ func TestPortalService_CreateInvitation(t *testing.T) {
 	t.Parallel()
 
 	repo := &fakeInvitationRepo{}
-	svc := NewPortalService(PortalDeps{Invitations: repo})
+	svc := NewPortalService(PortalDeps{Invitations: repo, Members: &fakeMemberRepo{}})
 	inv := svc.NewPendingInvitation("ws-1", "user@example.com", domain.RoleMember)
 
 	rawToken, err := svc.CreateInvitation(context.Background(), inv)
@@ -136,6 +167,68 @@ func TestPortalService_CreateInvitation(t *testing.T) {
 	sum := sha256.Sum256([]byte(rawToken))
 	if repo.created.TokenHash != hex.EncodeToString(sum[:]) {
 		t.Fatalf("token hash mismatch: got %q", repo.created.TokenHash)
+	}
+}
+
+func TestPortalService_CreateInvitation_rejectsInvalidRole(t *testing.T) {
+	t.Parallel()
+
+	svc := NewPortalService(PortalDeps{
+		Invitations: &fakeInvitationRepo{},
+		Members:     &fakeMemberRepo{},
+	})
+	inv := svc.NewPendingInvitation("ws-1", "user@example.com", "owner")
+
+	_, err := svc.CreateInvitation(context.Background(), inv)
+	if err == nil {
+		t.Fatal("expected error for invalid role")
+	}
+	if !errors.Is(err, port.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestPortalService_CreateInvitation_rejectsExistingMember(t *testing.T) {
+	t.Parallel()
+
+	svc := NewPortalService(PortalDeps{
+		Invitations: &fakeInvitationRepo{},
+		Members: &fakeMemberRepo{
+			emails: map[string]struct{}{"member@weprodev.com": {}},
+		},
+	})
+	inv := svc.NewPendingInvitation("ws-1", "member@weprodev.com", domain.RoleViewer)
+
+	_, err := svc.CreateInvitation(context.Background(), inv)
+	if err == nil {
+		t.Fatal("expected error for existing member")
+	}
+	if !errors.Is(err, port.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestPortalService_CreateInvitation_rejectsPendingDuplicate(t *testing.T) {
+	t.Parallel()
+
+	svc := NewPortalService(PortalDeps{
+		Invitations: &fakeInvitationRepo{
+			list: []domain.Invitation{{
+				WorkspaceID: "ws-1",
+				Email:       "invitee@example.com",
+				Status:      "pending",
+			}},
+		},
+		Members: &fakeMemberRepo{},
+	})
+	inv := svc.NewPendingInvitation("ws-1", "invitee@example.com", domain.RoleMember)
+
+	_, err := svc.CreateInvitation(context.Background(), inv)
+	if err == nil {
+		t.Fatal("expected error for duplicate pending invitation")
+	}
+	if !errors.Is(err, port.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
 	}
 }
 

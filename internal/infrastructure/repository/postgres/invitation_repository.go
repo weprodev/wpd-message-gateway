@@ -67,3 +67,21 @@ func (r *InvitationRepository) ListPendingByWorkspace(ctx context.Context, works
 	}
 	return out, nil
 }
+
+func (r *InvitationRepository) PendingInvitationExistsByEmail(ctx context.Context, workspaceID, email string) (bool, error) {
+	var exists bool
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM invitations
+			WHERE workspace_id = $1
+			  AND lower(email) = lower($2)
+			  AND status = 'pending'
+			  AND expires_at > NOW()
+		)
+	`, workspaceID, email).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to check pending invitation by email", "error", err, "workspace_id", workspaceID, "email", email)
+	}
+	return exists, err
+}

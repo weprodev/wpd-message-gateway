@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/dto"
@@ -99,6 +100,9 @@ func (h *PortalWorkspaceHandler) ListMembers(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to list members", "error", err, "workspace_id", wid)
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to list members")
 	}
+	if members == nil {
+		members = []domain.WorkspaceMember{}
+	}
 	return c.JSON(http.StatusOK, members)
 }
 
@@ -118,6 +122,9 @@ func (h *PortalWorkspaceHandler) ListInvitations(c echo.Context) error {
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to list invitations", "error", err, "workspace_id", wid)
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to list invitations")
+	}
+	if list == nil {
+		list = []domain.Invitation{}
 	}
 	return c.JSON(http.StatusOK, list)
 }

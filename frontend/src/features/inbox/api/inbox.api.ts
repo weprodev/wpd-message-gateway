@@ -1,6 +1,6 @@
 import { apiFetch, getToken } from "@/core/api/client"
-import type { EmailTemplate, InboxEmailPage, LogRow, StoredEmail } from "./inbox.types"
-import { parseLogsResponse } from "./logs.schema"
+import type { EmailTemplate, InboxEmailPage, LogRow, StoredEmail } from "../inbox.types"
+import { parseLogsResponse } from "../logs.schema"
 
 async function parseApiError(res: Response, fallback: string): Promise<string> {
   try {

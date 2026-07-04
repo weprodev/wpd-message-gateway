@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it, vi, beforeEach } from "vitest"
 
-import { fetchInboxEmailById, fetchInboxEmails } from "../inbox.api"
+import { fetchInboxEmailById, fetchInboxEmails } from "../api/inbox.api"
 import { useInboxEmails } from "./use-inbox-emails.hook"
 
-vi.mock("../inbox.api", () => ({
+vi.mock("../api/inbox.api", () => ({
   fetchInboxEmails: vi.fn(),
   fetchInboxEmailById: vi.fn(),
 }))

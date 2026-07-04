@@ -67,19 +67,20 @@ CREATE INDEX idx_workspaces_active_list
     WHERE status = 'active';
 
 -- ==============================================================================
--- 3. ROLES TABLE (RBAC)
+-- 3. ROLES TABLE (wpd-gogate RBAC — global role catalog)
 -- ==============================================================================
 
 CREATE TABLE roles (
-    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'msg_web',
-    display_name TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT        NOT NULL,
+    guard_name TEXT        NOT NULL DEFAULT 'msg_web',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT roles_name_guard_unique UNIQUE (name, guard_name)
 );
+
+CREATE INDEX idx_roles_guard_name ON roles (guard_name);
 
 CREATE TRIGGER trg_roles_set_updated_at
     BEFORE UPDATE ON roles
@@ -393,25 +394,27 @@ CREATE INDEX idx_workspace_access_audits_actor_user_id
     WHERE actor_user_id IS NOT NULL;
 
 -- ==============================================================================
--- 16. PERMISSIONS TABLE (RBAC Engine)
+-- 16. PERMISSIONS TABLE (wpd-gogate RBAC)
 -- ==============================================================================
 
 CREATE TABLE permissions (
-    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'msg_web',
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT        NOT NULL,
+    guard_name TEXT        NOT NULL DEFAULT 'msg_web',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT permissions_name_guard_unique UNIQUE (name, guard_name)
 );
+
+CREATE INDEX idx_permissions_guard_name ON permissions (guard_name);
 
 CREATE TRIGGER trg_permissions_set_updated_at
     BEFORE UPDATE ON permissions
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==============================================================================
--- 17. ROLE_HAS_PERMISSIONS JOIN TABLE (RBAC Engine)
+-- 17. ROLE_HAS_PERMISSIONS (wpd-gogate RBAC)
 -- ==============================================================================
 
 CREATE TABLE role_has_permissions (
@@ -421,16 +424,18 @@ CREATE TABLE role_has_permissions (
     PRIMARY KEY (permission_id, role_id)
 );
 
+CREATE INDEX idx_role_has_permissions_role_id ON role_has_permissions (role_id);
+
 -- ==============================================================================
--- 18. MODEL_HAS_ROLES TABLE (Polymorphic RBAC mappings)
+-- 18. MODEL_HAS_ROLES (wpd-gogate polymorphic role assignments; team_id = workspace)
 -- ==============================================================================
 
 CREATE TABLE model_has_roles (
-    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    role_id    UUID        NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    model_type TEXT        NOT NULL,
-    model_id   UUID        NOT NULL,
-    team_id    UUID        REFERENCES workspaces(id) ON DELETE CASCADE,
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    role_id    UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    model_type TEXT NOT NULL,
+    model_id   UUID NOT NULL,
+    team_id    UUID REFERENCES workspaces(id) ON DELETE CASCADE,
 
     CONSTRAINT model_has_roles_unique UNIQUE NULLS NOT DISTINCT (role_id, model_id, model_type, team_id)
 );
@@ -438,15 +443,15 @@ CREATE TABLE model_has_roles (
 CREATE INDEX idx_model_has_roles_lookup ON model_has_roles (model_id, model_type, team_id);
 
 -- ==============================================================================
--- 19. MODEL_HAS_PERMISSIONS TABLE (Polymorphic RBAC mappings)
+-- 19. MODEL_HAS_PERMISSIONS (wpd-gogate direct permission overrides; team_id = workspace)
 -- ==============================================================================
 
 CREATE TABLE model_has_permissions (
-    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    permission_id UUID        NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-    model_type    TEXT        NOT NULL,
-    model_id      UUID        NOT NULL,
-    team_id       UUID        REFERENCES workspaces(id) ON DELETE CASCADE,
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+    model_type    TEXT NOT NULL,
+    model_id      UUID NOT NULL,
+    team_id       UUID REFERENCES workspaces(id) ON DELETE CASCADE,
 
     CONSTRAINT model_has_permissions_unique UNIQUE NULLS NOT DISTINCT (permission_id, model_id, model_type, team_id)
 );

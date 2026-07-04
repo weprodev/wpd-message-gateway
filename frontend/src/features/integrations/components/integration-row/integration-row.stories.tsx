@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 
+import { Permission, Role, WorkspaceAuthorizationProvider } from "@/core/auth"
 import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 import { IntegrationRow } from "./integration-row"
 
@@ -36,6 +37,18 @@ const meta = {
   title: "Features/Integrations/IntegrationRow",
   component: IntegrationRow,
   parameters: { layout: "padded" },
+  decorators: [
+    (Story) => (
+      <WorkspaceAuthorizationProvider
+        role={Role.Member}
+        permissions={[Permission.IntegrationsRead, Permission.IntegrationsWrite]}
+      >
+        <div className="max-w-3xl rounded-lg border border-border bg-card">
+          <Story />
+        </div>
+      </WorkspaceAuthorizationProvider>
+    ),
+  ],
 } satisfies Meta<typeof IntegrationRow>
 
 export default meta

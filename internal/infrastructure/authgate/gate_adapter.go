@@ -12,29 +12,39 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
-type GoGateAdapter struct {
-	gate *gogate.Gate
-	db   pgsql.DBTX
+// DBProvider resolves the active DB handle (pool or transaction) from context.
+type DBProvider interface {
+	GetDB(ctx context.Context) pgsql.DBTX
 }
 
-func NewGoGateAdapter(gate *gogate.Gate, db pgsql.DBTX) port.AuthorizationGate {
-	return &GoGateAdapter{gate: gate, db: db}
+type GoGateAdapter struct {
+	gate *gogate.Gate
+	db   DBProvider
+	cfg  gogate.Config
+}
+
+func NewGoGateAdapter(gate *gogate.Gate, db DBProvider, cfg gogate.Config) port.AuthorizationGate {
+	return &GoGateAdapter{gate: gate, db: db, cfg: cfg}
+}
+
+func (a *GoGateAdapter) txGate(ctx context.Context) *gogate.Gate {
+	return gogate.NewGate(a.db.GetDB(ctx), &a.cfg)
 }
 
 func (a *GoGateAdapter) AssignRole(ctx context.Context, modelType, modelID, teamID, roleName string) error {
-	return a.gate.Model(modelType, modelID, teamID).AssignRole(ctx, roleName, "")
+	return a.txGate(ctx).Model(modelType, modelID, teamID).AssignRole(ctx, roleName, "")
 }
 
 func (a *GoGateAdapter) RemoveRole(ctx context.Context, modelType, modelID, teamID, roleName string) error {
-	return a.gate.Model(modelType, modelID, teamID).RemoveRole(ctx, roleName, "")
+	return a.txGate(ctx).Model(modelType, modelID, teamID).RemoveRole(ctx, roleName, "")
 }
 
 func (a *GoGateAdapter) GetRoleNames(ctx context.Context, modelType, modelID, teamID string) ([]string, error) {
-	return a.gate.Model(modelType, modelID, teamID).GetRoleNames(ctx)
+	return a.txGate(ctx).Model(modelType, modelID, teamID).GetRoleNames(ctx)
 }
 
 func (a *GoGateAdapter) GetAllPermissions(ctx context.Context, modelType, modelID, teamID string) ([]string, error) {
-	return a.gate.Model(modelType, modelID, teamID).GetAllPermissions(ctx)
+	return a.txGate(ctx).Model(modelType, modelID, teamID).GetAllPermissions(ctx)
 }
 
 func (a *GoGateAdapter) GetPermissionsForTeams(
@@ -63,7 +73,7 @@ func (a *GoGateAdapter) GetPermissionsForTeams(
 		ORDER BY team_id, permission
 	`
 
-	rows, err := a.db.QueryContext(ctx, query, modelType, modelID, pq.Array(teamIDs))
+	rows, err := a.db.GetDB(ctx).QueryContext(ctx, query, modelType, modelID, pq.Array(teamIDs))
 	if err != nil {
 		return nil, err
 	}

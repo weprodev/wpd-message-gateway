@@ -5,7 +5,18 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	gogate "github.com/weprodev/wpd-gogate"
+
+	"github.com/weprodev/go-pkg/pgsql"
 )
+
+type staticDBProvider struct {
+	db pgsql.DBTX
+}
+
+func (s staticDBProvider) GetDB(context.Context) pgsql.DBTX {
+	return s.db
+}
 
 func TestGoGateAdapter_GetPermissionsForTeams_emptyInput(t *testing.T) {
 	t.Parallel()
@@ -16,7 +27,7 @@ func TestGoGateAdapter_GetPermissionsForTeams_emptyInput(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	adapter := NewGoGateAdapter(nil, db)
+	adapter := NewGoGateAdapter(nil, staticDBProvider{db: db}, gogate.DefaultConfig())
 	out, err := adapter.GetPermissionsForTeams(context.Background(), "User", "user-1", nil)
 	if err != nil {
 		t.Fatalf("GetPermissionsForTeams: %v", err)
@@ -44,7 +55,7 @@ func TestGoGateAdapter_GetPermissionsForTeams_dedupesPermissions(t *testing.T) {
 		WithArgs("User", "user-1", sqlmock.AnyArg()).
 		WillReturnRows(rows)
 
-	adapter := NewGoGateAdapter(nil, db)
+	adapter := NewGoGateAdapter(nil, staticDBProvider{db: db}, gogate.DefaultConfig())
 	out, err := adapter.GetPermissionsForTeams(context.Background(), "User", "user-1", []string{"team-1"})
 	if err != nil {
 		t.Fatalf("GetPermissionsForTeams: %v", err)

@@ -1,0 +1,28 @@
+meta {
+  name: Viewer Invite Existing Member Forbidden
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/invitations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{portalJwt}}
+}
+
+body:json {
+  {
+    "email": "member@weprodev.com",
+    "role": "viewer"
+  }
+}
+
+tests {
+  test("cannot invite an existing workspace member", function() {
+    expect(res.status).to.equal(400);
+  });
+}

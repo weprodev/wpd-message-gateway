@@ -13,12 +13,14 @@ type WorkspaceMemberRepository interface {
 	Remove(ctx context.Context, workspaceID, userID string) error
 	GetRole(ctx context.Context, workspaceID, userID string) (string, error)
 	ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error)
+	MemberExistsByEmail(ctx context.Context, workspaceID, email string) (bool, error)
 }
 
 // InvitationRepository stores pending invites.
 type InvitationRepository interface {
 	Create(ctx context.Context, inv *domain.Invitation) error
 	ListPendingByWorkspace(ctx context.Context, workspaceID string) ([]domain.Invitation, error)
+	PendingInvitationExistsByEmail(ctx context.Context, workspaceID, email string) (bool, error)
 }
 
 // MessageLogQuery filters for listing request logs.
@@ -45,4 +47,9 @@ type AuthorizationGate interface {
 	GetRoleNames(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
 	GetAllPermissions(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
 	GetPermissionsForTeams(ctx context.Context, modelType, modelID string, teamIDs []string) (map[string][]string, error)
+}
+
+// TransactionManager executes a function inside a database transaction.
+type TransactionManager interface {
+	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }

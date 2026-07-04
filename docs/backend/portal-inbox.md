@@ -16,10 +16,10 @@ The Portal is the web UI and REST surface for the WPD Message Gateway when runni
 | **Email inbox** | Browse captured outbound emails with live SSE updates |
 | **Email templates** | Create and manage reusable email layouts |
 | **Integrations** | Connect, activate, deactivate, or remove messaging providers |
-| **Settings** | General workspace settings, API keys, message dispatch mode |
+| **Settings** | General workspace settings, API keys, team management, message dispatch mode |
 | **Get started** | Curl examples for sending via the public gateway API |
 
-Team member management is a settings placeholder. SMS, push, and chat show **request logs** in the UI; captured-message browsing for those channels is API-only.
+Team management (members and role-based invitations) lives under **Settings → Team Management**. SMS, push, and chat show **request logs** in the UI; captured-message browsing for those channels is API-only.
 
 ### REST API (server)
 

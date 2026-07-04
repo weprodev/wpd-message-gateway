@@ -70,3 +70,22 @@ func TestWorkspaceMemberRepository_ListMembers(t *testing.T) {
 		t.Fatalf("unexpected members: %+v", members)
 	}
 }
+
+func TestWorkspaceMemberRepository_MemberExistsByEmail(t *testing.T) {
+	t.Parallel()
+
+	client, mock, _ := newMockPgClient(t)
+	repo := NewWorkspaceMemberRepository(client)
+
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs("ws-1", "member@weprodev.com").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+
+	exists, err := repo.MemberExistsByEmail(context.Background(), "ws-1", "member@weprodev.com")
+	if err != nil {
+		t.Fatalf("MemberExistsByEmail: %v", err)
+	}
+	if !exists {
+		t.Fatal("expected member to exist")
+	}
+}

@@ -1,47 +1,77 @@
--- Default RBAC Permissions & Role Bindings for WPD Message Gateway
+-- Default RBAC roles, permissions, and mappings for WPD Message Gateway.
+-- Schema and assignment model follow wpd-gogate (global roles; workspace scope via team_id).
+-- Guard name must match domain.RBACGuardName and gogate.DefaultGuardName in wire.go.
 
--- 1. Insert default roles
-INSERT INTO roles (id, name, display_name, guard_name)
+-- 1. Global workspace roles (available to every workspace via model_has_roles.team_id)
+INSERT INTO roles (name, guard_name)
 VALUES
-    ('00000000-0000-0000-0000-000000000020', 'admin', 'Admin', 'msg_web'),
-    ('00000000-0000-0000-0000-000000000021', 'member', 'Member', 'msg_web')
+    ('admin', 'msg_web'),
+    ('member', 'msg_web'),
+    ('viewer', 'msg_web')
 ON CONFLICT (name, guard_name) DO NOTHING;
 
--- 2. Insert permissions
-INSERT INTO permissions (id, name, guard_name)
+-- 2. Portal permissions
+INSERT INTO permissions (name, guard_name)
 VALUES
-    (gen_random_uuid(), 'workspaces.read', 'msg_web'),
-    (gen_random_uuid(), 'workspaces.write', 'msg_web'),
-    (gen_random_uuid(), 'members.read', 'msg_web'),
-    (gen_random_uuid(), 'members.write', 'msg_web'),
-    (gen_random_uuid(), 'apikeys.read', 'msg_web'),
-    (gen_random_uuid(), 'apikeys.write', 'msg_web'),
-    (gen_random_uuid(), 'logs.read', 'msg_web'),
-    (gen_random_uuid(), 'integrations.read', 'msg_web'),
-    (gen_random_uuid(), 'integrations.write', 'msg_web'),
-    (gen_random_uuid(), 'templates.read', 'msg_web'),
-    (gen_random_uuid(), 'templates.write', 'msg_web'),
-    (gen_random_uuid(), 'settings.read', 'msg_web'),
-    (gen_random_uuid(), 'settings.write', 'msg_web'),
-    (gen_random_uuid(), 'invitations.read', 'msg_web'),
-    (gen_random_uuid(), 'invitations.write', 'msg_web'),
-    (gen_random_uuid(), 'inbox.write', 'msg_web')
+    ('workspaces.read', 'msg_web'),
+    ('workspaces.write', 'msg_web'),
+    ('members.read', 'msg_web'),
+    ('members.write', 'msg_web'),
+    ('apikeys.read', 'msg_web'),
+    ('apikeys.write', 'msg_web'),
+    ('logs.read', 'msg_web'),
+    ('integrations.read', 'msg_web'),
+    ('integrations.write', 'msg_web'),
+    ('templates.read', 'msg_web'),
+    ('templates.write', 'msg_web'),
+    ('settings.read', 'msg_web'),
+    ('settings.write', 'msg_web'),
+    ('invitations.read', 'msg_web'),
+    ('invitations.write', 'msg_web'),
+    ('inbox.write', 'msg_web')
 ON CONFLICT (name, guard_name) DO NOTHING;
 
--- 3. Bind permissions to 'admin' role
-INSERT INTO role_has_permissions (permission_id, role_id)
-SELECT p.id, r.id
-FROM permissions p
-CROSS JOIN roles r
-WHERE r.name = 'admin'
+-- 3. Admin — full access
+INSERT INTO role_has_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+CROSS JOIN permissions p
+WHERE r.name = 'admin' AND r.guard_name = 'msg_web' AND p.guard_name = 'msg_web'
 ON CONFLICT (permission_id, role_id) DO NOTHING;
 
--- 4. Bind permissions to 'member' role (read-only + inbox.write)
-INSERT INTO role_has_permissions (permission_id, role_id)
-SELECT p.id, r.id
-FROM permissions p
-CROSS JOIN roles r
+-- 4. Member — manage workspace resources; cannot change workspace, members, or invitations
+INSERT INTO role_has_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+CROSS JOIN permissions p
 WHERE r.name = 'member'
+  AND r.guard_name = 'msg_web'
+  AND p.guard_name = 'msg_web'
+  AND p.name IN (
+    'workspaces.read',
+    'members.read',
+    'apikeys.read',
+    'apikeys.write',
+    'logs.read',
+    'integrations.read',
+    'integrations.write',
+    'templates.read',
+    'templates.write',
+    'settings.read',
+    'settings.write',
+    'invitations.read',
+    'inbox.write'
+  )
+ON CONFLICT (permission_id, role_id) DO NOTHING;
+
+-- 5. Viewer — read-only
+INSERT INTO role_has_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+CROSS JOIN permissions p
+WHERE r.name = 'viewer'
+  AND r.guard_name = 'msg_web'
+  AND p.guard_name = 'msg_web'
   AND p.name IN (
     'workspaces.read',
     'members.read',
@@ -50,7 +80,6 @@ WHERE r.name = 'member'
     'integrations.read',
     'templates.read',
     'settings.read',
-    'invitations.read',
-    'inbox.write'
+    'invitations.read'
   )
 ON CONFLICT (permission_id, role_id) DO NOTHING;

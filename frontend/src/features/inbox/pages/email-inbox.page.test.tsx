@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
+import { Permission, Role, WorkspaceAuthorizationProvider } from "@/core/auth"
+
 import { useInboxEmails } from "../hooks/use-inbox-emails.hook"
 import { EmailInboxPage } from "./email-inbox.page"
 
@@ -24,12 +26,14 @@ const sampleEmail = {
   },
 }
 
-function renderPage() {
+function renderPage(permissions: string[] = [Permission.LogsRead, Permission.InboxWrite]) {
   return render(
     <MemoryRouter initialEntries={["/workspaces/ws-1/inbox/email"]}>
-      <Routes>
-        <Route path="/workspaces/:wid/inbox/email" element={<EmailInboxPage />} />
-      </Routes>
+      <WorkspaceAuthorizationProvider role={Role.Viewer} permissions={permissions}>
+        <Routes>
+          <Route path="/workspaces/:wid/inbox/email" element={<EmailInboxPage />} />
+        </Routes>
+      </WorkspaceAuthorizationProvider>
     </MemoryRouter>,
   )
 }
@@ -77,6 +81,28 @@ describe("EmailInboxPage", () => {
     renderPage()
 
     expect(screen.getAllByText("Hello").length).toBeGreaterThan(0)
+  })
+
+  it("hides delete action for read-only users", () => {
+    mockedUseInboxEmails.mockReturnValue({
+      messages: [sampleEmail],
+      selectedMessageId: "email-1",
+      setSelectedMessageId: vi.fn(),
+      isLoading: false,
+      isLoadingMore: false,
+      error: null,
+      nextCursor: undefined,
+      hasMore: false,
+      reload: vi.fn(),
+      loadMore: vi.fn(),
+      upsertMessage: vi.fn(),
+      removeMessage: vi.fn(),
+      clearMessages: vi.fn(),
+    })
+
+    renderPage([Permission.LogsRead])
+
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
   })
 
   it("shows error message when hook reports failure", () => {

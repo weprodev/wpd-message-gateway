@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 
-import { fetchInboxEmailById, fetchInboxEmails } from "../inbox.api"
+import { fetchInboxEmailById, fetchInboxEmails } from "../api/inbox.api"
 import type { StoredEmail } from "../inbox.types"
 
 const PAGE_SIZE = 50

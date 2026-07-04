@@ -7,7 +7,7 @@ import {
   listApiKeys,
   patchSettings,
   regenerateApiKey,
-} from "../settings.api"
+} from "../api/settings.api"
 import { parseMessageDispatchConfig } from "../message-dispatch-mode"
 import { parseWorkspaceSettings } from "../settings.schema"
 import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "../settings.types"

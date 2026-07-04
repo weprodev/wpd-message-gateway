@@ -308,9 +308,10 @@ dev: docker-check
 	@printf "   │  $(BOLD)Gateway API:$(RESET)  http://localhost:10101             │\n"
 	@printf "   │  $(BOLD)Portal UI:$(RESET)    http://localhost:10104             │\n"
 	@printf "   │                                                   │\n"
-	@printf "   │  $(BOLD)Demo Account$(RESET)                                     │\n"
-	@printf "   │  Email:    demo@weprodev.com                      │\n"
-	@printf "   │  Password: secret                                 │\n"
+	@printf "   │  $(BOLD)Demo accounts$(RESET) (password: secret)  │\n"
+	@printf "   │  admin:  demo@weprodev.com   (workspace admin)    │\n"
+	@printf "   │  member: member@weprodev.com (workspace member)   │\n"
+	@printf "   │  viewer: viewer@weprodev.com (workspace viewer)   │\n"
 	@printf "   │                                                   │\n"
 	@printf "   ╰───────────────────────────────────────────────────╯\n"
 	@printf "\n"
@@ -329,7 +330,7 @@ db-init: docker-check
 	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
 		bash /docker-entrypoint-initdb.d/init-db.sh
 	@docker compose restart gateway
-	@printf "$(GREEN)✅ Database ready — gateway will apply seeds on startup (demo@weprodev.com / secret)$(RESET)\n"
+	@printf "$(GREEN)✅ Database ready — gateway will apply seeds on startup (demo accounts: password secret)$(RESET)\n"
 	@printf "\n"
 
 ## Re-apply SQL seeds by restarting the gateway (seeds run on every startup)
@@ -337,7 +338,7 @@ seed-demo: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🌱 Re-applying database seeds (gateway restart)...$(RESET)\n"
 	@docker compose restart gateway
-	@printf "$(GREEN)✅ Seeds applied on gateway startup (demo@weprodev.com / secret)$(RESET)\n"
+	@printf "$(GREEN)✅ Seeds applied on gateway startup (demo accounts: password secret)$(RESET)\n"
 	@printf "\n"
 
 

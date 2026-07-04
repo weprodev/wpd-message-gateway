@@ -153,7 +153,7 @@ The Portal UI supports:
 
 Use the **Get started** dialog on the logs pages for curl examples. Send traffic through the public gateway API (`POST /v1/email`, `POST /v1/sms`, etc.) with a workspace API key.
 
-For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_providers.sql`, `003_seed_mailgun_config.sql`, and `004_demo_workspace.sql` (optional demo data: `demo@weprodev.com` / `secret`).
+For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_providers.sql`, `003_seed_mailgun_config.sql`, and `004_demo_workspace.sql` (optional demo data: `demo@weprodev.com`, `member@weprodev.com`, `viewer@weprodev.com` — password `secret` for all).
 
 ### Sending via HTTP
 
@@ -342,23 +342,31 @@ Routes registered in `internal/presentation/router.go`. **Portal UI pages exist 
 | Method | Endpoint | Portal UI | Description |
 |--------|----------|:---------:|-------------|
 | GET | `/api/v1/workspaces` | ✓ | List workspaces for the logged-in user |
+| GET | `/api/v1/workspaces/:wid/members` | ✓ | List workspace members and roles (`members.read`) |
+| DELETE | `/api/v1/workspaces/:wid/members/:userId` | ✓ | Remove a member (`members.write`) |
+| GET | `/api/v1/workspaces/:wid/invitations` | ✓ | List pending invitations (`invitations.read`) |
+| POST | `/api/v1/workspaces/:wid/invitations` | ✓ | Invite a user with role (`invitations.write`; body: `email`, `role`) |
 | GET | `/api/v1/workspaces/:wid/logs` | ✓ | Message request logs (optionally filter by `channel`) |
 
-Additional workspace endpoints (create, API keys, settings, templates, members, inbox) are implemented in `internal/presentation/router.go` and covered in [Portal inbox](./portal-inbox.md) and [E2E testing](./e2e-testing.md).
+Additional workspace endpoints (create, API keys, settings, templates, inbox) are implemented in `internal/presentation/router.go` and covered in [Portal inbox](./portal-inbox.md) and [E2E testing](./e2e-testing.md).
 
 ### Workspace access (portal JWT routes & RBAC)
 
 Workspace-scoped routes require a valid portal JWT and are governed by a Role-Based Access Control (RBAC) middleware backed by `wpd-gogate`.
 
-Roles and permissions are defined in [permission.go](../../internal/core/domain/permission.go):
-- **admin**: Full read/write access. The creator of a workspace is automatically assigned this role (as `admin` in both members repository and `gogate`).
-- **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus inbox mutations (`inbox.write`).
+Roles and permissions are defined in [permission.go](../../internal/core/domain/permission.go) and seeded by `database/seeds/001_seed_permissions.sql`:
 
-To bootstrap roles and permissions, make sure you run the database seeds:
-1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.
+- **admin**: Full read/write access. The workspace creator is assigned this role automatically (in both `workspace_members` and wpd-gogate `model_has_roles`).
+- **member**: Manage integrations, templates, settings, API keys, and inbox content. Cannot change workspace metadata, manage members, or manage invitations.
+- **viewer**: Read-only (`*.read` permissions). Used for invited/read-only members.
+
+**Public workspace guests** (non-members on `visibility = public` workspaces) receive only `workspaces.read` and `templates.read` (`PublicGuestPermissions`). The portal UI uses the `role` and `permissions` fields returned by `GET /api/v1/workspaces` for conditional rendering via `frontend/src/core/auth/`.
+
+To bootstrap roles and permissions, run the database seeds:
+1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`, `viewer`), permissions, and role-to-permission mappings.
 2. Run `database/seeds/002_seed_providers.sql` to seed the provider catalog (memory, mailgun, etc.).
 3. Run `database/seeds/003_seed_mailgun_config.sql` to seed Mailgun Portal config field metadata.
-4. Run `database/seeds/004_demo_workspace.sql` (optional) — demo user (`demo@weprodev.com` / `secret`), workspace, admin role, memory integration, API key (`demo-client-id` / `demo-secret`).
+4. Run `database/seeds/004_demo_workspace.sql` (optional) — demo workspace with three portal users (`demo@weprodev.com`, `member@weprodev.com`, `viewer@weprodev.com`; password `secret`), admin/member/viewer roles, memory integration, API key (`demo-client-id` / `demo-secret`).
 
 ### Dual Authorization Models
 

@@ -1,6 +1,6 @@
 import { apiFetch } from "@/core/api/client"
 
-import type { Workspace } from "./workspace.types"
+import type { Workspace } from "../workspace.types"
 
 export async function fetchWorkspaces(): Promise<
   { ok: true; workspaces: Workspace[] } | { ok: false; status: number; message?: string }

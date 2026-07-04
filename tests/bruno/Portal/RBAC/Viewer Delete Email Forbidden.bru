@@ -1,0 +1,21 @@
+meta {
+  name: Viewer Delete Email Forbidden
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/inbox/emails/00000000-0000-0000-0000-000000000099
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{viewerPortalJwt}}
+}
+
+tests {
+  test("viewer cannot delete inbox messages", function() {
+    expect(res.status).to.equal(403);
+  });
+}

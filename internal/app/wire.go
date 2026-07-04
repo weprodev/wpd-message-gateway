@@ -74,7 +74,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	if err := gateEngine.LoadPolicy(startCtx); err != nil {
 		return nil, fmt.Errorf("load RBAC policies: %w", err)
 	}
-	authGate := authgate.NewGoGateAdapter(gateEngine, pgClient.GetDB(startCtx))
+	authGate := authgate.NewGoGateAdapter(gateEngine, pgClient, gateCfg)
 
 	// ── Encryption service ──────────────────────────────────────────────────
 	encKey := cfg.EncryptionKey
@@ -127,6 +127,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		JWTSecret:    jwtSecret,
 		JWTTTL:       jwtTTL,
 		Gate:         authGate,
+		TxManager:    pgClient,
 	})
 
 	// ── Inbox: payload-backed reads, in-memory writes for SSE ───────────────

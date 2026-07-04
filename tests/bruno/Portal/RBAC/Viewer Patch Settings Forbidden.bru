@@ -1,0 +1,27 @@
+meta {
+  name: Viewer Patch Settings Forbidden
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/settings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{viewerPortalJwt}}
+}
+
+body:json {
+  {
+    "message_dispatch_mode": "provider"
+  }
+}
+
+tests {
+  test("viewer cannot patch settings", function() {
+    expect(res.status).to.equal(403);
+  });
+}
