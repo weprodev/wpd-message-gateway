@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 
-import { fetchLogs } from "../inbox.api"
+import { fetchLogs } from "../api/inbox.api"
 import type { LogRow } from "../inbox.types"
 
 export function useInboxLogs(workspaceId: string | undefined, channel?: string) {

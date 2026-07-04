@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 
-import { fetchGetStartedContext, type GetStartedContext } from "../get-started.api"
+import { fetchGetStartedContext, type GetStartedContext } from "../api/get-started.api"
 
 export function useGetStartedContext(workspaceId: string | undefined, enabled: boolean) {
   const [context, setContext] = useState<GetStartedContext | null>(null)

@@ -1,0 +1,27 @@
+meta {
+  name: Viewer Create API Key Forbidden
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/api-keys
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{viewerPortalJwt}}
+}
+
+body:json {
+  {
+    "name": "Viewer should not create"
+  }
+}
+
+tests {
+  test("viewer cannot create API keys", function() {
+    expect(res.status).to.equal(403);
+  });
+}

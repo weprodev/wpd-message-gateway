@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
+
+import { Permission, Role, WorkspaceAuthorizationProvider } from "@/core/auth"
+
 import { EmailContent } from "./email-content"
 
 const mockEmail = {
@@ -20,6 +23,18 @@ const meta = {
   title: "Features/Inbox/EmailContent",
   component: EmailContent,
   tags: ["autodocs"],
+  decorators: [
+    (Story) => (
+      <WorkspaceAuthorizationProvider
+        role={Role.Member}
+        permissions={[Permission.LogsRead, Permission.InboxWrite]}
+      >
+        <div className="h-[480px] max-w-4xl border border-border">
+          <Story />
+        </div>
+      </WorkspaceAuthorizationProvider>
+    ),
+  ],
 } satisfies Meta<typeof EmailContent>
 
 export default meta

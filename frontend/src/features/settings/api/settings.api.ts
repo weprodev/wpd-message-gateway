@@ -1,8 +1,8 @@
 import { fetchWorkspaceApiKeys } from "@/core/api/workspace-api-keys"
 import { apiFetch } from "@/core/api/client"
 
-import { parseWorkspaceSettings } from "./settings.schema"
-import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "./settings.types"
+import { parseWorkspaceSettings } from "../settings.schema"
+import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "../settings.types"
 
 async function readApiErrorMessage(res: Response, fallback: string): Promise<string> {
   try {

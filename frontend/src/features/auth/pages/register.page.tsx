@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { AuthCard } from "@/shared/components/auth-card"
-import { registerAccount } from "../auth.api"
+import { registerAccount } from "../api/auth.api"
 
 export function RegisterPage() {
   const navigate = useNavigate()

@@ -579,7 +579,7 @@ const invitationTTL = 7 * 24 * time.Hour
 func (s *PortalService) NewPendingInvitation(workspaceID, email, role string) *domain.Invitation {
 	return &domain.Invitation{
 		WorkspaceID: workspaceID,
-		Email:       email,
+		Email:       strings.ToLower(strings.TrimSpace(email)),
 		Role:        role,
 		ExpiresAt:   time.Now().Add(invitationTTL),
 		Status:      "pending",
@@ -597,6 +597,28 @@ func (s *PortalService) CreateInvitation(ctx context.Context, inv *domain.Invita
 	if !domain.IsWorkspaceRole(inv.Role) {
 		return "", fmt.Errorf("invalid role %q: %w", inv.Role, port.ErrInvalidInput)
 	}
+
+	inv.Email = strings.ToLower(strings.TrimSpace(inv.Email))
+	if inv.Email == "" {
+		return "", fmt.Errorf("email required: %w", port.ErrInvalidInput)
+	}
+
+	isMember, err := s.members.MemberExistsByEmail(ctx, inv.WorkspaceID, inv.Email)
+	if err != nil {
+		return "", err
+	}
+	if isMember {
+		return "", fmt.Errorf("user is already a member of this workspace: %w", port.ErrInvalidInput)
+	}
+
+	hasPending, err := s.invites.PendingInvitationExistsByEmail(ctx, inv.WorkspaceID, inv.Email)
+	if err != nil {
+		return "", err
+	}
+	if hasPending {
+		return "", fmt.Errorf("a pending invitation already exists for this email: %w", port.ErrInvalidInput)
+	}
+
 	// Generate a cryptographically random token from two UUIDs.
 	rawToken = uuid.NewString() + uuid.NewString()
 	sum := sha256.Sum256([]byte(rawToken))

@@ -3,10 +3,10 @@ import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
-import { registerAccount } from "../auth.api"
+import { registerAccount } from "../api/auth.api"
 import { RegisterPage } from "./register.page"
 
-vi.mock("../auth.api", () => ({
+vi.mock("../api/auth.api", () => ({
   registerAccount: vi.fn(),
 }))
 

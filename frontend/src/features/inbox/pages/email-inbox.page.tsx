@@ -9,7 +9,7 @@ import {
   buildInboxEventsUrl,
   deleteInboxEmail,
   fetchInboxEmailById,
-} from "../inbox.api"
+} from "../api/inbox.api"
 import { EmailList } from "../components/email-list"
 import { EmailContent } from "../components/email-content"
 import { useInboxEmails } from "../hooks/use-inbox-emails.hook"

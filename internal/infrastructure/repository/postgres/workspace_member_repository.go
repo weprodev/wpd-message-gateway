@@ -102,3 +102,19 @@ func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID
 	}
 	return out, nil
 }
+
+func (r *WorkspaceMemberRepository) MemberExistsByEmail(ctx context.Context, workspaceID, email string) (bool, error) {
+	var exists bool
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM workspace_members wm
+			INNER JOIN users u ON u.id = wm.user_id
+			WHERE wm.workspace_id = $1 AND lower(u.email) = lower($2)
+		)
+	`, workspaceID, email).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to check workspace member by email", "error", err, "workspace_id", workspaceID, "email", email)
+	}
+	return exists, err
+}

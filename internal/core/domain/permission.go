@@ -62,6 +62,41 @@ var ReadPermissions = []string{
 	PermissionInvitationsRead,
 }
 
+// WritePermissions require admin or member role (never viewer).
+var WritePermissions = []string{
+	PermissionWorkspacesWrite,
+	PermissionMembersWrite,
+	PermissionAPIKeysWrite,
+	PermissionIntegrationsWrite,
+	PermissionTemplatesWrite,
+	PermissionSettingsWrite,
+	PermissionInvitationsWrite,
+	PermissionInboxWrite,
+}
+
+// AllPermissions is the full portal RBAC catalog (read + write).
+var AllPermissions = append(append([]string{}, ReadPermissions...), WritePermissions...)
+
+// IsWritePermission reports whether name is a mutating portal permission.
+func IsWritePermission(name string) bool {
+	for _, permission := range WritePermissions {
+		if permission == name {
+			return true
+		}
+	}
+	return false
+}
+
+// IsReadPermission reports whether name is a read-only portal permission for workspace members.
+func IsReadPermission(name string) bool {
+	for _, permission := range ReadPermissions {
+		if permission == name {
+			return true
+		}
+	}
+	return false
+}
+
 // PublicGuestPermissions are the only permissions non-members receive on public workspaces.
 // Narrower than viewer role: guests must not read members, API keys, logs, or settings.
 var PublicGuestPermissions = []string{

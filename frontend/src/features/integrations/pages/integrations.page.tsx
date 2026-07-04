@@ -5,6 +5,7 @@ import { useState } from "react"
 import { PageHeader } from "@/shared/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import { Can, Permission } from "@/core/auth"
 import { cn } from "@/lib/utils"
 
 import { ConnectModal } from "@/features/integrations/components/connect-modal"
@@ -129,12 +130,14 @@ export function IntegrationsPage() {
                     </p>
                   </div>
                   {tab === "connected" && (
-                    <Button
-                      onClick={() => setActiveTab("available")}
-                      className="bg-primary-brand hover:bg-primary-brand-hover"
-                    >
-                      Connect a Provider
-                    </Button>
+                    <Can permission={Permission.IntegrationsWrite}>
+                      <Button
+                        onClick={() => setActiveTab("available")}
+                        className="bg-primary-brand hover:bg-primary-brand-hover"
+                      >
+                        Connect a Provider
+                      </Button>
+                    </Can>
                   )}
                 </div>
               ) : (

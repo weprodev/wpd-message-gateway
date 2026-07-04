@@ -100,13 +100,18 @@ make dev
 | Portal UI | http://localhost:10104 |
 | Gateway API | http://localhost:10101 |
 
-### Demo account
+### Demo accounts
 
-Seeded on first DB init. Reset anytime: `make seed-demo`.
+Seeded on first DB init. Reset anytime: `make seed-demo`. All portal passwords are `secret`.
+
+| Role | Email | Demo workspace role |
+|------|-------|---------------------|
+| Admin | `demo@weprodev.com` | admin |
+| Member | `member@weprodev.com` | member |
+| Viewer | `viewer@weprodev.com` | viewer |
 
 | | |
 |--|--|
-| Portal | `demo@weprodev.com` / `secret` |
 | API key | `demo-client-id` / `demo-secret` |
 | Workspace ID | `00000000-0000-0000-0000-000000000001` |
 

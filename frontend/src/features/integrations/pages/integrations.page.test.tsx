@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
+import { Permission, Role, WorkspaceAuthorizationProvider } from "@/core/auth"
+
 import { useIntegrations } from "../hooks/use-integrations.hook"
 import { IntegrationsPage } from "./integrations.page"
 
@@ -13,12 +15,14 @@ vi.mock("../hooks/use-integrations.hook", () => ({
 
 const mockedUseIntegrations = vi.mocked(useIntegrations)
 
-function renderPage() {
+function renderPage(permissions: string[] = [Permission.IntegrationsRead, Permission.IntegrationsWrite]) {
   return render(
     <MemoryRouter initialEntries={["/workspaces/ws-1/integrations"]}>
-      <Routes>
-        <Route path="/workspaces/:wid/integrations" element={<IntegrationsPage />} />
-      </Routes>
+      <WorkspaceAuthorizationProvider role={Role.Viewer} permissions={permissions}>
+        <Routes>
+          <Route path="/workspaces/:wid/integrations" element={<IntegrationsPage />} />
+        </Routes>
+      </WorkspaceAuthorizationProvider>
     </MemoryRouter>,
   )
 }

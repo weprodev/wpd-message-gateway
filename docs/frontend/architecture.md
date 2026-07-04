@@ -32,10 +32,11 @@ Route composition lives in **`core/router/router.tsx`** only.
 ```
 features/workspaces/
 ├── index.ts                 # public barrel
+├── api/                     # HTTP clients for this feature
+│   └── *.api.ts
 ├── pages/
 ├── layouts/                 # domain shells (not shared/)
 ├── hooks/use-*.hook.ts
-├── *.api.ts
 └── *.types.ts
 ```
 
@@ -85,7 +86,7 @@ Constants mirror `internal/core/domain/permission.go`. Static role matrices (e.g
 
 ## Adding a feature
 
-1. Create `features/<name>/` with pages, hooks, `*.api.ts`, `*.types.ts`
+1. Create `features/<name>/` with pages, hooks, `api/*.api.ts`, `*.types.ts`
 2. Export public API from `index.ts`
 3. Extend `core/router/routes.ts` and `core/router/router.tsx`
 4. Colocate Storybook stories

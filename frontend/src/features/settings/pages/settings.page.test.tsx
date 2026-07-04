@@ -94,4 +94,26 @@ describe("SettingsPage", () => {
 
     expect(screen.queryByRole("button", { name: /generate key/i })).not.toBeInTheDocument()
   })
+
+  it("hides dispatch save controls for read-only users", () => {
+    mockedUseSettings.mockReturnValue({
+      settings: {},
+      apiKeys: [],
+      messageDispatchConfig: { mode: "memory", storeMessageContent: false },
+      isLoading: false,
+      error: null,
+      reload: vi.fn(),
+      saveSettings: vi.fn(),
+      addApiKey: vi.fn(),
+      removeApiKey: vi.fn(),
+      rotateApiKey: vi.fn(),
+    })
+
+    renderSettingsPage("dispatch", [Permission.SettingsRead])
+
+    expect(screen.queryByRole("button", { name: /save dispatch settings/i })).not.toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: /memory/i })).toBeDisabled()
+    expect(screen.getByRole("radio", { name: /provider/i })).toBeDisabled()
+    expect(screen.getByRole("checkbox", { name: /store message content in inbox/i })).toBeDisabled()
+  })
 })

@@ -245,7 +245,7 @@ The React Portal (`frontend/`) includes:
 | **Integrations** | Connect and manage providers |
 | **Settings** | General, API keys, message dispatch |
 
-**API-only today:** team invites/members UI (placeholder), SMS/push/chat captured-message browsers (email inbox only), internal inbox ingest.
+**API-only today:** SMS/push/chat captured-message browsers (email inbox only), internal inbox ingest.
 
 ---
 

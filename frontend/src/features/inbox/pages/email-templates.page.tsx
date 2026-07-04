@@ -17,11 +17,12 @@ import {
   TableCell,
 } from "@/components/ui/table"
 import { ROUTES } from "@/core/router/routes"
+import { Permission, useWorkspaceAuthorization } from "@/core/auth"
 import {
   createEmailTemplate,
   deleteEmailTemplate,
   fetchEmailTemplates,
-} from "../inbox.api"
+} from "../api/inbox.api"
 import type { EmailTemplate } from "../inbox.types"
 
 type TabType = "templates" | "headers" | "footers"
@@ -42,6 +43,8 @@ function getCategoryColor(category: string) {
 export function EmailTemplatesPage() {
   const { wid } = useParams<{ wid: string }>()
   const navigate = useNavigate()
+  const { can } = useWorkspaceAuthorization()
+  const canManageTemplates = can(Permission.TemplatesWrite)
 
   const [activeTab, setActiveTab] = useState<TabType>("templates")
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
@@ -212,12 +215,12 @@ export function EmailTemplatesPage() {
           className="w-64 shadow-xs shrink-0"
         />
 
-        {activeTab === "templates" && (
+        {activeTab === "templates" && canManageTemplates ? (
           <Button type="button" size="sm" onClick={() => setIsCreateOpen(true)} className="h-10 shrink-0">
             <Icon name="add" size="sm" data-icon="inline-start" />
             Create Template
           </Button>
-        )}
+        ) : null}
       </div>
 
       {/* Table Content */}
@@ -250,12 +253,12 @@ export function EmailTemplatesPage() {
           <p className="text-xs text-text-secondary mt-1 mb-4">
             {searchQuery ? "No templates match your search criteria." : "Create your first reusable email template template."}
           </p>
-          {!searchQuery && (
+          {!searchQuery && canManageTemplates ? (
             <Button size="sm" onClick={() => setIsCreateOpen(true)}>
               <Icon name="add" size="sm" data-icon="inline-start" />
               Create Template
             </Button>
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="bg-card rounded-[16px] border border-border shadow-xs overflow-hidden">
@@ -297,14 +300,18 @@ export function EmailTemplatesPage() {
                     </span>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(t.id)}
-                      className="p-1.5 rounded bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
-                      title="Delete Template"
-                    >
-                      <Icon name="delete" size="sm" />
-                    </button>
+                    {canManageTemplates ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(t.id)}
+                        className="p-1.5 rounded bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+                        title="Delete Template"
+                      >
+                        <Icon name="delete" size="sm" />
+                      </button>
+                    ) : (
+                      <span className="text-xs text-text-tertiary">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

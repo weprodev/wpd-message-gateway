@@ -1,11 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("@/features/integrations/integrations.api", () => ({
+vi.mock("@/features/integrations/api/integrations.api", () => ({
   fetchProviderConfigFields: vi.fn(),
 }))
 
-import { fetchProviderConfigFields } from "@/features/integrations/integrations.api"
+import { fetchProviderConfigFields } from "@/features/integrations/api/integrations.api"
 
 import { useProviderConfigFields } from "./use-provider-config-fields.hook"
 

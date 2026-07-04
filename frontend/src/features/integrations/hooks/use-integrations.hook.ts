@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
-import { deleteIntegration, listIntegrations, upsertIntegration, fetchProviders } from "@/features/integrations/integrations.api"
-import type { BackendProvider } from "@/features/integrations/integrations.api"
+import { deleteIntegration, listIntegrations, upsertIntegration, fetchProviders } from "@/features/integrations/api/integrations.api"
+import type { BackendProvider } from "@/features/integrations/api/integrations.api"
 import {
   INTEGRATION_STATUS,
   type Integration,

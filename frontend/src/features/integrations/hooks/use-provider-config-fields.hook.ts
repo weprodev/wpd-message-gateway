@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-import { fetchProviderConfigFields, type ProviderConfigField } from "@/features/integrations/integrations.api"
+import { fetchProviderConfigFields, type ProviderConfigField } from "@/features/integrations/api/integrations.api"
 
 export function useProviderConfigFields(workspaceId: string, providerId: string | undefined, enabled: boolean) {
   const [fields, setFields] = useState<ProviderConfigField[]>([])

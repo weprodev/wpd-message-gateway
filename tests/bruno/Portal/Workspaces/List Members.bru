@@ -1,0 +1,28 @@
+meta {
+  name: List Members
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/members
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{portalJwt}}
+}
+
+tests {
+  test("should list workspace members", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body).to.be.an("array");
+    if (res.body.length > 0) {
+      const member = res.body[0];
+      expect(member).to.have.property("user_id");
+      expect(member).to.have.property("role");
+      expect(member).to.have.property("joined_at");
+    }
+  });
+}

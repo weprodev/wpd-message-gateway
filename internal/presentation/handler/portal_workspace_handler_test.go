@@ -30,12 +30,38 @@ func (f *fakeInvitationRepository) ListPendingByWorkspace(context.Context, strin
 	return nil, nil
 }
 
+func (f *fakeInvitationRepository) PendingInvitationExistsByEmail(context.Context, string, string) (bool, error) {
+	return false, nil
+}
+
+type fakeWorkspaceMemberRepository struct {
+	existingEmails map[string]struct{}
+}
+
+func (f *fakeWorkspaceMemberRepository) Add(context.Context, string, string, string) error {
+	return nil
+}
+func (f *fakeWorkspaceMemberRepository) Remove(context.Context, string, string) error { return nil }
+func (f *fakeWorkspaceMemberRepository) GetRole(context.Context, string, string) (string, error) {
+	return "", nil
+}
+func (f *fakeWorkspaceMemberRepository) ListMembers(context.Context, string) ([]domain.WorkspaceMember, error) {
+	return nil, nil
+}
+func (f *fakeWorkspaceMemberRepository) MemberExistsByEmail(_ context.Context, _ string, email string) (bool, error) {
+	_, ok := f.existingEmails[strings.ToLower(strings.TrimSpace(email))]
+	return ok, nil
+}
+
 func TestPortalWorkspaceHandler_CreateInvitation(t *testing.T) {
 	t.Parallel()
 	e := echo.New()
 
 	repo := &fakeInvitationRepository{}
-	svc := service.NewPortalService(service.PortalDeps{Invitations: repo})
+	svc := service.NewPortalService(service.PortalDeps{
+		Invitations: repo,
+		Members:     &fakeWorkspaceMemberRepository{},
+	})
 	h := NewPortalWorkspaceHandler(svc)
 
 	body := `{"email":"invitee@example.com","role":"member"}`
@@ -69,6 +95,36 @@ func TestPortalWorkspaceHandler_CreateInvitation(t *testing.T) {
 	}
 	if repo.created.Email != "invitee@example.com" || repo.created.Status != "pending" {
 		t.Fatalf("unexpected persisted invitation: %+v", repo.created)
+	}
+}
+
+func TestPortalWorkspaceHandler_CreateInvitation_rejectsExistingMember(t *testing.T) {
+	t.Parallel()
+	e := echo.New()
+
+	svc := service.NewPortalService(service.PortalDeps{
+		Invitations: &fakeInvitationRepository{},
+		Members: &fakeWorkspaceMemberRepository{
+			existingEmails: map[string]struct{}{"member@weprodev.com": {}},
+		},
+	})
+	h := NewPortalWorkspaceHandler(svc)
+
+	body := `{"email":"member@weprodev.com","role":"viewer"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/ws-1/invitations", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("wid")
+	c.SetParamValues("ws-1")
+
+	err := h.CreateInvitation(c)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %v", err)
 	}
 }
 

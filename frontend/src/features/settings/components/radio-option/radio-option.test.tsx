@@ -40,4 +40,25 @@ describe("RadioOption", () => {
     await user.click(screen.getByRole("radio"))
     expect(onChange).toHaveBeenCalledTimes(1)
   })
+
+  it("does not call onChange when disabled", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    render(
+      <RadioOption
+        id="dispatch-provider"
+        name="dispatch-mode"
+        label="Provider"
+        description="Send through provider."
+        checked={false}
+        onChange={onChange}
+        disabled
+      />,
+    )
+
+    expect(screen.getByRole("radio")).toBeDisabled()
+    await user.click(screen.getByRole("radio"))
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })
