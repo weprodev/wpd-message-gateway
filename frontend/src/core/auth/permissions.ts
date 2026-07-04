@@ -64,6 +64,16 @@ const viewerPermissions = new Set<PermissionName>([
   Permission.InvitationsRead,
 ])
 
+/** Non-member access on public workspaces — mirrors domain.PublicGuestPermissions. */
+export const PublicGuestPermissions: readonly PermissionName[] = [
+  Permission.WorkspacesRead,
+  Permission.TemplatesRead,
+]
+
+export function isPublicGuestPermission(permission: string): boolean {
+  return (PublicGuestPermissions as readonly string[]).includes(permission)
+}
+
 /** Static role → permission matrix (wpd-gogate HasRolePermission equivalent). */
 export function hasRolePermission(role: string, permission: string): boolean {
   if (role === Role.Admin) {

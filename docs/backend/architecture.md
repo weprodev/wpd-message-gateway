@@ -185,10 +185,13 @@ Portal accounts use **email + password** (passwords are stored hashed). All mana
 
 The core service layer decouples from `wpd-gogate` by depending on the `port.AuthorizationGate` interface. The implementation adapter lives in `internal/infrastructure/authgate/gate_adapter.go`.
 
-- **admin**: Full read/write access to settings, integrations, templates, API keys, and member removal. Assigned automatically to the creator of a workspace.
-- **member**: Read-only access to workspaces, settings, templates, API keys, and logs, plus inbox mutations (`inbox.write`).
+- **admin**: Full access to all portal permissions. Assigned automatically to the workspace creator.
+- **member**: Manage workspace resources (integrations, templates, settings, API keys, inbox) but cannot modify workspace metadata, manage members, or send invitations. See `database/seeds/001_seed_permissions.sql` for the exact permission matrix.
+- **viewer**: Read-only access to workspace resources (`*.read` permissions). Assigned explicitly via membership or invitation.
 
-Public workspaces (`is_private = false`) are dynamically accessible to any authenticated user as a `"viewer"` with read-only permissions (i.e. `*.read` operations are bypassed and approved automatically without requiring explicit membership or Casbin checks). All write operations on public workspaces remain strictly restricted to workspace admins.
+Roles are **global** in the `roles` table (wpd-gogate schema) and scoped per workspace through `workspace_members.role_id` and `model_has_roles.team_id`.
+
+**Public workspace guests** (authenticated users who are not members of a public workspace) receive a narrower guest set — `workspaces.read` and `templates.read` only — via `domain.PublicGuestPermissions`. The RBAC middleware bypasses gogate checks only for those permissions; all other routes still require membership and role-based permissions. Write operations always require explicit membership with sufficient permissions.
 
 ### Send API Auth (Machine-to-Machine)
 
@@ -336,7 +339,7 @@ Every entity in the system is scoped to a workspace:
 
 ```text
 Workspace "myapp"
-├── Members (users with roles: admin, member)
+├── Members (users with roles: admin, member, viewer)
 ├── API Keys (for machine-to-machine sends)
 ├── Integrations (provider credentials per channel)
 │   ├── email: mailgun { api_key: "...", domain: "..." }

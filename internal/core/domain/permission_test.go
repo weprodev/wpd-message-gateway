@@ -14,3 +14,17 @@ func TestIsWorkspaceRole(t *testing.T) {
 		t.Fatal("IsWorkspaceRole(superadmin) = true, want false")
 	}
 }
+
+func TestIsPublicGuestPermission(t *testing.T) {
+	t.Parallel()
+
+	if !IsPublicGuestPermission(PermissionWorkspacesRead) {
+		t.Fatal("expected workspaces.read for public guests")
+	}
+	if !IsPublicGuestPermission(PermissionTemplatesRead) {
+		t.Fatal("expected templates.read for public guests")
+	}
+	if IsPublicGuestPermission(PermissionLogsRead) {
+		t.Fatal("logs.read must not be granted to public guests")
+	}
+}

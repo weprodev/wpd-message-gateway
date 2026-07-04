@@ -60,7 +60,28 @@ ROUTES.workspace.overview(workspaceId)
 
 ## Auth
 
-Session guards are deferred. Pages are reachable without login; JWT is attached by `core/api/client` when present. When auth ships, add a guard in `core/router/router.tsx` only.
+Portal routes under `/workspaces/:wid/*` require a JWT (`ProtectedRoute` in `core/router/protected-route.tsx`). The API client in `core/api/client.ts` attaches the token to requests.
+
+### Workspace authorization (UI)
+
+Inside `WorkspaceLayout`, `WorkspaceAuthorizationProvider` exposes the active workspace `role` and resolved `permissions[]` from `GET /api/v1/workspaces`. Use this for **UI gating only** — the backend enforces permissions via wpd-gogate middleware on every route.
+
+```tsx
+import { Can, Permission, Role, useWorkspaceAuthorization } from "@/core/auth"
+
+// Declarative
+<Can permission={Permission.APIKeysWrite}>
+  <Button>Generate key</Button>
+</Can>
+
+// Imperative
+const { can, hasRole } = useWorkspaceAuthorization()
+if (can(Permission.SettingsWrite)) { /* ... */ }
+```
+
+Constants mirror `internal/core/domain/permission.go`. Static role matrices (e.g. invitation role picker) can use `hasRolePermission()` from `core/auth/permissions.ts`.
+
+**Never rely on UI checks for security** — they only hide controls; unauthorized API calls still return 403.
 
 ## Adding a feature
 

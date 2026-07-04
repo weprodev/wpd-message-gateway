@@ -46,3 +46,8 @@ type AuthorizationGate interface {
 	GetAllPermissions(ctx context.Context, modelType, modelID, teamID string) ([]string, error)
 	GetPermissionsForTeams(ctx context.Context, modelType, modelID string, teamIDs []string) (map[string][]string, error)
 }
+
+// TransactionManager executes a function inside a database transaction.
+type TransactionManager interface {
+	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}

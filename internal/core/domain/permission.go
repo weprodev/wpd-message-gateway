@@ -50,7 +50,7 @@ const (
 	PermissionInboxWrite = "inbox.write"
 )
 
-// ReadPermissions are granted to viewer role and public workspace guests.
+// ReadPermissions are granted to the viewer workspace role (full read-only member).
 var ReadPermissions = []string{
 	PermissionWorkspacesRead,
 	PermissionMembersRead,
@@ -60,6 +60,23 @@ var ReadPermissions = []string{
 	PermissionTemplatesRead,
 	PermissionSettingsRead,
 	PermissionInvitationsRead,
+}
+
+// PublicGuestPermissions are the only permissions non-members receive on public workspaces.
+// Narrower than viewer role: guests must not read members, API keys, logs, or settings.
+var PublicGuestPermissions = []string{
+	PermissionWorkspacesRead,
+	PermissionTemplatesRead,
+}
+
+// IsPublicGuestPermission reports whether permission is allowed for public workspace guests.
+func IsPublicGuestPermission(name string) bool {
+	for _, permission := range PublicGuestPermissions {
+		if permission == name {
+			return true
+		}
+	}
+	return false
 }
 
 // IsWorkspaceRole reports whether name is one of the seeded workspace roles.

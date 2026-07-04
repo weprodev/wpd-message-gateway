@@ -23,7 +23,7 @@ const sampleApiKey = {
   last_used_at: null,
 }
 
-function renderSettingsPage(tab = "developer", permissions = [Permission.APIKeysWrite]) {
+function renderSettingsPage(tab = "developer", permissions: string[] = [Permission.APIKeysWrite]) {
   return render(
     <MemoryRouter initialEntries={[`/workspaces/w1/settings?tab=${tab}`]}>
       <WorkspaceAuthorizationProvider role={Role.Admin} permissions={permissions}>

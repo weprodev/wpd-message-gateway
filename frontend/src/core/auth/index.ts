@@ -10,7 +10,9 @@ export {
   Role,
   WorkspaceRoles,
   hasRolePermission,
+  isPublicGuestPermission,
   isWorkspaceRole,
+  PublicGuestPermissions,
   type PermissionName,
   type WorkspaceRole,
 } from "./permissions"
