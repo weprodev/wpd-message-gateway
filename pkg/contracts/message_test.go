@@ -60,7 +60,20 @@ func TestInboxMessageIDFromResult(t *testing.T) {
 	}{
 		{"nil result", nil, ""},
 		{"provider without inbox", &SendResult{ID: "prov-1", Meta: map[string]string{MetaKeyDispatchMode: DispatchModeProvider}}, ""},
-		{"memory mode", &SendResult{ID: "inbox-1", Meta: map[string]string{MetaKeyDispatchMode: DispatchModeMemory}}, "inbox-1"},
+		{"memory mode retained", &SendResult{
+			ID: "inbox-1",
+			Meta: map[string]string{
+				MetaKeyDispatchMode: DispatchModeMemory,
+				MetaKeyStoreContent: metaStoreContentTrue,
+			},
+		}, "inbox-1"},
+		{"memory mode not retained", &SendResult{
+			ID: "mem-1",
+			Meta: map[string]string{
+				MetaKeyDispatchMode: DispatchModeMemory,
+				MetaKeyStoreContent: metaStoreContentFalse,
+			},
+		}, ""},
 		{"provider with inbox meta", &SendResult{
 			ID: "prov-1",
 			Meta: map[string]string{

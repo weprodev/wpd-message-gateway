@@ -62,20 +62,19 @@ func TestResolveMessageDispatchConfig(t *testing.T) {
 
 func TestMessageDispatchConfig_ShouldCaptureToInbox(t *testing.T) {
 	tests := []struct {
-		name          string
-		config        MessageDispatchConfig
-		effectiveMode MessageDispatchMode
-		want          bool
+		name   string
+		config MessageDispatchConfig
+		want   bool
 	}{
-		{"memory always captures", MessageDispatchConfig{Mode: DispatchMemory}, DispatchMemory, true},
-		{"provider without store", MessageDispatchConfig{Mode: DispatchProvider}, DispatchProvider, false},
-		{"provider with store", MessageDispatchConfig{Mode: DispatchProvider, StoreMessageContent: true}, DispatchProvider, true},
-		{"provider fallback to memory", MessageDispatchConfig{Mode: DispatchProvider}, DispatchMemory, true},
+		{"memory without store", MessageDispatchConfig{Mode: DispatchMemory, StoreMessageContent: false}, false},
+		{"memory with store", MessageDispatchConfig{Mode: DispatchMemory, StoreMessageContent: true}, true},
+		{"provider without store", MessageDispatchConfig{Mode: DispatchProvider}, false},
+		{"provider with store", MessageDispatchConfig{Mode: DispatchProvider, StoreMessageContent: true}, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.config.ShouldCaptureToInbox(tt.effectiveMode); got != tt.want {
+			if got := tt.config.ShouldCaptureToInbox(); got != tt.want {
 				t.Fatalf("ShouldCaptureToInbox() = %v, want %v", got, tt.want)
 			}
 		})

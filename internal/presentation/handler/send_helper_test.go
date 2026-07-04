@@ -88,7 +88,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		}
 	})
 
-	t.Run("successful dispatch stores inbox message id in memory mode", func(t *testing.T) {
+	t.Run("successful dispatch stores inbox message id when content retained", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -104,6 +104,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 				Meta: map[string]string{
 					contracts.MetaKeyProviderName: "memory",
 					contracts.MetaKeyDispatchMode: contracts.DispatchModeMemory,
+					contracts.MetaKeyStoreContent: "true",
 				},
 			}, nil
 		})

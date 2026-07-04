@@ -164,7 +164,7 @@ function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelP
         <label htmlFor="store-message-content" className="flex flex-1 cursor-pointer flex-col gap-1">
           <span className="text-sm font-medium text-foreground">Store message content in inbox</span>
           <span className="text-sm text-text-secondary">
-            When enabled, message bodies are captured in the portal inbox for review.
+            When enabled, message bodies are captured in the portal inbox and shown as Retained in message logs.
           </span>
         </label>
         <Checkbox

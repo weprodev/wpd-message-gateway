@@ -54,16 +54,19 @@ func StoreContentFromResult(r *SendResult) bool {
 	return r.Meta[MetaKeyStoreContent] == metaStoreContentTrue
 }
 
-// InboxMessageIDFromResult returns the inbox message ID when dispatch captured content.
+// InboxMessageIDFromResult returns the inbox message ID when dispatch captured content in the portal inbox.
 //
 // Provider dispatch stores the inbox UUID in MetaKeyInboxMessageID; SendResult.ID is the provider ID.
-// Memory-only dispatch has no provider result, so SendResult.ID is the inbox UUID.
+// Memory dispatch with store_message_content stores the inbox UUID in SendResult.ID.
 func InboxMessageIDFromResult(r *SendResult) string {
 	if r == nil || r.Meta == nil {
 		return ""
 	}
 	if id := r.Meta[MetaKeyInboxMessageID]; id != "" {
 		return id
+	}
+	if !StoreContentFromResult(r) {
+		return ""
 	}
 	if r.Meta[MetaKeyDispatchMode] == DispatchModeMemory && r.ID != "" {
 		return r.ID

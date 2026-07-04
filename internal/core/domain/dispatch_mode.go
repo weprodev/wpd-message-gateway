@@ -51,9 +51,9 @@ func (c MessageDispatchConfig) RoutesViaProvider() bool {
 	return c.Mode == DispatchProvider
 }
 
-// ShouldCaptureToInbox reports whether message content should be written to the inbox writer.
-func (c MessageDispatchConfig) ShouldCaptureToInbox(effectiveMode MessageDispatchMode) bool {
-	return c.StoreMessageContent || effectiveMode == DispatchMemory
+// ShouldCaptureToInbox reports whether message content should be written to the portal inbox.
+func (c MessageDispatchConfig) ShouldCaptureToInbox() bool {
+	return c.StoreMessageContent
 }
 
 // ResolveMessageDispatchConfig reads canonical workspace setting values.

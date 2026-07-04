@@ -6,13 +6,17 @@ import (
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
+	_ "github.com/weprodev/wpd-message-gateway/pkg/provider/memory"
 )
 
 func TestGatewayService_SendSMS_memoryOnly(t *testing.T) {
 	t.Parallel()
 
+	settings := &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyStoreMessageContent: "true",
+	}}
 	inbox := &stubInbox{}
-	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, inbox, nil)
+	svc := NewGatewayService(&stubIntegrationRepo{}, nil, settings, inbox, nil)
 
 	res, err := svc.SendSMS(context.Background(), "ws-1", contracts.SMS{
 		To:      []string{"+15550001111"},
@@ -35,8 +39,11 @@ func TestGatewayService_SendSMS_memoryOnly(t *testing.T) {
 func TestGatewayService_SendPush_memoryOnly(t *testing.T) {
 	t.Parallel()
 
+	settings := &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyStoreMessageContent: "true",
+	}}
 	inbox := &stubInbox{}
-	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, inbox, nil)
+	svc := NewGatewayService(&stubIntegrationRepo{}, nil, settings, inbox, nil)
 
 	res, err := svc.SendPush(context.Background(), "ws-1", contracts.PushNotification{
 		DeviceTokens: []string{"device-token-1"},
@@ -60,8 +67,11 @@ func TestGatewayService_SendPush_memoryOnly(t *testing.T) {
 func TestGatewayService_SendChat_memoryOnly(t *testing.T) {
 	t.Parallel()
 
+	settings := &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyStoreMessageContent: "true",
+	}}
 	inbox := &stubInbox{}
-	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, inbox, nil)
+	svc := NewGatewayService(&stubIntegrationRepo{}, nil, settings, inbox, nil)
 
 	res, err := svc.SendChat(context.Background(), "ws-1", contracts.ChatMessage{
 		To:      []string{"user-1"},
@@ -86,8 +96,11 @@ func TestGatewayService_SendSMS_memoryOnly_inboxNil(t *testing.T) {
 
 	svc := NewGatewayService(&stubIntegrationRepo{}, nil, nil, nil, nil)
 
-	_, err := svc.SendSMS(context.Background(), "ws-1", contracts.SMS{To: []string{"+1"}, Message: "x"})
-	if err == nil {
-		t.Fatal("expected error when inbox is nil")
+	res, err := svc.SendSMS(context.Background(), "ws-1", contracts.SMS{To: []string{"+1"}, Message: "x"})
+	if err != nil {
+		t.Fatalf("expected memory provider dispatch without inbox, got: %v", err)
+	}
+	if res.ID == "" {
+		t.Fatal("expected provider message id")
 	}
 }

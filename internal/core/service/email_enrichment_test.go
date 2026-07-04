@@ -65,7 +65,9 @@ func TestGatewayService_SendEmail_enrichesSenderFromIntegration(t *testing.T) {
 		Config:       []byte(`{"from_email":"noreply@weprodev.com","from_name":"WeProDev"}`),
 		Status:       "connected",
 	}
-	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, nil, inbox, nil)
+	svc := NewGatewayService(&stubIntegrationRepo{active: intg}, nil, &stubSettingsRepo{values: map[string]string{
+		domain.SettingKeyStoreMessageContent: "true",
+	}}, inbox, nil)
 
 	_, err := svc.SendEmail(t.Context(), "ws-1", contracts.Email{
 		To:      []string{"user@example.com"},
