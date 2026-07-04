@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
+import { Permission, Role, WorkspaceAuthorizationProvider } from "@/core/auth"
+
 import { useSettings } from "../hooks/use-settings.hook"
 import { SettingsPage } from "./settings.page"
 
@@ -21,12 +23,14 @@ const sampleApiKey = {
   last_used_at: null,
 }
 
-function renderSettingsPage(tab = "developer") {
+function renderSettingsPage(tab = "developer", permissions = [Permission.APIKeysWrite]) {
   return render(
     <MemoryRouter initialEntries={[`/workspaces/w1/settings?tab=${tab}`]}>
-      <Routes>
-        <Route path="/workspaces/:wid/settings" element={<SettingsPage />} />
-      </Routes>
+      <WorkspaceAuthorizationProvider role={Role.Admin} permissions={permissions}>
+        <Routes>
+          <Route path="/workspaces/:wid/settings" element={<SettingsPage />} />
+        </Routes>
+      </WorkspaceAuthorizationProvider>
     </MemoryRouter>,
   )
 }
@@ -70,5 +74,24 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("heading", { name: "API Keys" })).toBeInTheDocument()
     expect(screen.getByText("Production")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /generate key/i })).toBeInTheDocument()
+  })
+
+  it("hides generate key action for read-only users", () => {
+    mockedUseSettings.mockReturnValue({
+      settings: {},
+      apiKeys: [sampleApiKey],
+      messageDispatchConfig: { mode: "memory", storeMessageContent: false },
+      isLoading: false,
+      error: null,
+      reload: vi.fn(),
+      saveSettings: vi.fn(),
+      addApiKey: vi.fn(),
+      removeApiKey: vi.fn(),
+      rotateApiKey: vi.fn(),
+    })
+
+    renderSettingsPage("developer", [Permission.APIKeysRead])
+
+    expect(screen.queryByRole("button", { name: /generate key/i })).not.toBeInTheDocument()
   })
 })

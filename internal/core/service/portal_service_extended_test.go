@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
 
@@ -136,6 +137,21 @@ func TestPortalService_CreateInvitation(t *testing.T) {
 	sum := sha256.Sum256([]byte(rawToken))
 	if repo.created.TokenHash != hex.EncodeToString(sum[:]) {
 		t.Fatalf("token hash mismatch: got %q", repo.created.TokenHash)
+	}
+}
+
+func TestPortalService_CreateInvitation_rejectsInvalidRole(t *testing.T) {
+	t.Parallel()
+
+	svc := NewPortalService(PortalDeps{Invitations: &fakeInvitationRepo{}})
+	inv := svc.NewPendingInvitation("ws-1", "user@example.com", "owner")
+
+	_, err := svc.CreateInvitation(context.Background(), inv)
+	if err == nil {
+		t.Fatal("expected error for invalid role")
+	}
+	if !errors.Is(err, port.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
 	}
 }
 

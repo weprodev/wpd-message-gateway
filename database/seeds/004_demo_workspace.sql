@@ -47,21 +47,23 @@ ON CONFLICT (id) DO UPDATE SET
     is_private = EXCLUDED.is_private;
 
 INSERT INTO workspace_members (workspace_id, user_id, role_id)
-VALUES (
+SELECT
     '00000000-0000-0000-0000-000000000001',
     '00000000-0000-0000-0000-000000000010',
-    '00000000-0000-0000-0000-000000000020'
-)
+    r.id
+FROM roles r
+WHERE r.name = 'admin' AND r.guard_name = 'msg_web'
 ON CONFLICT (workspace_id, user_id) DO UPDATE SET
     role_id = EXCLUDED.role_id;
 
 INSERT INTO model_has_roles (role_id, model_type, model_id, team_id)
-VALUES (
-    '00000000-0000-0000-0000-000000000020',
+SELECT
+    r.id,
     'users',
     '00000000-0000-0000-0000-000000000010',
     '00000000-0000-0000-0000-000000000001'
-)
+FROM roles r
+WHERE r.name = 'admin' AND r.guard_name = 'msg_web'
 ON CONFLICT (role_id, model_id, model_type, team_id) DO NOTHING;
 
 INSERT INTO workspace_channels (workspace_id, channel_type, enabled)

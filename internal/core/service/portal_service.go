@@ -222,17 +222,8 @@ func (s *PortalService) ListWorkspaces(ctx context.Context, userID string) ([]do
 			continue
 		}
 		if w.Visibility == "public" {
-			w.Role = "viewer"
-			w.Permissions = []string{
-				domain.PermissionWorkspacesRead,
-				domain.PermissionMembersRead,
-				domain.PermissionAPIKeysRead,
-				domain.PermissionLogsRead,
-				domain.PermissionIntegrationsRead,
-				domain.PermissionTemplatesRead,
-				domain.PermissionSettingsRead,
-				domain.PermissionInvitationsRead,
-			}
+			w.Role = domain.RoleViewer
+			w.Permissions = append([]string(nil), domain.ReadPermissions...)
 		}
 	}
 
@@ -586,6 +577,9 @@ func (s *PortalService) ListInvitations(ctx context.Context, workspaceID string)
 // CreateInvitation generates a secure invitation token, stores its hash, and persists the
 // invitation. The returned plaintext token must be sent to the invitee and is never stored.
 func (s *PortalService) CreateInvitation(ctx context.Context, inv *domain.Invitation) (rawToken string, err error) {
+	if !domain.IsWorkspaceRole(inv.Role) {
+		return "", fmt.Errorf("invalid role %q: %w", inv.Role, port.ErrInvalidInput)
+	}
 	// Generate a cryptographically random token from two UUIDs.
 	rawToken = uuid.NewString() + uuid.NewString()
 	sum := sha256.Sum256([]byte(rawToken))

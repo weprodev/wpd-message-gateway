@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import { Permission, useWorkspaceAuthorization } from "@/core/auth"
 
 import type { ApiKey } from "../../settings.types"
 
@@ -18,6 +19,9 @@ function formatLastUsed(value?: string | null): string {
 }
 
 export function ApiKeyRow({ apiKey, onRegenerate, onDelete, isBusy }: ApiKeyRowProps) {
+  const { can } = useWorkspaceAuthorization()
+  const canManageKeys = can(Permission.APIKeysWrite)
+
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-4 last:border-b-0">
       <div className="min-w-0 flex-1">
@@ -30,26 +34,30 @@ export function ApiKeyRow({ apiKey, onRegenerate, onDelete, isBusy }: ApiKeyRowP
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={isBusy}
-          onClick={() => onRegenerate(apiKey.id)}
-        >
-          <Icon name="refresh" size="sm" />
-          Regenerate
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={isBusy}
-          onClick={() => onDelete(apiKey.id)}
-        >
-          <Icon name="delete" size="sm" />
-          Delete
-        </Button>
+        {canManageKeys ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isBusy}
+              onClick={() => onRegenerate(apiKey.id)}
+            >
+              <Icon name="refresh" size="sm" />
+              Regenerate
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isBusy}
+              onClick={() => onDelete(apiKey.id)}
+            >
+              <Icon name="delete" size="sm" />
+              Delete
+            </Button>
+          </>
+        ) : null}
       </div>
     </div>
   )

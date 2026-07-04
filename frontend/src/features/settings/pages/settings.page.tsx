@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { PageHeader } from "@/shared/components/page-header"
 import { cn } from "@/lib/utils"
+import { Can, Permission, Role, useWorkspaceAuthorization } from "@/core/auth"
 
 import { ApiKeyCreateDialog } from "../components/api-key-create-dialog"
 import { ApiKeyRow } from "../components/api-key-row"
@@ -31,6 +32,8 @@ interface GeneralSettingsPanelProps {
 }
 
 function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
+  const { can } = useWorkspaceAuthorization()
+  const canEditSettings = can(Permission.SettingsWrite)
   const [ownerEmail, setOwnerEmail] = useState(settings.owner_email ?? "")
   const [pinCode, setPinCode] = useState(settings.pin_code ?? "")
   const [showPin, setShowPin] = useState(false)
@@ -57,6 +60,7 @@ function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
           value={ownerEmail}
           onChange={(ev) => setOwnerEmail(ev.target.value)}
           placeholder="owner@company.com"
+          disabled={!canEditSettings}
         />
       </div>
 
@@ -72,6 +76,7 @@ function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
             onChange={(ev) => setPinCode(ev.target.value)}
             placeholder="••••••"
             className="pr-10"
+            disabled={!canEditSettings}
           />
           <button
             type="button"
@@ -84,9 +89,11 @@ function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
         </div>
       </div>
 
-      <Button type="button" onClick={handleSave} disabled={isSaving} className="w-fit">
-        {isSaving ? "Saving…" : "Save changes"}
-      </Button>
+      {canEditSettings ? (
+        <Button type="button" onClick={handleSave} disabled={isSaving} className="w-fit">
+          {isSaving ? "Saving…" : "Save changes"}
+        </Button>
+      ) : null}
     </div>
   )
 }
@@ -290,15 +297,17 @@ export function SettingsPage() {
         <Tabs.Content value="general">
           <GeneralSettingsPanel key={wid} settings={settings} onSave={saveSettings} />
 
-          <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-            <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
-            <p className="mt-1 text-sm text-text-secondary">
-              Permanently delete this workspace and all associated data.
-            </p>
-            <Button type="button" variant="destructive" className="mt-4" disabled>
-              Delete workspace
-            </Button>
-          </section>
+          <Can role={Role.Admin}>
+            <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+              <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
+              <p className="mt-1 text-sm text-text-secondary">
+                Permanently delete this workspace and all associated data.
+              </p>
+              <Button type="button" variant="destructive" className="mt-4" disabled>
+                Delete workspace
+              </Button>
+            </section>
+          </Can>
         </Tabs.Content>
 
         <Tabs.Content value="developer" className="flex flex-col gap-4">
@@ -309,10 +318,12 @@ export function SettingsPage() {
                 Manage keys used to authenticate gateway requests.
               </p>
             </div>
-            <Button type="button" onClick={() => setCreateDialogOpen(true)}>
-              <Icon name="add" size="sm" />
-              Generate key
-            </Button>
+            <Can permission={Permission.APIKeysWrite}>
+              <Button type="button" onClick={() => setCreateDialogOpen(true)}>
+                <Icon name="add" size="sm" />
+                Generate key
+              </Button>
+            </Can>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-border bg-card">
