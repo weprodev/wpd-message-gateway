@@ -1,14 +1,16 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
 
-import { fetchInboxEmails } from "../inbox.api"
+import { fetchInboxEmailById, fetchInboxEmails } from "../inbox.api"
 import { useInboxEmails } from "./use-inbox-emails.hook"
 
 vi.mock("../inbox.api", () => ({
   fetchInboxEmails: vi.fn(),
+  fetchInboxEmailById: vi.fn(),
 }))
 
 const mockedFetchInboxEmails = vi.mocked(fetchInboxEmails)
+const mockedFetchInboxEmailById = vi.mocked(fetchInboxEmailById)
 
 const sampleEmail = {
   id: "email-1",
@@ -24,6 +26,10 @@ const sampleEmail = {
 }
 
 describe("useInboxEmails", () => {
+  beforeEach(() => {
+    mockedFetchInboxEmailById.mockResolvedValue({ ok: false })
+  })
+
   it("loads emails for a workspace", async () => {
     mockedFetchInboxEmails.mockResolvedValue({
       ok: true,

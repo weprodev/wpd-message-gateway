@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 
-import { fetchInboxEmails } from "../inbox.api"
+import { fetchInboxEmailById, fetchInboxEmails } from "../inbox.api"
 import type { StoredEmail } from "../inbox.types"
 
 const PAGE_SIZE = 50
@@ -13,6 +13,16 @@ export function useInboxEmails(workspaceId: string | undefined) {
   const [error, setError] = useState<string | null>(null)
   const [nextCursor, setNextCursor] = useState<string | undefined>()
   const [hasMore, setHasMore] = useState(false)
+
+  const upsertMessage = useCallback((message: StoredEmail) => {
+    setMessages((prev) => {
+      const index = prev.findIndex((m) => m.id === message.id)
+      if (index === -1) return [message, ...prev]
+      const next = [...prev]
+      next[index] = message
+      return next
+    })
+  }, [])
 
   const applyPage = useCallback((result: Awaited<ReturnType<typeof fetchInboxEmails>>) => {
     setIsLoading(false)
@@ -46,6 +56,20 @@ export function useInboxEmails(workspaceId: string | undefined) {
     }
   }, [workspaceId, applyPage])
 
+  useEffect(() => {
+    if (!workspaceId || !selectedMessageId) return
+
+    let cancelled = false
+    void fetchInboxEmailById(workspaceId, selectedMessageId).then((result) => {
+      if (cancelled || !result.ok) return
+      upsertMessage(result.item)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId, selectedMessageId, upsertMessage])
+
   const reload = useCallback(async () => {
     if (!workspaceId) return
     setIsLoading(true)
@@ -69,13 +93,6 @@ export function useInboxEmails(workspaceId: string | undefined) {
     setNextCursor(result.page.next_cursor)
     setHasMore(result.page.has_more)
   }, [workspaceId, nextCursor, isLoadingMore])
-
-  const prependMessage = useCallback((message: StoredEmail) => {
-    setMessages((prev) => {
-      if (prev.some((m) => m.id === message.id)) return prev
-      return [message, ...prev]
-    })
-  }, [])
 
   const removeMessage = useCallback((messageId: string) => {
     setMessages((prev) => {
@@ -108,7 +125,7 @@ export function useInboxEmails(workspaceId: string | undefined) {
     hasMore,
     reload,
     loadMore,
-    prependMessage,
+    upsertMessage,
     removeMessage,
     clearMessages,
   }

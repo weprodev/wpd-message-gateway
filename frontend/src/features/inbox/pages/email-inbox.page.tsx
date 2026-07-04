@@ -31,35 +31,21 @@ export function EmailInboxPage() {
     hasMore,
     reload,
     loadMore,
-    prependMessage,
+    upsertMessage,
     removeMessage,
     clearMessages,
   } = useInboxEmails(wid)
 
   useEffect(() => {
-    if (!wid || !deepLinkMessageId) return
+    if (!deepLinkMessageId) return
 
-    let cancelled = false
-    ;(async () => {
-      const result = await fetchInboxEmailById(wid, deepLinkMessageId)
-      if (cancelled) return
-
-      if (result.ok) {
-        prependMessage(result.item)
-        setSelectedMessageId(deepLinkMessageId)
-      }
-
-      setSearchParams((params) => {
-        const next = new URLSearchParams(params)
-        next.delete("message")
-        return next
-      }, { replace: true })
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [wid, deepLinkMessageId, setSearchParams, prependMessage, setSelectedMessageId])
+    setSelectedMessageId(deepLinkMessageId)
+    setSearchParams((params) => {
+      const next = new URLSearchParams(params)
+      next.delete("message")
+      return next
+    }, { replace: true })
+  }, [deepLinkMessageId, setSearchParams, setSelectedMessageId])
 
   useEffect(() => {
     if (!wid) return
@@ -84,7 +70,7 @@ export function EmailInboxPage() {
             if (!id) return
             void fetchInboxEmailById(wid, id).then((result) => {
               if (!result.ok) return
-              prependMessage(result.item)
+              upsertMessage(result.item)
               setSelectedMessageId((current) => current ?? id)
             })
             return
@@ -111,7 +97,7 @@ export function EmailInboxPage() {
     return () => {
       eventSource?.close()
     }
-  }, [wid, prependMessage, removeMessage, clearMessages, setSelectedMessageId])
+  }, [wid, upsertMessage, removeMessage, clearMessages, setSelectedMessageId])
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!wid) return

@@ -47,7 +47,7 @@ describe("EmailInboxPage", () => {
       hasMore: false,
       reload: vi.fn(),
       loadMore: vi.fn(),
-      prependMessage: vi.fn(),
+      upsertMessage: vi.fn(),
       removeMessage: vi.fn(),
       clearMessages: vi.fn(),
     })
@@ -69,7 +69,7 @@ describe("EmailInboxPage", () => {
       hasMore: false,
       reload: vi.fn(),
       loadMore: vi.fn(),
-      prependMessage: vi.fn(),
+      upsertMessage: vi.fn(),
       removeMessage: vi.fn(),
       clearMessages: vi.fn(),
     })
@@ -91,7 +91,7 @@ describe("EmailInboxPage", () => {
       hasMore: false,
       reload: vi.fn(),
       loadMore: vi.fn(),
-      prependMessage: vi.fn(),
+      upsertMessage: vi.fn(),
       removeMessage: vi.fn(),
       clearMessages: vi.fn(),
     })

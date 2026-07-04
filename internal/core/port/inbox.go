@@ -67,7 +67,7 @@ type InboxChatPage struct {
 	HasMore    bool         `json:"has_more"`
 }
 
-// InboxReader is the read side of the in-process message capture store.
+// InboxReader is the read side of the message capture store (persisted payloads).
 type InboxReader interface {
 	StatsForWorkspace(workspaceID string) map[string]int
 	EmailsForWorkspace(workspaceID string) []StoredEmail
@@ -89,7 +89,7 @@ type InboxReader interface {
 	ClearWorkspace(workspaceID string)
 }
 
-// InboxWriter is the write side of the in-process message capture store.
+// InboxWriter is the write side of the message capture store.
 type InboxWriter interface {
 	WriteEmail(ctx context.Context, workspaceID string, email contracts.Email) (id string, err error)
 	WriteSMS(ctx context.Context, workspaceID string, sms contracts.SMS) (id string, err error)

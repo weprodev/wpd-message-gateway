@@ -129,8 +129,9 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		Gate:         authGate,
 	})
 
-	// ── Memory store & inbox writer ─────────────────────────────────────────
+	// ── Inbox: payload-backed reads, in-memory writes for SSE ───────────────
 	inboxStore := inbox.NewStore()
+	inboxReader := postgres.NewPayloadInboxReader(pgClient, inboxStore)
 	memoryStore := memory.GetStore()
 
 	var publishInboxEvent inbox.PublishFunc
@@ -139,7 +140,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 			publishInboxEvent(workspaceID, eventType, data)
 		}
 	}))
-	portalInboxHandler := handler.NewPortalInboxHandler(inboxStore, inboxWriter)
+	portalInboxHandler := handler.NewPortalInboxHandler(inboxReader, inboxWriter)
 	publishInboxEvent = func(workspaceID, eventType string, data any) {
 		portalInboxHandler.PublishInboxEvent(workspaceID, eventType, data)
 	}
