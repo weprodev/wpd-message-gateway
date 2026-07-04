@@ -19,6 +19,7 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/authgate"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/database"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/inbox"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
@@ -60,6 +61,10 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+
+	if err := database.ApplySeeds(startCtx, pgClient.GetDB(startCtx), database.SeedsDir()); err != nil {
+		return nil, fmt.Errorf("apply database seeds: %w", err)
 	}
 
 	// ── RBAC Gate ───────────────────────────────────────────────────────────

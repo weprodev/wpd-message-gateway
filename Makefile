@@ -322,23 +322,22 @@ dev-down: docker-check
 	@docker compose down
 	@printf "$(GREEN)✅ Stopped!$(RESET)\n"
 
-## Apply schema + seeds when Postgres volume exists but tables are missing (then restart gateway)
+## Apply schema when Postgres volume exists but tables are missing (then restart gateway)
 db-init: docker-check
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🗄️  Initializing database schema and seeds...$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🗄️  Initializing database schema...$(RESET)\n"
 	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
 		bash /docker-entrypoint-initdb.d/init-db.sh
 	@docker compose restart gateway
-	@printf "$(GREEN)✅ Database ready (demo@weprodev.com / secret)$(RESET)\n"
+	@printf "$(GREEN)✅ Database ready — gateway will apply seeds on startup (demo@weprodev.com / secret)$(RESET)\n"
 	@printf "\n"
 
-## Re-apply SQL seeds to the running Postgres container (demo user, RBAC, providers)
+## Re-apply SQL seeds by restarting the gateway (seeds run on every startup)
 seed-demo: docker-check
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🌱 Applying database seeds...$(RESET)\n"
-	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
-		bash /docker-entrypoint-initdb.d/scripts/apply-seeds.sh /docker-entrypoint-initdb.d/seeds
-	@printf "$(GREEN)✅ Seeds applied (demo@weprodev.com / secret)$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🌱 Re-applying database seeds (gateway restart)...$(RESET)\n"
+	@docker compose restart gateway
+	@printf "$(GREEN)✅ Seeds applied on gateway startup (demo@weprodev.com / secret)$(RESET)\n"
 	@printf "\n"
 
 
@@ -386,8 +385,8 @@ help:
 	@printf "$(BOLD)$(GREEN)🐳 Docker$(RESET)\n"
 	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway, DB, and UI via Docker (with hot-reloading)\n"
 	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker containers\n"
-	@printf "   $(YELLOW)make db-init$(RESET)      Apply schema + seeds if DB volume is empty (demo login)\n"
-	@printf "   $(YELLOW)make seed-demo$(RESET)    Re-apply SQL seeds (demo@weprodev.com / secret)\n"
+	@printf "   $(YELLOW)make db-init$(RESET)      Apply schema if DB volume is empty; gateway seeds on start\n"
+	@printf "   $(YELLOW)make seed-demo$(RESET)    Re-apply seeds via gateway restart\n"
 	@printf "\n"
 
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
