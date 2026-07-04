@@ -7,6 +7,14 @@ import { Role } from "@/core/auth"
 import type { WorkspaceMember } from "../../team.types"
 import { InviteMemberDialog } from "./invite-member-dialog"
 
+const existingMember: WorkspaceMember = {
+  workspace_id: "ws-1",
+  user_id: "user-member",
+  role: Role.Member,
+  joined_at: "2026-01-01T00:00:00Z",
+  user_email: "member@weprodev.com",
+}
+
 describe("InviteMemberDialog", () => {
   it("submits email and selected role", async () => {
     const user = userEvent.setup()
@@ -47,7 +55,7 @@ describe("InviteMemberDialog", () => {
         open
         onClose={vi.fn()}
         onInvite={onInvite}
-        members={[{ user_email: "member@weprodev.com" } satisfies Pick<WorkspaceMember, "user_email">]}
+        members={[existingMember]}
       />,
     )
 
