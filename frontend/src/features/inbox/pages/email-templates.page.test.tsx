@@ -44,7 +44,7 @@ describe("EmailTemplatesPage", () => {
           channel_type: "email",
           category: "transactional",
           subject: "Welcome!",
-          content: "<p>Hi</p>",
+          content_html: "<p>Hi</p>",
           is_active: true,
           is_default: false,
           created_at: "2026-01-01T00:00:00Z",

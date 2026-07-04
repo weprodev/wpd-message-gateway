@@ -53,12 +53,12 @@ func (a *GoGateAdapter) GetPermissionsForTeams(
 			JOIN roles r ON r.id = mhr.role_id
 			JOIN role_has_permissions rhp ON rhp.role_id = r.id
 			JOIN permissions p ON p.id = rhp.permission_id
-			WHERE mhr.model_type = $1 AND mhr.model_id::text = $2 AND mhr.team_id = ANY($3::uuid[])
-			UNION
+			WHERE mhr.model_type = $1 AND mhr.model_id = $2::uuid AND mhr.team_id = ANY($3::uuid[])
+			UNION ALL
 			SELECT mhp.team_id, p.name AS permission
 			FROM model_has_permissions mhp
 			JOIN permissions p ON p.id = mhp.permission_id
-			WHERE mhp.model_type = $1 AND mhp.model_id::text = $2 AND mhp.team_id = ANY($3::uuid[])
+			WHERE mhp.model_type = $1 AND mhp.model_id = $2::uuid AND mhp.team_id = ANY($3::uuid[])
 		) AS combined
 		ORDER BY team_id, permission
 	`

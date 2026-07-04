@@ -15,6 +15,7 @@ describe("WorkspacesPage", () => {
   it("shows loading spinner while workspaces load", () => {
     mockedUseWorkspaces.mockReturnValue({
       workspaces: [],
+      activeWorkspace: null,
       isLoading: true,
       error: null,
       reload: vi.fn(),
@@ -42,6 +43,7 @@ describe("WorkspacesPage", () => {
           created_at: "2026-01-01T00:00:00Z",
         },
       ],
+      activeWorkspace: null,
       isLoading: false,
       error: null,
       reload: vi.fn(),

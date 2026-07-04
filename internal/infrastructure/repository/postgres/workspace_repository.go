@@ -138,7 +138,7 @@ func (r *WorkspaceRepository) SetStatus(ctx context.Context, id, status string) 
 
 func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([]domain.Workspace, error) {
 	query := `
-		SELECT DISTINCT w.id, w.name, w.slug, u.email, w.status,
+		SELECT w.id, w.name, w.slug, u.email, w.status,
 		       CASE WHEN w.is_private THEN 'private' ELSE 'public' END,
 		       w.hashed_pin_code, w.icon_key, w.created_at, w.updated_at,
 		       COALESCE(r.name, '')
