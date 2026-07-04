@@ -132,16 +132,22 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug,
 		Visibility: "private",
 		IconKey:    strings.TrimSpace(iconKey),
 	}
-	if err := s.workspaces.Create(ctx, w); err != nil {
+	if err := s.workspaces.Create(ctx, w, userID); err != nil {
 		slog.ErrorContext(ctx, "workspace creation failed: database error", "error", err, "user_id", userID)
 		return nil, err
 	}
 	if err := s.members.Add(ctx, w.ID, userID, domain.RoleAdmin); err != nil {
 		slog.ErrorContext(ctx, "workspace creation failed: failed to add member", "error", err, "workspace_id", w.ID, "user_id", userID)
+		if delErr := s.workspaces.Delete(ctx, w.ID); delErr != nil {
+			slog.WarnContext(ctx, "failed to roll back workspace after member add error", "error", delErr, "workspace_id", w.ID)
+		}
 		return nil, err
 	}
 	if err := s.gate.AssignRole(ctx, "users", userID, w.ID, domain.RoleAdmin); err != nil {
 		slog.ErrorContext(ctx, "workspace creation failed: failed to assign role", "error", err, "workspace_id", w.ID, "user_id", userID)
+		if delErr := s.workspaces.Delete(ctx, w.ID); delErr != nil {
+			slog.WarnContext(ctx, "failed to roll back workspace after role assign error", "error", delErr, "workspace_id", w.ID)
+		}
 		return nil, err
 	}
 	slog.InfoContext(ctx, "workspace created successfully", "workspace_id", w.ID, "user_id", userID)

@@ -14,9 +14,10 @@ type stubWorkspaceRepo struct {
 	bySlug map[string]*domain.Workspace
 }
 
-func (s *stubWorkspaceRepo) Create(context.Context, *domain.Workspace) error { return nil }
-func (s *stubWorkspaceRepo) Update(context.Context, *domain.Workspace) error { return nil }
-func (s *stubWorkspaceRepo) SetStatus(context.Context, string, string) error { return nil }
+func (s *stubWorkspaceRepo) Create(context.Context, *domain.Workspace, string) error { return nil }
+func (s *stubWorkspaceRepo) Delete(context.Context, string) error                    { return nil }
+func (s *stubWorkspaceRepo) Update(context.Context, *domain.Workspace) error         { return nil }
+func (s *stubWorkspaceRepo) SetStatus(context.Context, string, string) error         { return nil }
 func (s *stubWorkspaceRepo) ListForUser(context.Context, string) ([]domain.Workspace, error) {
 	return nil, nil
 }

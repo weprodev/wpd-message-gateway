@@ -40,10 +40,10 @@ func scanWorkspace(scanner interface {
 	return w, nil
 }
 
-func (r *WorkspaceRepository) Create(ctx context.Context, workspace *domain.Workspace) error {
+func (r *WorkspaceRepository) Create(ctx context.Context, workspace *domain.Workspace, ownerID string) error {
 	query := `
 		INSERT INTO workspaces (name, slug, owner_id, status, is_private, hashed_pin_code, icon_key)
-		VALUES ($1, $2, (SELECT id FROM users WHERE email = $3), $4, $5 = 'private', $6, $7)
+		VALUES ($1, $2, $3, $4, $5 = 'private', $6, $7)
 		RETURNING id, created_at, updated_at
 	`
 	var hashedPin, icon interface{}
@@ -54,10 +54,19 @@ func (r *WorkspaceRepository) Create(ctx context.Context, workspace *domain.Work
 		icon = workspace.IconKey
 	}
 	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
-		workspace.Name, workspace.Slug, workspace.AdminEmail, workspace.Status, workspace.Visibility, hashedPin, icon,
+		workspace.Name, workspace.Slug, ownerID, workspace.Status, workspace.Visibility, hashedPin, icon,
 	).Scan(&workspace.ID, &workspace.CreatedAt, &workspace.UpdatedAt)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error: failed to create workspace", "error", err, "name", workspace.Name, "slug", workspace.Slug)
+		return mapDBError(err)
+	}
+	return nil
+}
+
+func (r *WorkspaceRepository) Delete(ctx context.Context, id string) error {
+	_, err := r.client.GetDB(ctx).ExecContext(ctx, `DELETE FROM workspaces WHERE id = $1`, id)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to delete workspace", "error", err, "id", id)
 	}
 	return err
 }

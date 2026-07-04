@@ -1,5 +1,7 @@
 #!/bin/bash
-# Apply idempotent SQL seeds in order. Used by init-db.sh and `make seed-demo`.
+# Apply idempotent SQL seeds in order. Invoked by init-db.sh and `make seed-demo` only —
+# must NOT live at the docker-entrypoint-initdb.d root (Postgres runs *.sh there alphabetically
+# before init-db.sh, which breaks first-time migration).
 set -euo pipefail
 
 SEEDS_DIR="${1:-/docker-entrypoint-initdb.d/seeds}"

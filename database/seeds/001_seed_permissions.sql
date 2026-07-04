@@ -1,10 +1,10 @@
 -- Default RBAC Permissions & Role Bindings for WPD Message Gateway
 
 -- 1. Insert default roles
-INSERT INTO roles (id, name, display_name)
+INSERT INTO roles (id, name, display_name, guard_name)
 VALUES
-    ('00000000-0000-0000-0000-000000000020', 'admin', 'Admin'),
-    ('00000000-0000-0000-0000-000000000021', 'member', 'Member')
+    ('00000000-0000-0000-0000-000000000020', 'admin', 'Admin', 'msg_web'),
+    ('00000000-0000-0000-0000-000000000021', 'member', 'Member', 'msg_web')
 ON CONFLICT (name, guard_name) DO NOTHING;
 
 -- 2. Insert permissions

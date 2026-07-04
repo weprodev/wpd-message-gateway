@@ -337,7 +337,7 @@ seed-demo: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🌱 Applying database seeds...$(RESET)\n"
 	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
-		bash /docker-entrypoint-initdb.d/apply-seeds.sh /docker-entrypoint-initdb.d/seeds
+		bash /docker-entrypoint-initdb.d/scripts/apply-seeds.sh /docker-entrypoint-initdb.d/seeds
 	@printf "$(GREEN)✅ Seeds applied (demo@weprodev.com / secret)$(RESET)\n"
 	@printf "\n"
 

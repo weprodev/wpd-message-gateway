@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/dto"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
@@ -39,6 +41,9 @@ func (h *PortalWorkspaceHandler) CreateWorkspace(c echo.Context) error {
 	w, err := h.svc.CreateWorkspace(c.Request().Context(), uid, body.Name, body.Slug, body.IconKey)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create workspace", "error", err, "user_id", uid, "name", body.Name)
+		if errors.Is(err, port.ErrConflict) {
+			return echo.NewHTTPError(http.StatusConflict, "workspace slug already exists")
+		}
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create workspace")
 	}
 	return c.JSON(http.StatusCreated, w)
