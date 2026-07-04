@@ -132,16 +132,22 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug,
 		Visibility: "private",
 		IconKey:    strings.TrimSpace(iconKey),
 	}
-	if err := s.workspaces.Create(ctx, w); err != nil {
+	if err := s.workspaces.Create(ctx, w, userID); err != nil {
 		slog.ErrorContext(ctx, "workspace creation failed: database error", "error", err, "user_id", userID)
 		return nil, err
 	}
 	if err := s.members.Add(ctx, w.ID, userID, domain.RoleAdmin); err != nil {
 		slog.ErrorContext(ctx, "workspace creation failed: failed to add member", "error", err, "workspace_id", w.ID, "user_id", userID)
+		if delErr := s.workspaces.Delete(ctx, w.ID); delErr != nil {
+			slog.WarnContext(ctx, "failed to roll back workspace after member add error", "error", delErr, "workspace_id", w.ID)
+		}
 		return nil, err
 	}
 	if err := s.gate.AssignRole(ctx, "users", userID, w.ID, domain.RoleAdmin); err != nil {
 		slog.ErrorContext(ctx, "workspace creation failed: failed to assign role", "error", err, "workspace_id", w.ID, "user_id", userID)
+		if delErr := s.workspaces.Delete(ctx, w.ID); delErr != nil {
+			slog.WarnContext(ctx, "failed to roll back workspace after role assign error", "error", delErr, "workspace_id", w.ID)
+		}
 		return nil, err
 	}
 	slog.InfoContext(ctx, "workspace created successfully", "workspace_id", w.ID, "user_id", userID)
@@ -208,32 +214,39 @@ func (s *PortalService) ListWorkspaces(ctx context.Context, userID string) ([]do
 		return nil, err
 	}
 
+	memberWorkspaceIDs := make([]string, 0, len(workspaces))
 	for i := range workspaces {
 		w := &workspaces[i]
-		// Get role in this workspace
-		role, err := s.members.GetRole(ctx, w.ID, userID)
-		if err != nil {
-			// If not a member, check if it's public
-			if w.Visibility == "public" {
-				w.Role = "viewer"
-				w.Permissions = []string{
-					domain.PermissionWorkspacesRead,
-					domain.PermissionMembersRead,
-					domain.PermissionAPIKeysRead,
-					domain.PermissionLogsRead,
-					domain.PermissionIntegrationsRead,
-					domain.PermissionTemplatesRead,
-					domain.PermissionSettingsRead,
-					domain.PermissionInvitationsRead,
-				}
-			}
+		if w.Role != "" {
+			memberWorkspaceIDs = append(memberWorkspaceIDs, w.ID)
 			continue
 		}
+		if w.Visibility == "public" {
+			w.Role = "viewer"
+			w.Permissions = []string{
+				domain.PermissionWorkspacesRead,
+				domain.PermissionMembersRead,
+				domain.PermissionAPIKeysRead,
+				domain.PermissionLogsRead,
+				domain.PermissionIntegrationsRead,
+				domain.PermissionTemplatesRead,
+				domain.PermissionSettingsRead,
+				domain.PermissionInvitationsRead,
+			}
+		}
+	}
 
-		w.Role = role
-		// Get permissions from gogate
-		perms, err := s.gate.GetAllPermissions(ctx, "users", userID, w.ID)
-		if err == nil {
+	permsByTeam, err := s.gate.GetPermissionsForTeams(ctx, "users", userID, memberWorkspaceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load workspace permissions: %w", err)
+	}
+
+	for i := range workspaces {
+		w := &workspaces[i]
+		if w.Role == "" {
+			continue
+		}
+		if perms, ok := permsByTeam[w.ID]; ok {
 			w.Permissions = perms
 		}
 	}
@@ -510,12 +523,59 @@ func (s *PortalService) GetSettings(ctx context.Context, workspaceID string) (ma
 }
 
 func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, kv map[string]string) error {
+	keys := make([]string, 0, len(kv))
+	for k := range kv {
+		keys = append(keys, k)
+	}
+	slog.InfoContext(ctx, "patching workspace settings", "workspace_id", workspaceID, "keys", keys)
+
 	for k, v := range kv {
+		if err := domain.ValidateWorkspaceSettingValue(k, v); err != nil {
+			slog.WarnContext(ctx, "settings patch rejected: invalid value",
+				"workspace_id", workspaceID,
+				"key", k,
+				"error", err,
+			)
+			return fmt.Errorf("%w: %w", port.ErrInvalidInput, err)
+		}
+
+		if k == domain.SettingKeyMessageDispatchMode && v == string(domain.DispatchProvider) {
+			list, err := s.integrations.ListByWorkspace(ctx, workspaceID)
+			if err != nil {
+				return fmt.Errorf("failed to check integrations for provider enablement: %w", err)
+			}
+			hasConnected := false
+			for _, intg := range list {
+				if intg.ProviderName != domain.ProviderNameMemory && intg.Status == domain.IntegrationStatusConnected {
+					hasConnected = true
+					break
+				}
+			}
+			if !hasConnected {
+				return fmt.Errorf("%w: configure a provider in Integrations before switching to provider mode", port.ErrInvalidInput)
+			}
+		}
+
 		if err := s.settings.Set(ctx, workspaceID, k, v); err != nil {
 			return err
 		}
 	}
+
+	slog.InfoContext(ctx, "workspace settings patched successfully", "workspace_id", workspaceID, "keys", keys)
 	return nil
+}
+
+const invitationTTL = 7 * 24 * time.Hour
+
+// NewPendingInvitation builds a workspace invitation with the standard expiry window.
+func (s *PortalService) NewPendingInvitation(workspaceID, email, role string) *domain.Invitation {
+	return &domain.Invitation{
+		WorkspaceID: workspaceID,
+		Email:       email,
+		Role:        role,
+		ExpiresAt:   time.Now().Add(invitationTTL),
+		Status:      "pending",
+	}
 }
 
 // ListInvitations returns all pending invitations for a workspace.

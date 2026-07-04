@@ -30,7 +30,9 @@ func TestRequirePermission(t *testing.T) {
 	}
 	defer db.Close() //nolint:errcheck
 
-	gate := gogate.NewGate(db, nil)
+	gateCfg := gogate.DefaultConfig()
+	gateCfg.DefaultGuardName = domain.RBACGuardName
+	gate := gogate.NewGate(db, &gateCfg)
 
 	// Build echo instance
 	e := echo.New()
@@ -48,7 +50,7 @@ func TestRequirePermission(t *testing.T) {
 
 		// Mock the check query inside Gate.Check
 		mock.ExpectQuery(`SELECT 'role' AS type, r.name AS value FROM model_has_roles mhr JOIN roles r ON r.id = mhr.role_id WHERE mhr.model_type = \$1 AND mhr.model_id = \$2 AND mhr.team_id = \$5 AND r.guard_name = \$3 UNION ALL SELECT 'permission' AS type, p.name AS value FROM model_has_permissions mhp JOIN permissions p ON p.id = mhp.permission_id WHERE mhp.model_type = \$1 AND mhp.model_id = \$2 AND mhp.team_id = \$5 AND p.name = \$4 AND p.guard_name = \$3`).
-			WithArgs("users", "user-123", "web", domain.PermissionWorkspacesRead, "ws-1").
+			WithArgs("users", "user-123", "msg_web", domain.PermissionWorkspacesRead, "ws-1").
 			WillReturnRows(sqlmock.NewRows([]string{"type", "value"}).AddRow("permission", domain.PermissionWorkspacesRead))
 
 		wsRepo := &mockWorkspaceRepository{
@@ -89,7 +91,7 @@ func TestRequirePermission(t *testing.T) {
 		c.SetRequest(req.WithContext(ctx))
 
 		mock.ExpectQuery(`SELECT 'role' AS type, r.name AS value FROM model_has_roles mhr JOIN roles r ON r.id = mhr.role_id WHERE mhr.model_type = \$1 AND mhr.model_id = \$2 AND mhr.team_id = \$5 AND r.guard_name = \$3 UNION ALL SELECT 'permission' AS type, p.name AS value FROM model_has_permissions mhp JOIN permissions p ON p.id = mhp.permission_id WHERE mhp.model_type = \$1 AND mhp.model_id = \$2 AND mhp.team_id = \$5 AND p.name = \$4 AND p.guard_name = \$3`).
-			WithArgs("users", "user-123", "web", domain.PermissionWorkspacesWrite, "ws-1").
+			WithArgs("users", "user-123", "msg_web", domain.PermissionWorkspacesWrite, "ws-1").
 			WillReturnRows(sqlmock.NewRows([]string{"type", "value"})) // no rows matched
 
 		wsRepo := &mockWorkspaceRepository{

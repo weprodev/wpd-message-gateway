@@ -12,8 +12,10 @@ export type LogRow = {
   request_id?: string
   duration_ms?: number
   error_message?: string
+  inbox_message_id?: string
   created_at: string
   source_name?: string
+  client_id?: string
 }
 
 export interface StoredEmail {
@@ -35,9 +37,10 @@ export interface StoredEmail {
   }
 }
 
-export type InboxCredentials = {
-  clientId: string
-  clientSecret: string
+export type InboxEmailPage = {
+  items: StoredEmail[]
+  next_cursor?: string
+  has_more: boolean
 }
 
 export type EmailTemplate = {

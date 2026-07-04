@@ -11,31 +11,51 @@ import (
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
+const (
+	defaultInboxPageSize = 50
+	maxInboxPageSize     = 200
+)
+
 var _ port.InboxReader = (*Store)(nil)
 var _ port.InboxWriter = (*Store)(nil)
 
-// Store implements an in-memory message store that satisfies port.InboxReader and port.InboxWriter.
+// Store implements an in-memory message store indexed by workspace for O(1) bucket lookup.
 type Store struct {
 	mu     sync.RWMutex
-	emails []port.StoredEmail
-	sms    []port.StoredSMS
-	pushes []port.StoredPush
-	chats  []port.StoredChat
+	emails map[string][]port.StoredEmail
+	sms    map[string][]port.StoredSMS
+	pushes map[string][]port.StoredPush
+	chats  map[string][]port.StoredChat
 }
 
 // NewStore creates a new in-memory store.
 func NewStore() *Store {
-	return &Store{}
+	return &Store{
+		emails: make(map[string][]port.StoredEmail),
+		sms:    make(map[string][]port.StoredSMS),
+		pushes: make(map[string][]port.StoredPush),
+		chats:  make(map[string][]port.StoredChat),
+	}
+}
+
+func clampInboxLimit(limit int) int {
+	if limit <= 0 {
+		return defaultInboxPageSize
+	}
+	if limit > maxInboxPageSize {
+		return maxInboxPageSize
+	}
+	return limit
 }
 
 // StatsForWorkspace returns counts for messages belonging to workspace.
 func (s *Store) StatsForWorkspace(workspaceID string) map[string]int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	nEmail := countWorkspace(s.emails, workspaceID)
-	nSMS := countWorkspaceSMS(s.sms, workspaceID)
-	nPush := countWorkspacePush(s.pushes, workspaceID)
-	nChat := countWorkspaceChat(s.chats, workspaceID)
+	nEmail := len(s.emails[workspaceID])
+	nSMS := len(s.sms[workspaceID])
+	nPush := len(s.pushes[workspaceID])
+	nChat := len(s.chats[workspaceID])
 	return map[string]int{
 		"emails": nEmail,
 		"sms":    nSMS,
@@ -45,63 +65,53 @@ func (s *Store) StatsForWorkspace(workspaceID string) map[string]int {
 	}
 }
 
-func countWorkspace(items []port.StoredEmail, workspaceID string) int {
-	n := 0
-	for _, e := range items {
-		if e.WorkspaceID == workspaceID {
-			n++
-		}
-	}
-	return n
-}
-
-func countWorkspaceSMS(items []port.StoredSMS, workspaceID string) int {
-	n := 0
-	for _, e := range items {
-		if e.WorkspaceID == workspaceID {
-			n++
-		}
-	}
-	return n
-}
-
-func countWorkspacePush(items []port.StoredPush, workspaceID string) int {
-	n := 0
-	for _, e := range items {
-		if e.WorkspaceID == workspaceID {
-			n++
-		}
-	}
-	return n
-}
-
-func countWorkspaceChat(items []port.StoredChat, workspaceID string) int {
-	n := 0
-	for _, e := range items {
-		if e.WorkspaceID == workspaceID {
-			n++
-		}
-	}
-	return n
-}
-
 func (s *Store) EmailsForWorkspace(workspaceID string) []port.StoredEmail {
+	page := s.ListEmailsForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListEmailsForWorkspace(workspaceID string, limit int, cursor string) port.InboxEmailPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make([]port.StoredEmail, 0)
-	for _, e := range s.emails {
-		if e.WorkspaceID == workspaceID {
-			out = append(out, e)
+
+	all := s.emails[workspaceID]
+	limit = clampInboxLimit(limit)
+	start := 0
+	if cursor != "" {
+		for i, item := range all {
+			if item.ID == cursor {
+				start = i + 1
+				break
+			}
 		}
 	}
-	return out
+
+	end := start + limit
+	hasMore := end < len(all)
+	if end > len(all) {
+		end = len(all)
+	}
+
+	items := make([]port.StoredEmail, 0, end-start)
+	if start < len(all) {
+		items = append(items, all[start:end]...)
+	}
+	nextCursor := ""
+	if hasMore && len(items) > 0 {
+		nextCursor = items[len(items)-1].ID
+	}
+	return port.InboxEmailPage{
+		Items:      items,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+	}
 }
 
 func (s *Store) EmailByIDForWorkspace(id, workspaceID string) (port.StoredEmail, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, e := range s.emails {
-		if e.ID == id && e.WorkspaceID == workspaceID {
+	for _, e := range s.emails[workspaceID] {
+		if e.ID == id {
 			return e, true
 		}
 	}
@@ -111,33 +121,65 @@ func (s *Store) EmailByIDForWorkspace(id, workspaceID string) (port.StoredEmail,
 func (s *Store) DeleteEmailByIDForWorkspace(id, workspaceID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i, e := range s.emails {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			s.emails = append(s.emails[:i], s.emails[i+1:]...)
+	items := s.emails[workspaceID]
+	for i, e := range items {
+		if e.ID == id {
+			s.emails[workspaceID] = append(items[:i], items[i+1:]...)
 			return true
 		}
 	}
 	return false
 }
 
-func (s *Store) SMSForWorkspace(workspaceID string) []port.StoredSMS {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]port.StoredSMS, 0)
-	for _, e := range s.sms {
-		if e.WorkspaceID == workspaceID {
-			out = append(out, e)
+func paginateByID[T any](all []T, limit int, cursor string, idOf func(T) string) (items []T, nextCursor string, hasMore bool) {
+	limit = clampInboxLimit(limit)
+	start := 0
+	if cursor != "" {
+		for i, item := range all {
+			if idOf(item) == cursor {
+				start = i + 1
+				break
+			}
 		}
 	}
-	return out
+
+	end := start + limit
+	hasMore = end < len(all)
+	if end > len(all) {
+		end = len(all)
+	}
+
+	items = make([]T, 0, end-start)
+	if start < len(all) {
+		items = append(items, all[start:end]...)
+	}
+	if hasMore && len(items) > 0 {
+		nextCursor = idOf(items[len(items)-1])
+	}
+	return items, nextCursor, hasMore
+}
+
+func (s *Store) SMSForWorkspace(workspaceID string) []port.StoredSMS {
+	page := s.ListSMSForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListSMSForWorkspace(workspaceID string, limit int, cursor string) port.InboxSMSPage {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items, nextCursor, hasMore := paginateByID(s.sms[workspaceID], limit, cursor, func(item port.StoredSMS) string {
+		return item.ID
+	})
+	return port.InboxSMSPage{Items: items, NextCursor: nextCursor, HasMore: hasMore}
 }
 
 func (s *Store) SMSByIDForWorkspace(id, workspaceID string) (port.StoredSMS, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, e := range s.sms {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			return e, true
+	for _, item := range s.sms[workspaceID] {
+		if item.ID == id {
+			return item, true
 		}
 	}
 	return port.StoredSMS{}, false
@@ -146,9 +188,10 @@ func (s *Store) SMSByIDForWorkspace(id, workspaceID string) (port.StoredSMS, boo
 func (s *Store) DeleteSMSByIDForWorkspace(id, workspaceID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i, e := range s.sms {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			s.sms = append(s.sms[:i], s.sms[i+1:]...)
+	items := s.sms[workspaceID]
+	for i, e := range items {
+		if e.ID == id {
+			s.sms[workspaceID] = append(items[:i], items[i+1:]...)
 			return true
 		}
 	}
@@ -156,23 +199,26 @@ func (s *Store) DeleteSMSByIDForWorkspace(id, workspaceID string) bool {
 }
 
 func (s *Store) PushForWorkspace(workspaceID string) []port.StoredPush {
+	page := s.ListPushForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListPushForWorkspace(workspaceID string, limit int, cursor string) port.InboxPushPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make([]port.StoredPush, 0)
-	for _, e := range s.pushes {
-		if e.WorkspaceID == workspaceID {
-			out = append(out, e)
-		}
-	}
-	return out
+
+	items, nextCursor, hasMore := paginateByID(s.pushes[workspaceID], limit, cursor, func(item port.StoredPush) string {
+		return item.ID
+	})
+	return port.InboxPushPage{Items: items, NextCursor: nextCursor, HasMore: hasMore}
 }
 
 func (s *Store) PushByIDForWorkspace(id, workspaceID string) (port.StoredPush, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, e := range s.pushes {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			return e, true
+	for _, item := range s.pushes[workspaceID] {
+		if item.ID == id {
+			return item, true
 		}
 	}
 	return port.StoredPush{}, false
@@ -181,9 +227,10 @@ func (s *Store) PushByIDForWorkspace(id, workspaceID string) (port.StoredPush, b
 func (s *Store) DeletePushByIDForWorkspace(id, workspaceID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i, e := range s.pushes {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			s.pushes = append(s.pushes[:i], s.pushes[i+1:]...)
+	items := s.pushes[workspaceID]
+	for i, e := range items {
+		if e.ID == id {
+			s.pushes[workspaceID] = append(items[:i], items[i+1:]...)
 			return true
 		}
 	}
@@ -191,23 +238,26 @@ func (s *Store) DeletePushByIDForWorkspace(id, workspaceID string) bool {
 }
 
 func (s *Store) ChatForWorkspace(workspaceID string) []port.StoredChat {
+	page := s.ListChatForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListChatForWorkspace(workspaceID string, limit int, cursor string) port.InboxChatPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make([]port.StoredChat, 0)
-	for _, e := range s.chats {
-		if e.WorkspaceID == workspaceID {
-			out = append(out, e)
-		}
-	}
-	return out
+
+	items, nextCursor, hasMore := paginateByID(s.chats[workspaceID], limit, cursor, func(item port.StoredChat) string {
+		return item.ID
+	})
+	return port.InboxChatPage{Items: items, NextCursor: nextCursor, HasMore: hasMore}
 }
 
 func (s *Store) ChatByIDForWorkspace(id, workspaceID string) (port.StoredChat, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, e := range s.chats {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			return e, true
+	for _, item := range s.chats[workspaceID] {
+		if item.ID == id {
+			return item, true
 		}
 	}
 	return port.StoredChat{}, false
@@ -216,9 +266,10 @@ func (s *Store) ChatByIDForWorkspace(id, workspaceID string) (port.StoredChat, b
 func (s *Store) DeleteChatByIDForWorkspace(id, workspaceID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i, e := range s.chats {
-		if e.ID == id && e.WorkspaceID == workspaceID {
-			s.chats = append(s.chats[:i], s.chats[i+1:]...)
+	items := s.chats[workspaceID]
+	for i, e := range items {
+		if e.ID == id {
+			s.chats[workspaceID] = append(items[:i], items[i+1:]...)
 			return true
 		}
 	}
@@ -228,62 +279,23 @@ func (s *Store) DeleteChatByIDForWorkspace(id, workspaceID string) bool {
 func (s *Store) ClearWorkspace(workspaceID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.emails = filterKeepOtherWorkspaces(s.emails, workspaceID)
-	s.sms = filterKeepOtherWorkspacesSMS(s.sms, workspaceID)
-	s.pushes = filterKeepOtherWorkspacesPush(s.pushes, workspaceID)
-	s.chats = filterKeepOtherWorkspacesChat(s.chats, workspaceID)
-}
-
-func filterKeepOtherWorkspaces(items []port.StoredEmail, workspaceID string) []port.StoredEmail {
-	out := items[:0]
-	for _, e := range items {
-		if e.WorkspaceID != workspaceID {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-func filterKeepOtherWorkspacesSMS(items []port.StoredSMS, workspaceID string) []port.StoredSMS {
-	out := items[:0]
-	for _, e := range items {
-		if e.WorkspaceID != workspaceID {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-func filterKeepOtherWorkspacesPush(items []port.StoredPush, workspaceID string) []port.StoredPush {
-	out := items[:0]
-	for _, e := range items {
-		if e.WorkspaceID != workspaceID {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-func filterKeepOtherWorkspacesChat(items []port.StoredChat, workspaceID string) []port.StoredChat {
-	out := items[:0]
-	for _, e := range items {
-		if e.WorkspaceID != workspaceID {
-			out = append(out, e)
-		}
-	}
-	return out
+	delete(s.emails, workspaceID)
+	delete(s.sms, workspaceID)
+	delete(s.pushes, workspaceID)
+	delete(s.chats, workspaceID)
 }
 
 func (s *Store) WriteEmail(_ context.Context, workspaceID string, email contracts.Email) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := uuid.New().String()
-	s.emails = append(s.emails, port.StoredEmail{
+	item := port.StoredEmail{
 		ID:          id,
 		WorkspaceID: workspaceID,
 		CreatedAt:   time.Now(),
 		Email:       email,
-	})
+	}
+	s.emails[workspaceID] = append([]port.StoredEmail{item}, s.emails[workspaceID]...)
 	return id, nil
 }
 
@@ -291,12 +303,13 @@ func (s *Store) WriteSMS(_ context.Context, workspaceID string, sms contracts.SM
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := uuid.New().String()
-	s.sms = append(s.sms, port.StoredSMS{
+	item := port.StoredSMS{
 		ID:          id,
 		WorkspaceID: workspaceID,
 		CreatedAt:   time.Now(),
 		SMS:         sms,
-	})
+	}
+	s.sms[workspaceID] = append([]port.StoredSMS{item}, s.sms[workspaceID]...)
 	return id, nil
 }
 
@@ -304,12 +317,13 @@ func (s *Store) WritePush(_ context.Context, workspaceID string, push contracts.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := uuid.New().String()
-	s.pushes = append(s.pushes, port.StoredPush{
+	item := port.StoredPush{
 		ID:          id,
 		WorkspaceID: workspaceID,
 		CreatedAt:   time.Now(),
 		Push:        push,
-	})
+	}
+	s.pushes[workspaceID] = append([]port.StoredPush{item}, s.pushes[workspaceID]...)
 	return id, nil
 }
 
@@ -317,11 +331,12 @@ func (s *Store) WriteChat(_ context.Context, workspaceID string, chat contracts.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := uuid.New().String()
-	s.chats = append(s.chats, port.StoredChat{
+	item := port.StoredChat{
 		ID:          id,
 		WorkspaceID: workspaceID,
 		CreatedAt:   time.Now(),
 		Chat:        chat,
-	})
+	}
+	s.chats[workspaceID] = append([]port.StoredChat{item}, s.chats[workspaceID]...)
 	return id, nil
 }

@@ -4,11 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 	"github.com/weprodev/wpd-message-gateway/pkg/registry"
 )
+
+// memoryDispatchIntegration is a stable synthetic integration for in-process memory provider dispatch.
+func memoryDispatchIntegration() domain.Integration {
+	return domain.Integration{
+		ID:           domain.ProviderNameMemory,
+		ProviderName: domain.ProviderNameMemory,
+		Config:       []byte(`{}`),
+		UpdatedAt:    time.Unix(0, 0).UTC(),
+	}
+}
 
 // providerCache caches instantiated send providers keyed by integration ID and
 // the update timestamp. The timestamp acts as a natural version: when the

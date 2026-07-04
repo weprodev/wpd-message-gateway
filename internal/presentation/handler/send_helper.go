@@ -10,8 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
@@ -38,53 +38,56 @@ func (sh *SendHelper) DispatchAndLog(
 	start := time.Now()
 	ctx := c.Request().Context()
 
-	// Enrich context with gateway-domain attributes for logger
-	ctx = logger.WithWorkspace(ctx, workspaceID, apiKeyID)
-	ctx = logger.WithChannel(ctx, channel)
+	ctx = logctx.WithWorkspace(ctx, workspaceID, apiKeyID)
+	ctx = logctx.WithChannel(ctx, channel)
 
 	if workspaceID == "" {
-		sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-			http.StatusUnauthorized, endpoint, start, "missing workspace context", "")
+		slog.WarnContext(ctx, "send rejected: missing workspace context", "endpoint", endpoint)
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing workspace context"})
 	}
 
 	if err := json.NewDecoder(c.Request().Body).Decode(dst); err != nil {
-		sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-			http.StatusBadRequest, endpoint, start, "invalid JSON body", "")
+		slog.WarnContext(ctx, "send rejected: invalid JSON body", "endpoint", endpoint, "error", err)
+		sh.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
+			http.StatusBadRequest, endpoint, start, "invalid JSON body", "", nil, nil)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 	}
 
+	slog.InfoContext(ctx, "send dispatch starting", "endpoint", endpoint)
+
 	result, err := send(ctx)
+	providerName := contracts.ProviderNameFromResult(result)
+	if providerName != "" {
+		ctx = logctx.WithProvider(ctx, providerName)
+	}
+
 	if err != nil {
-		// Log the full error internally; never echo infrastructure details to the caller.
-		slog.ErrorContext(ctx, "send failed", "error", err)
-		sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-			http.StatusInternalServerError, endpoint, start, err.Error(), providerFromMeta(result))
+		slog.ErrorContext(ctx, "send failed", "error", err, "endpoint", endpoint, "duration_ms", time.Since(start).Milliseconds())
+		sh.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
+			http.StatusInternalServerError, endpoint, start, err.Error(), providerName, dst, result)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "send failed"})
 	}
 
-	if provider := providerFromMeta(result); provider != "" {
-		ctx = logger.WithProvider(ctx, provider)
-	}
-	slog.InfoContext(ctx, "send ok", "duration_ms", time.Since(start).Milliseconds())
-	sh.RecordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
-		http.StatusOK, endpoint, start, "", providerFromMeta(result))
+	slog.InfoContext(ctx, "send ok", "endpoint", endpoint, "duration_ms", time.Since(start).Milliseconds())
+	sh.recordLog(ctx, workspaceID, apiKeyID, channel, c.Request().Method,
+		http.StatusOK, endpoint, start, "", providerName, dst, result)
 	return c.JSON(http.StatusOK, result)
 }
 
-// RecordLog persists a MessageRequestLog entry. Failures are logged with slog.
-func (sh *SendHelper) RecordLog(
+func (sh *SendHelper) recordLog(
 	ctx context.Context,
 	workspaceID, apiKeyID, channelType, method string,
 	statusCode int,
 	endpoint string,
 	start time.Time,
 	errMsg, providerName string,
+	reqBody any,
+	result *contracts.SendResult,
 ) {
 	if sh.svc == nil || workspaceID == "" {
 		return
 	}
-	entry := &domain.MessageRequestLog{
+	entry := domain.MessageRequestLog{
 		WorkspaceID:  workspaceID,
 		APIKeyID:     apiKeyID,
 		ChannelType:  channelType,
@@ -92,18 +95,37 @@ func (sh *SendHelper) RecordLog(
 		StatusCode:   statusCode,
 		Endpoint:     endpoint,
 		ProviderName: providerName,
-		RequestID:    logger.GetRequestID(ctx),
+		RequestID:    logctx.GetRequestID(ctx),
 		DurationMs:   int(time.Since(start).Milliseconds()),
 		ErrorMessage: errMsg,
 	}
-	if err := sh.svc.RecordLog(ctx, entry); err != nil {
-		slog.ErrorContext(ctx, "message_request_log insert failed", "error", err)
+	if statusCode == http.StatusOK {
+		entry.InboxMessageID = contracts.InboxMessageIDFromResult(result)
 	}
-}
 
-func providerFromMeta(r *contracts.SendResult) string {
-	if r == nil || r.Meta == nil {
-		return ""
+	if contracts.StoreContentFromResult(result) {
+		var requestBody, responseBody string
+		if reqBody != nil {
+			if b, err := json.Marshal(reqBody); err != nil {
+				slog.WarnContext(ctx, "failed to marshal request body for log payload", "error", err, "endpoint", endpoint)
+			} else {
+				requestBody = string(b)
+			}
+		}
+		if b, err := json.Marshal(result); err != nil {
+			slog.WarnContext(ctx, "failed to marshal response body for log payload", "error", err, "endpoint", endpoint)
+		} else {
+			responseBody = string(b)
+		}
+		if requestBody != "" || responseBody != "" {
+			entry.Payload = &domain.MessageRequestPayload{
+				RequestBody:  requestBody,
+				ResponseBody: responseBody,
+			}
+		}
 	}
-	return r.Meta["provider_name"]
+
+	if err := sh.svc.RecordLog(ctx, entry); err != nil {
+		slog.WarnContext(ctx, "failed to persist message request log", "error", err, "endpoint", endpoint)
+	}
 }

@@ -1,14 +1,13 @@
 package handler
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
+	"github.com/weprodev/wpd-message-gateway/internal/presentation/dto"
 )
 
 type PortalIntegrationHandler struct {
@@ -19,28 +18,6 @@ func NewPortalIntegrationHandler(svc *service.PortalService) *PortalIntegrationH
 	return &PortalIntegrationHandler{svc: svc}
 }
 
-type integrationBody struct {
-	ChannelType  string          `json:"channel_type"`
-	ProviderName string          `json:"provider_name"`
-	Config       json.RawMessage `json:"config"`
-	Status       string          `json:"status"`
-	IsDefault    bool            `json:"is_default"`
-}
-
-func integrationToJSON(intg domain.Integration) map[string]any {
-	return map[string]any{
-		"id":            intg.ID,
-		"workspace_id":  intg.WorkspaceID,
-		"channel_type":  intg.ChannelType,
-		"provider_name": intg.ProviderName,
-		"config":        json.RawMessage(intg.Config),
-		"status":        intg.Status,
-		"is_default":    intg.IsDefault,
-		"created_at":    intg.CreatedAt,
-		"updated_at":    intg.UpdatedAt,
-	}
-}
-
 func (h *PortalIntegrationHandler) ListIntegrations(c echo.Context) error {
 	wid := c.Param("wid")
 	list, err := h.svc.ListIntegrations(c.Request().Context(), wid)
@@ -48,42 +25,30 @@ func (h *PortalIntegrationHandler) ListIntegrations(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to list integrations", "error", err)
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to list integrations")
 	}
-	out := make([]map[string]any, 0, len(list))
+	out := make([]dto.Integration, 0, len(list))
 	for _, intg := range list {
-		out = append(out, integrationToJSON(intg))
+		out = append(out, dto.IntegrationFromDomain(intg))
 	}
 	return c.JSON(http.StatusOK, out)
 }
 
 func (h *PortalIntegrationHandler) UpsertIntegration(c echo.Context) error {
 	wid := c.Param("wid")
-	var body integrationBody
+	var body dto.UpsertIntegrationRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind integration body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	cfg, err := service.IntegrationConfigJSON(body.Config)
+	intg, err := body.ToDomain(wid)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to parse integration config JSON", "error", err, "workspace_id", wid, "provider_name", body.ProviderName)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid config JSON")
-	}
-	status := body.Status
-	if status == "" {
-		status = domain.IntegrationStatusConnected
-	}
-	intg := &domain.Integration{
-		WorkspaceID:  wid,
-		ChannelType:  body.ChannelType,
-		ProviderName: body.ProviderName,
-		Config:       cfg,
-		Status:       status,
-		IsDefault:    body.IsDefault,
 	}
 	if err := h.svc.UpsertIntegration(c.Request().Context(), intg); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to upsert integration", "error", err, "workspace_id", wid, "provider_name", body.ProviderName)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to upsert integration")
 	}
-	return c.JSON(http.StatusOK, integrationToJSON(*intg))
+	return c.JSON(http.StatusOK, dto.IntegrationFromDomain(*intg))
 }
 
 func (h *PortalIntegrationHandler) DeleteIntegration(c echo.Context) error {

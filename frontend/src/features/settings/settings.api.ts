@@ -1,35 +1,40 @@
+import { fetchWorkspaceApiKeys } from "@/core/api/workspace-api-keys"
 import { apiFetch } from "@/core/api/client"
 
-import type { ApiKey, WorkspaceSettings } from "./settings.types"
+import { parseWorkspaceSettings } from "./settings.schema"
+import type { ApiKey, WorkspaceSettings, WorkspaceSettingsPatch } from "./settings.types"
+
+async function readApiErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { message?: string }
+    const message = body.message?.trim()
+    return message || fallback
+  } catch {
+    return fallback
+  }
+}
 
 export async function getSettings(workspaceId: string): Promise<WorkspaceSettings> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`)
   if (!res.ok) {
     throw new Error("Failed to load settings")
   }
-  return (await res.json()) as WorkspaceSettings
+  return parseWorkspaceSettings(await res.json())
 }
 
-export async function patchSettings(
-  workspaceId: string,
-  body: Record<string, string>,
-): Promise<void> {
+export async function patchSettings(workspaceId: string, body: WorkspaceSettingsPatch): Promise<void> {
   const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/settings`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error("Failed to save settings")
+    throw new Error(await readApiErrorMessage(res, "Failed to save settings"))
   }
 }
 
 export async function listApiKeys(workspaceId: string): Promise<ApiKey[]> {
-  const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys`)
-  if (!res.ok) {
-    throw new Error("Failed to load API keys")
-  }
-  return (await res.json()) as ApiKey[]
+  return fetchWorkspaceApiKeys(workspaceId)
 }
 
 export async function createApiKey(

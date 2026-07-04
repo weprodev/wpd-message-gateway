@@ -62,6 +62,9 @@ CREATE TRIGGER trg_workspaces_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE INDEX idx_workspaces_owner_id ON workspaces(owner_id);
+CREATE INDEX idx_workspaces_active_list
+    ON workspaces (status, is_private, name)
+    WHERE status = 'active';
 
 -- ==============================================================================
 -- 3. ROLES TABLE (RBAC)
@@ -70,7 +73,7 @@ CREATE INDEX idx_workspaces_owner_id ON workspaces(owner_id);
 CREATE TABLE roles (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'web',
+    guard_name   TEXT        NOT NULL DEFAULT 'msg_web',
     display_name TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -123,7 +126,9 @@ CREATE UNIQUE INDEX idx_invitations_pending_per_workspace_email
 
 CREATE INDEX idx_invitations_workspace_id ON invitations(workspace_id);
 CREATE INDEX idx_invitations_token_hash   ON invitations(token_hash);
-CREATE INDEX idx_invitations_role_id       ON invitations(role_id);
+CREATE INDEX idx_invitations_workspace_pending
+    ON invitations (workspace_id, status, expires_at)
+    WHERE status = 'pending';
 
 -- ==============================================================================
 -- 6. WORKSPACE_CHANNELS TABLE
@@ -186,6 +191,8 @@ CREATE TRIGGER trg_provider_config_fields_set_updated_at
     BEFORE UPDATE ON provider_config_fields
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+CREATE INDEX idx_provider_config_fields_provider_id ON provider_config_fields(provider_id);
+
 -- ==============================================================================
 -- 9. INTEGRATIONS TABLE (Workspace ↔ Provider Credentials)
 -- ==============================================================================
@@ -217,6 +224,8 @@ CREATE UNIQUE INDEX idx_integrations_default_per_channel
 
 CREATE INDEX idx_integrations_provider_id ON integrations(provider_id);
 CREATE INDEX idx_integrations_workspace_channel ON integrations(workspace_id, channel_type);
+CREATE INDEX idx_integrations_workspace_channel_status
+    ON integrations (workspace_id, channel_type, status, is_default DESC, created_at DESC);
 
 CREATE TRIGGER trg_integrations_set_updated_at
     BEFORE UPDATE ON integrations
@@ -241,6 +250,7 @@ CREATE TABLE api_keys (
 );
 
 CREATE INDEX idx_api_keys_workspace_id ON api_keys(workspace_id);
+CREATE INDEX idx_api_keys_workspace_created ON api_keys (workspace_id, created_at DESC);
 
 -- ==============================================================================
 -- 11. MESSAGE_REQUEST_LOGS TABLE (Append-only)
@@ -258,6 +268,7 @@ CREATE TABLE message_request_logs (
     request_id    VARCHAR(64),
     duration_ms   INT          CHECK (duration_ms >= 0),
     error_message TEXT,
+    inbox_message_id UUID,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -271,6 +282,24 @@ CREATE INDEX idx_message_request_logs_api_key
 CREATE INDEX idx_message_request_logs_workspace_api_created
     ON message_request_logs (workspace_id, api_key_id, created_at DESC)
     WHERE api_key_id IS NOT NULL;
+
+CREATE INDEX idx_message_request_logs_workspace_channel_created
+    ON message_request_logs (workspace_id, channel_type, created_at DESC);
+
+CREATE INDEX idx_message_request_logs_workspace_inbox_message
+    ON message_request_logs (workspace_id, inbox_message_id)
+    WHERE inbox_message_id IS NOT NULL;
+
+-- ==============================================================================
+-- 11.5. MESSAGE_REQUEST_PAYLOADS TABLE (Append-only body storage)
+-- ==============================================================================
+
+CREATE TABLE message_request_payloads (
+    log_id        UUID        PRIMARY KEY REFERENCES message_request_logs(id) ON DELETE CASCADE,
+    request_body  TEXT,
+    response_body TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ==============================================================================
 -- 12. TEMPLATES TABLE
@@ -370,7 +399,7 @@ CREATE INDEX idx_workspace_access_audits_actor_user_id
 CREATE TABLE permissions (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'web',
+    guard_name   TEXT        NOT NULL DEFAULT 'msg_web',
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 

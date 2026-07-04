@@ -101,11 +101,11 @@ Router → Middleware → Handler → Service → Port ← Repository / Provider
 
 | Area | Violation |
 | ---- | --------- |
-| `internal/core/domain/` | Imports Echo, HTTP, infra, or presentation |
+| `internal/core/domain/` | Imports Echo, HTTP, infra, presentation, or contains struct tags (`json`, `db`) |
 | `internal/core/port/` | Contains implementation instead of interfaces |
 | `internal/core/service/` | Direct SQL/HTTP; missing `ctx`; orchestration left in handler |
-| `internal/infrastructure/` | Business rules; bypasses port interfaces |
-| `internal/presentation/` | Business logic; handler → repository without service; RBAC in handler instead of middleware |
+| `internal/infrastructure/` | Business rules; bypasses port interfaces; imports `presentation/dto` |
+| `internal/presentation/` | Business logic; handler → repository without service; RBAC in handler instead of middleware; **request/response structs or JSON mappers in `handler/*.go`** |
 | `pkg/gateway`, `pkg/contracts` | Imports `internal/*`; embedded SDK requires PostgreSQL |
 | Providers | No `init()` registration or missing blank import in `internal/app/imports.go` |
 | Auth | Portal mutations without JWT + `RequirePermission`; internal ingest open outside local dev |
@@ -184,6 +184,8 @@ Do not invent issues. If the diff is clean, say so.
 | MGW.MIGRATION | Migration hygiene failure |
 | MGW.LOG-SECRET | Secrets or PII in logs |
 | MGW.N+1-QUERY | Query inside a loop |
+| MGW.HANDLER-DTO | HTTP struct or mapper (`XFromDomain` / `ToDomain` / `ToPatch`) in `handler/*.go` instead of `presentation/dto/` |
+| MGW.DTO-IN-REPO | Repository or port interface accepts `presentation/dto.*` instead of `domain.*` |
 | MGW.GOROUTINE-LEAK | Goroutine without lifecycle control |
 
 **Frontend**
@@ -219,6 +221,7 @@ Do not invent issues. If the diff is clean, say so.
 | -- | ------- |
 | DDD.LAYER | Business rule or orchestration in the wrong layer (handler/UI/infra) |
 | DDD.BOUNDARY | Bounded context violated (feature↔feature, `pkg`→`internal`, shared→feature) |
+| DDD.DOMAIN-LEAK | Domain object returned directly from handler without DTO mapping, or containing presentation tags (`json`) |
 | DDD.VALUE-TYPE | Domain concept as raw string/number — use typed constant in domain + API/FE mirror |
 
 **General — SOLID**

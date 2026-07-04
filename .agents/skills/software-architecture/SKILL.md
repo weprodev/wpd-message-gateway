@@ -40,6 +40,7 @@ This skill provides guidance for quality focused software development and archit
 - **Clean Architecture & DDD Principles:**
   - Follow domain-driven design and ubiquitous language
   - Separate domain entities from infrastructure concerns
+  - **Strict boundary**: Presentation data transfer objects (DTOs) must be completely separate from Domain entities. The Presentation layer is responsible for mapping Domain objects to DTOs. Domain objects must never contain presentation tags (e.g. JSON) and must never be serialized directly.
   - Keep business logic independent of frameworks
   - Define use cases clearly and keep them isolated
 - **Naming Conventions:**

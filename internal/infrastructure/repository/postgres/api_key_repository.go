@@ -68,8 +68,12 @@ func (r *APIKeyRepository) GetByClientID(ctx context.Context, clientID string) (
 }
 
 func (r *APIKeyRepository) UpdateLastUsedAt(ctx context.Context, id string) error {
+	// Throttle writes: inbox/SSE can hit this on every request.
 	_, err := r.client.GetDB(ctx).ExecContext(ctx,
-		`UPDATE api_keys SET last_used_at = NOW() WHERE id = $1`,
+		`UPDATE api_keys
+		 SET last_used_at = NOW()
+		 WHERE id = $1
+		   AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '5 minutes')`,
 		id,
 	)
 	if err != nil {

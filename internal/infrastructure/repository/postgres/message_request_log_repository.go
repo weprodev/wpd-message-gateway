@@ -21,52 +21,88 @@ func NewMessageRequestLogRepository(client *pgsql.PgClient) port.MessageRequestL
 }
 
 func (r *MessageRequestLogRepository) Create(ctx context.Context, log *domain.MessageRequestLog) error {
-	query := `
-		INSERT INTO message_request_logs (workspace_id, api_key_id, channel_type, http_method, status_code, endpoint, provider_name, request_id, duration_ms, error_message)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	const query = `
+		INSERT INTO message_request_logs (
+			workspace_id, api_key_id, channel_type, http_method, status_code, endpoint,
+			provider_name, request_id, duration_ms, error_message, inbox_message_id
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at
 	`
-	var apiKeyID interface{}
-	if log.APIKeyID != "" {
-		apiKeyID = log.APIKeyID
-	}
-	var reqID interface{}
-	if log.RequestID != "" {
-		reqID = log.RequestID
-	}
-	var dur interface{}
-	if log.DurationMs > 0 {
-		dur = log.DurationMs
-	}
-	var errMsg interface{}
-	if log.ErrorMessage != "" {
-		errMsg = log.ErrorMessage
-	}
-	var provider interface{}
-	if log.ProviderName != "" {
-		provider = log.ProviderName
-	}
+
 	err := r.client.GetDB(ctx).QueryRowContext(ctx, query,
-		log.WorkspaceID, apiKeyID, log.ChannelType, log.HTTPMethod, log.StatusCode, log.Endpoint,
-		provider, reqID, dur, errMsg,
+		log.WorkspaceID,
+		nullIfEmpty(log.APIKeyID),
+		log.ChannelType,
+		log.HTTPMethod,
+		log.StatusCode,
+		log.Endpoint,
+		nullIfEmpty(log.ProviderName),
+		nullIfEmpty(log.RequestID),
+		nullIfNonPositive(log.DurationMs),
+		nullIfEmpty(log.ErrorMessage),
+		nullIfEmpty(log.InboxMessageID),
 	).Scan(&log.ID, &log.CreatedAt)
 	if err != nil {
-		slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "workspace_id", log.WorkspaceID, "endpoint", log.Endpoint)
+		slog.ErrorContext(ctx, "database error: failed to create message request log", "error", err, "endpoint", log.Endpoint)
+		return err
 	}
-	return err
+
+	if log.Payload != nil {
+		if err := r.insertPayload(ctx, log); err != nil {
+			// Metadata logs must persist even when optional payload storage fails.
+			slog.WarnContext(ctx, "message request payload not stored", "error", err, "log_id", log.ID)
+		}
+	}
+
+	return nil
+}
+
+func (r *MessageRequestLogRepository) insertPayload(ctx context.Context, log *domain.MessageRequestLog) error {
+	log.Payload.LogID = log.ID
+	payloadQuery := `
+		INSERT INTO message_request_payloads (log_id, request_body, response_body)
+		VALUES ($1, $2, $3)
+		RETURNING created_at
+	`
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, payloadQuery,
+		log.Payload.LogID, log.Payload.RequestBody, log.Payload.ResponseBody,
+	).Scan(&log.Payload.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("insert message request payload: %w", err)
+	}
+	return nil
+}
+
+func scanMessageRequestLogWithSource(
+	scanner interface{ Scan(dest ...any) error },
+) (domain.MessageRequestLogWithSource, error) {
+	var row domain.MessageRequestLogWithSource
+	var apiKeyID, reqID, errMsg, prov, inboxID sql.NullString
+	var dur sql.NullInt64
+
+	err := scanner.Scan(
+		&row.ID, &row.WorkspaceID, &apiKeyID, &row.ChannelType, &row.HTTPMethod, &row.StatusCode, &row.Endpoint,
+		&prov, &reqID, &dur, &errMsg, &inboxID, &row.CreatedAt,
+		&row.SourceName, &row.ClientID,
+	)
+	if err != nil {
+		return row, err
+	}
+
+	row.APIKeyID = optionalStringFromNull(apiKeyID)
+	row.ProviderName = optionalStringFromNull(prov)
+	row.RequestID = optionalStringFromNull(reqID)
+	row.ErrorMessage = optionalStringFromNull(errMsg)
+	row.InboxMessageID = optionalStringFromNull(inboxID)
+	if dur.Valid {
+		row.DurationMs = int(dur.Int64)
+	}
+
+	return row, nil
 }
 
 func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port.MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error) {
-	if q.Limit <= 0 {
-		q.Limit = 50
-	}
-	if q.Limit > 500 {
-		q.Limit = 500
-	}
-	if q.Offset < 0 {
-		q.Offset = 0
-	}
-
 	db := r.client.GetDB(ctx)
 	args := []any{q.WorkspaceID}
 	where := "l.workspace_id = $1"
@@ -86,68 +122,43 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 		args = append(args, *q.To)
 	}
 
-	countQuery := "SELECT COUNT(*) FROM message_request_logs l WHERE " + where
+	limit, offset := clampLimitOffset(q.Limit, q.Offset)
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM message_request_logs l WHERE %s`, where)
 	var total int
 	if err := db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
-		slog.ErrorContext(ctx, "database error: failed to count message request logs", "error", err, "workspace_id", q.WorkspaceID)
+		slog.ErrorContext(ctx, "database error: failed to count message request logs", "error", err)
 		return nil, 0, err
 	}
 
-	// LIMIT and OFFSET come from bounded Go int values clamped above — not from user input.
-	// database/sql does not support parameterised LIMIT/OFFSET in standard Postgres; using
-	// fmt.Sprintf with validated integers is the correct approach here.
 	listQuery := fmt.Sprintf(`
 		SELECT l.id, l.workspace_id, l.api_key_id, l.channel_type, l.http_method, l.status_code, l.endpoint,
-			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.created_at,
+			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.inbox_message_id, l.created_at,
 			COALESCE(k.name, ''), COALESCE(k.client_id, '')
 		FROM message_request_logs l
 		LEFT JOIN api_keys k ON k.id = l.api_key_id
 		WHERE %s
 		ORDER BY l.created_at DESC
-		LIMIT %d OFFSET %d`, where, q.Limit, q.Offset)
+		LIMIT %d OFFSET %d`, where, limit, offset)
 
 	rows, err := db.QueryContext(ctx, listQuery, args...)
 	if err != nil {
-		slog.ErrorContext(ctx, "database error: failed to query message request logs", "error", err, "workspace_id", q.WorkspaceID)
+		slog.ErrorContext(ctx, "database error: failed to query message request logs", "error", err)
 		return nil, 0, err
 	}
 	defer rows.Close() //nolint:errcheck
 
 	var out []domain.MessageRequestLogWithSource
 	for rows.Next() {
-		var row domain.MessageRequestLogWithSource
-		var apiKeyID sql.NullString
-		var reqID sql.NullString
-		var dur sql.NullInt64
-		var errMsg sql.NullString
-		var prov sql.NullString
-		if err := rows.Scan(
-			&row.ID, &row.WorkspaceID, &apiKeyID, &row.ChannelType, &row.HTTPMethod, &row.StatusCode, &row.Endpoint,
-			&prov, &reqID, &dur, &errMsg, &row.CreatedAt,
-			&row.SourceName, &row.ClientID,
-		); err != nil {
-			slog.ErrorContext(ctx, "database error: failed to scan message request log", "error", err, "workspace_id", q.WorkspaceID)
+		row, err := scanMessageRequestLogWithSource(rows)
+		if err != nil {
+			slog.ErrorContext(ctx, "database error: failed to scan message request log", "error", err)
 			return nil, 0, err
-		}
-		if apiKeyID.Valid {
-			row.APIKeyID = apiKeyID.String
-		}
-		if prov.Valid {
-			row.ProviderName = prov.String
-		}
-		if reqID.Valid {
-			row.RequestID = reqID.String
-		}
-		if dur.Valid {
-			row.DurationMs = int(dur.Int64)
-		}
-		if errMsg.Valid {
-			row.ErrorMessage = errMsg.String
 		}
 		out = append(out, row)
 	}
 	if err := rows.Err(); err != nil {
-		slog.ErrorContext(ctx, "database error: rows iteration failed for message request logs", "error", err, "workspace_id", q.WorkspaceID)
+		slog.ErrorContext(ctx, "database error: rows iteration failed for message request logs", "error", err)
 		return nil, 0, err
 	}
 	return out, total, nil

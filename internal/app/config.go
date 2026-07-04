@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -67,15 +68,51 @@ func (c *Config) DefaultSMSProvider() string   { return c.Providers.Defaults.SMS
 func (c *Config) DefaultPushProvider() string  { return c.Providers.Defaults.Push }
 func (c *Config) DefaultChatProvider() string  { return c.Providers.Defaults.Chat }
 
-// LoadConfig loads configuration from a YAML file.
-func LoadConfig(path string) (*Config, error) {
-	if path == "" {
-		path = "configs/local.yml"
-	}
+const defaultServerPort = 10101
 
-	data, err := os.ReadFile(path)
+// EnvironmentName returns the runtime environment (config file, then APP_ENVIRONMENT, then local).
+func (c *Config) EnvironmentName() string {
+	if c != nil && c.Environment != "" {
+		return c.Environment
+	}
+	if v := os.Getenv("APP_ENVIRONMENT"); v != "" {
+		return v
+	}
+	return "local"
+}
+
+// ListenAddr returns the HTTP listen address for the gateway server.
+func (c *Config) ListenAddr() string {
+	port := defaultServerPort
+	if c != nil && c.Server.Port > 0 {
+		port = c.Server.Port
+	}
+	return fmt.Sprintf(":%d", port)
+}
+
+// LogSummary logs a non-secret snapshot of loaded configuration at startup.
+func (c *Config) LogSummary() {
+	if c == nil {
+		return
+	}
+	slog.Info("loaded configuration",
+		"environment", c.EnvironmentName(),
+		"listen_addr", c.ListenAddr(),
+		"email_provider", c.DefaultEmailProvider(),
+		"sms_provider", c.DefaultSMSProvider(),
+		"push_provider", c.DefaultPushProvider(),
+		"chat_provider", c.DefaultChatProvider(),
+	)
+}
+
+// LoadAppConfig loads configuration from YAML, applying env overrides.
+// When configPath is empty, resolves via CONFIG_PATH, container paths, or configs/local.yml.
+func LoadAppConfig(configPath string) (*Config, error) {
+	configPath = resolveConfigPath(configPath)
+
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+		return nil, fmt.Errorf("error reading config file %s: %w", configPath, err)
 	}
 
 	cfg := &Config{
@@ -86,13 +123,45 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
+		return nil, fmt.Errorf("error parsing config file %s: %w", configPath, err)
 	}
 
 	cfg.applyEnvOverrides()
 	cfg.parseProviderConfigs()
 
 	return cfg, nil
+}
+
+// resolveConfigPath returns an explicit path or discovers one from env/container defaults.
+func resolveConfigPath(configPath string) string {
+	if configPath != "" {
+		return configPath
+	}
+	if v := os.Getenv("CONFIG_PATH"); v != "" {
+		return v
+	}
+
+	env := os.Getenv("APP_ENVIRONMENT")
+	if env == "" {
+		env = os.Getenv("ENVIRONMENT")
+	}
+	if env == "" {
+		env = "local"
+	}
+
+	for _, candidate := range []string{
+		fmt.Sprintf("/configs/%s.yml", env),
+		"/configs/local.yml",
+		"/configs/config.yml",
+		"configs/local.yml",
+		"configs/local.example.yml",
+	} {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	return "configs/local.yml"
 }
 
 // applyEnvOverrides applies environment variable overrides.

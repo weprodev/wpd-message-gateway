@@ -16,8 +16,10 @@ import (
 
 	gogate "github.com/weprodev/wpd-gogate"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/authgate"
+	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/database"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/inbox"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/repository/postgres"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation"
@@ -61,12 +63,18 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		return nil, fmt.Errorf("connect to database: %w", err)
 	}
 
+	if err := database.ApplySeeds(startCtx, pgClient.GetDB(startCtx), database.SeedsDir()); err != nil {
+		return nil, fmt.Errorf("apply database seeds: %w", err)
+	}
+
 	// ── RBAC Gate ───────────────────────────────────────────────────────────
-	gateEngine := gogate.NewGate(pgClient.GetDB(startCtx), nil)
+	gateCfg := gogate.DefaultConfig()
+	gateCfg.DefaultGuardName = domain.RBACGuardName
+	gateEngine := gogate.NewGate(pgClient.GetDB(startCtx), &gateCfg)
 	if err := gateEngine.LoadPolicy(startCtx); err != nil {
 		return nil, fmt.Errorf("load RBAC policies: %w", err)
 	}
-	authGate := authgate.NewGoGateAdapter(gateEngine)
+	authGate := authgate.NewGoGateAdapter(gateEngine, pgClient.GetDB(startCtx))
 
 	// ── Encryption service ──────────────────────────────────────────────────
 	encKey := cfg.EncryptionKey
@@ -121,9 +129,21 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 		Gate:         authGate,
 	})
 
-	// ── Memory store & inbox writer ─────────────────────────────────────────
+	// ── Inbox: payload-backed reads, in-memory writes for SSE ───────────────
 	inboxStore := inbox.NewStore()
+	inboxReader := postgres.NewPayloadInboxReader(pgClient, inboxStore)
 	memoryStore := memory.GetStore()
+
+	var publishInboxEvent inbox.PublishFunc
+	inboxWriter := inbox.NewNotifyingWriter(inboxStore, inbox.PublishFunc(func(workspaceID, eventType string, data any) {
+		if publishInboxEvent != nil {
+			publishInboxEvent(workspaceID, eventType, data)
+		}
+	}))
+	portalInboxHandler := handler.NewPortalInboxHandler(inboxReader, inboxWriter)
+	publishInboxEvent = func(workspaceID, eventType string, data any) {
+		portalInboxHandler.PublishInboxEvent(workspaceID, eventType, data)
+	}
 
 	// ── Auth service ──────────────────────────────────────────────────────
 	authService := service.NewAuthService(
@@ -137,16 +157,15 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	)
 
 	// ── Gateway service ─────────────────────────────────────────────────────
-	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxStore, logRepo)
+	gatewaySvc := service.NewGatewayService(intgRepo, tmplRepo, settingsRepo, inboxWriter, logRepo)
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
-	portalHandler := handler.NewPortalHandler(portalSvc, gatewaySvc, logRepo)
+	portalHandler := handler.NewPortalHandler(portalSvc)
 	portalAuthHandler := handler.NewPortalAuthHandler(portalSvc, authService)
 	portalWorkspaceHandler := handler.NewPortalWorkspaceHandler(portalSvc)
 	portalIntegrationHandler := handler.NewPortalIntegrationHandler(portalSvc)
 	portalTemplateHandler := handler.NewPortalTemplateHandler(portalSvc)
-	portalInboxHandler := handler.NewPortalInboxHandler(inboxStore, inboxStore)
 	gatewayHandler := handler.NewGatewayHandler(gatewaySvc)
 
 	// ── Router ──────────────────────────────────────────────────────────────

@@ -1,22 +1,33 @@
 import * as Tabs from "@radix-ui/react-tabs"
 import { useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { PageHeader } from "@/shared/components/page-header"
 import { cn } from "@/lib/utils"
 
+import { ApiKeyCreateDialog } from "../components/api-key-create-dialog"
 import { ApiKeyRow } from "../components/api-key-row"
+import { ApiKeySecretDialog } from "../components/api-key-secret-dialog"
 import { RadioOption } from "../components/radio-option"
 import { useSettings } from "../hooks/use-settings.hook"
-import type { RetentionMode, SettingsTab, WorkspaceSettings } from "../settings.types"
+import { dispatchConfigsEqual, toStoreMessageContentSetting } from "../message-dispatch-mode"
+import type {
+  MessageDispatchConfig,
+  MessageDispatchMode,
+  SettingsTab,
+  WorkspaceSettings,
+  WorkspaceSettingsPatch,
+} from "../settings.types"
+import { settingsTabFromSearch } from "../settings.types"
 
 interface GeneralSettingsPanelProps {
   settings: WorkspaceSettings
-  onSave: (patch: Record<string, string>) => Promise<void>
+  onSave: (patch: WorkspaceSettingsPatch) => Promise<void>
 }
 
 function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
@@ -80,53 +91,103 @@ function GeneralSettingsPanel({ settings, onSave }: GeneralSettingsPanelProps) {
   )
 }
 
-interface RetentionSettingsPanelProps {
-  initialMode: RetentionMode
-  onSave: (patch: Record<string, string>) => Promise<void>
+interface DispatchSettingsPanelProps {
+  initialConfig: MessageDispatchConfig
+  onSave: (patch: WorkspaceSettingsPatch) => Promise<void>
 }
 
-function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelProps) {
-  const [retentionMode, setRetentionMode] = useState<RetentionMode>(initialMode)
+function DispatchSettingsPanel({ initialConfig, onSave }: DispatchSettingsPanelProps) {
+  const [mode, setMode] = useState<MessageDispatchMode>(initialConfig.mode)
+  const [storeMessageContent, setStoreMessageContent] = useState(initialConfig.storeMessageContent)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  const currentConfig: MessageDispatchConfig = { mode, storeMessageContent }
+  const isDirty = !dispatchConfigsEqual(currentConfig, initialConfig)
 
   async function handleSave() {
     setIsSaving(true)
+    setSaveError(null)
+    setSaveSuccess(false)
     try {
-      await onSave({ data_retention: retentionMode })
+      await onSave({
+        message_dispatch_mode: mode,
+        store_message_content: toStoreMessageContentSetting(storeMessageContent),
+      })
+      setSaveSuccess(true)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings")
     } finally {
       setIsSaving(false)
     }
   }
 
-  return (
-    <div className="flex max-w-xl flex-col gap-4">
-      <RadioOption
-        id="retention-memory"
-        name="retention"
-        label="Memory only"
-        description="Store messages in memory for testing — no persistence."
-        checked={retentionMode === "memory"}
-        onChange={() => setRetentionMode("memory")}
-      />
-      <RadioOption
-        id="retention-both"
-        name="retention"
-        label="Memory + Database"
-        description="Persist messages in the portal inbox and database."
-        checked={retentionMode === "both"}
-        onChange={() => setRetentionMode("both")}
-      />
-      <RadioOption
-        id="retention-providers"
-        name="retention"
-        label="Providers only"
-        description="Send through providers without storing message content."
-        checked={retentionMode === "providers"}
-        onChange={() => setRetentionMode("providers")}
-      />
+  function handleModeChange(nextMode: MessageDispatchMode) {
+    setMode(nextMode)
+    setSaveError(null)
+    setSaveSuccess(false)
+  }
 
-      <Button type="button" onClick={handleSave} disabled={isSaving} className="mt-2 w-fit">
-        {isSaving ? "Saving…" : "Save retention policy"}
+  function handleStoreContentChange(checked: boolean) {
+    setStoreMessageContent(checked)
+    setSaveError(null)
+    setSaveSuccess(false)
+  }
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium text-foreground">Dispatch mode</h2>
+        <p className="text-sm text-text-secondary">Choose where outbound messages are routed.</p>
+        <div className="mt-1 flex flex-col gap-3">
+          <RadioOption
+            id="dispatch-memory"
+            name="dispatch-mode"
+            label="Memory"
+            description="Capture messages in memory for development and testing."
+            checked={mode === "memory"}
+            onChange={() => handleModeChange("memory")}
+          />
+          <RadioOption
+            id="dispatch-provider"
+            name="dispatch-mode"
+            label="Provider"
+            description="Send messages through the connected channel integration."
+            checked={mode === "provider"}
+            onChange={() => handleModeChange("provider")}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+        <label htmlFor="store-message-content" className="flex flex-1 cursor-pointer flex-col gap-1">
+          <span className="text-sm font-medium text-foreground">Store message content in inbox</span>
+          <span className="text-sm text-text-secondary">
+            When enabled, message bodies are captured in the portal inbox and shown as Retained in message logs.
+          </span>
+        </label>
+        <Checkbox
+          id="store-message-content"
+          checked={storeMessageContent}
+          onCheckedChange={(checked) => handleStoreContentChange(checked === true)}
+        />
+      </div>
+
+      {saveError ? (
+        <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {saveError}
+        </p>
+      ) : null}
+
+      {saveSuccess ? (
+        <p className="rounded-lg border border-primary-brand/20 bg-primary-brand/5 p-3 text-sm text-primary-brand">
+          Dispatch settings saved.
+        </p>
+      ) : null}
+
+      <Button type="button" onClick={handleSave} disabled={isSaving || !isDirty} className="w-fit">
+        {isSaving ? "Saving…" : "Save dispatch settings"}
       </Button>
     </div>
   )
@@ -134,22 +195,37 @@ function RetentionSettingsPanel({ initialMode, onSave }: RetentionSettingsPanelP
 
 export function SettingsPage() {
   const { wid = "" } = useParams<{ wid: string }>()
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general")
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => settingsTabFromSearch(searchParams))
   const [busyKeyId, setBusyKeyId] = useState<string | null>(null)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [revealedSecret, setRevealedSecret] = useState<{
+    clientId?: string
+    clientSecret: string
+  } | null>(null)
 
-  const { settings, apiKeys, retentionMode, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
+  const { settings, apiKeys, messageDispatchConfig, isLoading, error, saveSettings, addApiKey, removeApiKey, rotateApiKey } =
     useSettings(wid)
 
-  async function handleCreateApiKey() {
-    const name = window.prompt("API key name")
-    if (!name?.trim()) return
-    await addApiKey(name.trim())
+  async function handleCreateApiKey(name: string) {
+    const created = await addApiKey(name)
+    if (created.client_secret) {
+      setRevealedSecret({
+        clientId: created.client_id,
+        clientSecret: created.client_secret,
+      })
+    }
   }
 
   async function handleRegenerate(keyId: string) {
     setBusyKeyId(keyId)
     try {
-      await rotateApiKey(keyId)
+      const result = await rotateApiKey(keyId)
+      const key = apiKeys.find((item) => item.id === keyId)
+      setRevealedSecret({
+        clientId: key?.client_id,
+        clientSecret: result.client_secret,
+      })
     } finally {
       setBusyKeyId(null)
     }
@@ -194,7 +270,7 @@ export function SettingsPage() {
               ["general", "General"],
               ["developer", "Developer"],
               ["team", "Team Management"],
-              ["retention", "Data Retention"],
+              ["dispatch", "Message Dispatch"],
             ] as const
           ).map(([value, label]) => (
             <Tabs.Trigger
@@ -213,6 +289,16 @@ export function SettingsPage() {
 
         <Tabs.Content value="general">
           <GeneralSettingsPanel key={wid} settings={settings} onSave={saveSettings} />
+
+          <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+            <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              Permanently delete this workspace and all associated data.
+            </p>
+            <Button type="button" variant="destructive" className="mt-4" disabled>
+              Delete workspace
+            </Button>
+          </section>
         </Tabs.Content>
 
         <Tabs.Content value="developer" className="flex flex-col gap-4">
@@ -223,16 +309,16 @@ export function SettingsPage() {
                 Manage keys used to authenticate gateway requests.
               </p>
             </div>
-            <Button type="button" onClick={handleCreateApiKey}>
+            <Button type="button" onClick={() => setCreateDialogOpen(true)}>
               <Icon name="add" size="sm" />
-              Create key
+              Generate key
             </Button>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             {apiKeys.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-text-secondary">
-                No API keys yet. Create one to send test requests.
+                No API keys yet. Create one to authenticate gateway requests.
               </p>
             ) : (
               apiKeys.map((key) => (
@@ -256,20 +342,28 @@ export function SettingsPage() {
           </div>
         </Tabs.Content>
 
-        <Tabs.Content value="retention">
-          <RetentionSettingsPanel key={`${wid}-${retentionMode}`} initialMode={retentionMode} onSave={saveSettings} />
+        <Tabs.Content value="dispatch">
+          <DispatchSettingsPanel
+            key={wid}
+            initialConfig={messageDispatchConfig}
+            onSave={saveSettings}
+          />
         </Tabs.Content>
       </Tabs.Root>
 
-      <section className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-        <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          Permanently delete this workspace and all associated data.
-        </p>
-        <Button type="button" variant="destructive" className="mt-4" disabled>
-          Delete workspace
-        </Button>
-      </section>
+      <ApiKeyCreateDialog
+        key={createDialogOpen ? "open" : "closed"}
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreate={handleCreateApiKey}
+      />
+
+      <ApiKeySecretDialog
+        open={revealedSecret !== null}
+        clientId={revealedSecret?.clientId}
+        clientSecret={revealedSecret?.clientSecret ?? ""}
+        onClose={() => setRevealedSecret(null)}
+      />
     </div>
   )
 }

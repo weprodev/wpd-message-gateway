@@ -14,9 +14,8 @@ import {
   filterIntegrationsByTab,
   groupByCategory,
   useIntegrations,
-  type IntegrationViewModel,
 } from "@/features/integrations/hooks/use-integrations.hook"
-import type { IntegrationActionResult, IntegrationChannel } from "@/features/integrations/integrations.types"
+import type { IntegrationActionResult, IntegrationChannel, IntegrationViewModel } from "@/features/integrations/integrations.types"
 
 const CATEGORY_LABELS: Record<IntegrationChannel, string> = {
   email: "Email",

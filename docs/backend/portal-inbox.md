@@ -9,24 +9,27 @@ The Portal is the web UI and REST surface for the WPD Message Gateway when runni
 ### Portal UI (http://localhost:10104)
 
 | Feature | Description |
-|---------|-------------|
+| ------- | ------------- |
 | **Authentication** | Register and sign in (email + password → JWT) |
-| **Workspaces** | List workspaces you belong to; open a workspace dashboard |
+| **Workspaces** | List, create, and join workspaces |
+| **Message logs** | Outbound send request audit trail (Overview + per-channel tabs) |
+| **Email inbox** | Browse captured outbound emails with live SSE updates |
+| **Email templates** | Create and manage reusable email layouts |
 | **Integrations** | Connect, activate, deactivate, or remove messaging providers |
-| **Message logs** | Outbound send **request audit trail** (not memory inbox capture) |
-| **Send test** | Send a test message per channel from the dashboard |
+| **Settings** | General workspace settings, API keys, message dispatch mode |
+| **Get started** | Curl examples for sending via the public gateway API |
 
-No Portal pages yet for: workspace create, API keys, templates, members, settings, or memory inbox browsing.
+Team member management is a settings placeholder. SMS, push, and chat show **request logs** in the UI; captured-message browsing for those channels is API-only.
 
 ### REST API (server)
 
 | Feature | Portal UI | Description |
-|---------|:---------:|-------------|
-| **Inbox capture** | | Messages stored in RAM (`memory_only` / `memory_and_provider`) — [Inbox API](#inbox-api-reference) |
+| ------- | :-------: | ----------- |
+| **Inbox capture** | Email ✓ | Messages captured when `message_dispatch_mode=memory` or `store_message_content=true` — [Inbox API](#inbox-api-reference) |
 | **Internal ingest** | | Automation writes to inbox (requires Portal auth) |
-| **Workspace provisioning** | | Create workspace, API keys, settings — curl/Bruno/CI only; see [E2E bootstrap](./e2e-testing.md) |
+| **Workspace API** | Partial | Create/join workspaces and manage keys in the UI; additional endpoints in [usage](./usage.md) |
 
-Provider credentials are stored in PostgreSQL (encrypted at rest) and managed via the Portal **Integrations** page. Dispatch mode is REST-only (`PATCH /api/v1/workspaces/:wid/settings`).
+Provider credentials are stored in PostgreSQL (encrypted at rest) and managed on the Portal **Integrations** page. Dispatch settings are configured in **Settings → Message Dispatch** or via REST.
 
 ---
 
@@ -44,12 +47,12 @@ Register (email + password), then sign in.
 
 ## Message Inbox (Memory Capture)
 
-When a workspace's **dispatch mode** is `memory_only` or `memory_and_provider`, outbound messages are captured in-process RAM and displayed in the Portal inbox.
+When a workspace uses `message_dispatch_mode=memory`, outbound messages are captured in-process RAM and displayed in the Portal inbox.
 
 ```
 Your App
    │
-   │  POST /v1/email  (workspace: memory_only)
+   │  POST /v1/email  (workspace: memory dispatch)
    ▼
 Memory Provider
    └──────────────────▶ Portal Inbox (REST + SSE)
@@ -67,25 +70,28 @@ Memory Provider
 
 ---
 
-## Dispatch Modes
+## Dispatch & Inbox Capture
 
-Each workspace controls how its outbound messages are handled:
+Each workspace controls routing and inbox capture with two settings:
 
-| `message_dispatch_mode` | Behavior |
-|------------------------|----------|
-| `memory_only` | Captured in RAM only, **no** external provider called. **Default.** |
-| `provider_only` | Sent through the connected integration, **no** memory copy. |
-| `memory_and_provider` | Stored in memory **and** sent through the integration. |
+| Setting | Values | Role |
+|---------|--------|------|
+| `message_dispatch_mode` | `memory` (default) \| `provider` | Routing target |
+| `store_message_content` | `false` (default) \| `true` | Capture message body in portal inbox when enabled |
 
-Set via REST (no Portal UI page yet):
+Portal **Settings → Message Dispatch**: radio **Memory** / **Provider**, plus a checkbox for **Store message content in inbox** (see [usage](./usage.md)).
+
+Set via Portal **Settings → Message Dispatch** or REST:
 
 ```bash
 PATCH /api/v1/workspaces/:wid/settings
 Content-Type: application/json
 Authorization: Bearer <portal-jwt>
 
-{ "message_dispatch_mode": "provider_only" }
+{ "message_dispatch_mode": "provider", "store_message_content": "false" }
 ```
+
+Request logs (`message_request_logs`) are always written for operational tracing.
 
 ---
 
@@ -186,8 +192,8 @@ portal:
   ui_port: 10104     # React dev server (Portal UI)
 ```
 
-> **Provider credentials** (Mailgun API keys, etc.) are **not** in this file.  
-> They are stored AES-encrypted in PostgreSQL and configured via the **Portal REST API** (no Portal UI page yet).
+> **Provider credentials** (Mailgun API keys, etc.) are **not** in this file.
+> Configure them on the Portal **Integrations** page or via the integrations REST API. Values are stored AES-encrypted in PostgreSQL.
 
 ---
 

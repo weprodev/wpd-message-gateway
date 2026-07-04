@@ -2,13 +2,14 @@ package presentation
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 
@@ -68,6 +69,23 @@ func NewRouter(
 	}
 }
 
+// enrichRequestIDContext copies Echo's X-Request-ID into the request context for slog correlation.
+func enrichRequestIDContext() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			reqID := c.Response().Header().Get(echo.HeaderXRequestID)
+			if reqID == "" {
+				reqID = c.Request().Header.Get(echo.HeaderXRequestID)
+			}
+			if reqID != "" {
+				ctx := logctx.WithRequestID(c.Request().Context(), reqID)
+				c.SetRequest(c.Request().WithContext(ctx))
+			}
+			return next(c)
+		}
+	}
+}
+
 // Setup configures Echo with all routes.
 func (rt *Router) Setup() *echo.Echo {
 	e := echo.New()
@@ -77,20 +95,7 @@ func (rt *Router) Setup() *echo.Echo {
 
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.RequestID())
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			reqID := c.Response().Header().Get(echo.HeaderXRequestID)
-			if reqID == "" {
-				reqID = c.Request().Header.Get(echo.HeaderXRequestID)
-			}
-			if reqID != "" {
-				ctx := c.Request().Context()
-				ctx = applogger.WithRequestID(ctx, reqID)
-				c.SetRequest(c.Request().WithContext(ctx))
-			}
-			return next(c)
-		}
-	})
+	e.Use(enrichRequestIDContext())
 	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{
 		LogStatus:   true,
 		LogURI:      true,
@@ -108,6 +113,10 @@ func (rt *Router) Setup() *echo.Echo {
 			return nil
 		},
 	}))
+	e.GET("/health", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
+
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.PATCH, echo.DELETE, echo.OPTIONS},
@@ -176,34 +185,32 @@ func (rt *Router) Setup() *echo.Echo {
 
 	protected.GET("/workspaces/:wid/invitations", pw.ListInvitations, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInvitationsRead))
 	protected.POST("/workspaces/:wid/invitations", pw.CreateInvitation, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInvitationsWrite))
-	protected.POST("/workspaces/:wid/send-test/:channel", ph.SendTest, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionSendTest))
 
-	// Inbox API — always enabled (portal is always on).
+	// Inbox API — JWT + logs.read (same access model as message logs overview).
 	if rt.memberRepo != nil {
 		inbox := rt.portalInboxHandler
 		inboxGroup := api.Group("/workspaces/:wid/inbox")
 		inboxGroup.Use(customMiddleware.PortalJWTBearerOrQuery(rt.jwtSecret))
-		inboxGroup.Use(customMiddleware.RequireWorkspaceMember(rt.memberRepo))
-		inboxGroup.Use(customMiddleware.RequireWorkspaceAPIKey(rt.apiKeyRepo))
+		inboxGroup.Use(customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionLogsRead))
 		inboxGroup.GET("/stats", inbox.HandleStats)
 		inboxGroup.GET("/emails", inbox.HandleGetEmails)
 		inboxGroup.GET("/emails/:id", inbox.HandleGetEmailByID)
-		inboxGroup.DELETE("/emails/:id", inbox.HandleDeleteEmailByID)
 		inboxGroup.GET("/sms", inbox.HandleGetSMS)
 		inboxGroup.GET("/sms/:id", inbox.HandleGetSMSByID)
-		inboxGroup.DELETE("/sms/:id", inbox.HandleDeleteSMSByID)
 		inboxGroup.GET("/push", inbox.HandleGetPush)
 		inboxGroup.GET("/push/:id", inbox.HandleGetPushByID)
-		inboxGroup.DELETE("/push/:id", inbox.HandleDeletePushByID)
 		inboxGroup.GET("/chat", inbox.HandleGetChat)
 		inboxGroup.GET("/chat/:id", inbox.HandleGetChatByID)
-		inboxGroup.DELETE("/chat/:id", inbox.HandleDeleteChatByID)
-		inboxGroup.DELETE("/messages", inbox.HandleClearAll)
 		inboxGroup.GET("/events", inbox.HandleSSE)
+		inboxGroup.DELETE("/emails/:id", inbox.HandleDeleteEmailByID, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInboxWrite))
+		inboxGroup.DELETE("/sms/:id", inbox.HandleDeleteSMSByID, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInboxWrite))
+		inboxGroup.DELETE("/push/:id", inbox.HandleDeletePushByID, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInboxWrite))
+		inboxGroup.DELETE("/chat/:id", inbox.HandleDeleteChatByID, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInboxWrite))
+		inboxGroup.DELETE("/messages", inbox.HandleClearAll, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInboxWrite))
 
 		internal := api.Group("/workspaces/:wid/internal")
 		internal.Use(customMiddleware.PortalJWTBearerOrQuery(rt.jwtSecret))
-		internal.Use(customMiddleware.RequireWorkspaceMember(rt.memberRepo))
+		internal.Use(customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInboxWrite))
 		internal.POST("/email", inbox.HandleIngestEmail)
 		internal.POST("/sms", inbox.HandleIngestSMS)
 		internal.POST("/push", inbox.HandleIngestPush)

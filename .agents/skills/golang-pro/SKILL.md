@@ -97,9 +97,10 @@ Key properties demonstrated: bounded goroutine lifetime via `ctx`, error propaga
 - Handle all errors explicitly (no naked returns)
 - Write table-driven tests with subtests
 - Document all exported functions, types, and packages
-- Use `X | Y` union constraints for generics (Go 1.18+)
+	- Use `X | Y` union constraints for generics (Go 1.18+)
 - Propagate errors with fmt.Errorf("%w", err)
 - Run race detector on tests (-race flag)
+- Maintain pure domain entities (strict DDD): NEVER use `json:"..."`, `db:"..."` or other presentation/infrastructure tags in `internal/core/domain`. Map in **`internal/presentation/dto/`**: outbound **`{Type}FromDomain(domain.X)`** package funcs; inbound **`(r R) ToDomain()`** / **`ToPatch()`** on request DTOs. **Never pass `dto.*` to repositories** — only `domain.*` crosses the port boundary.
 
 ### MUST NOT DO
 - Ignore errors (avoid _ assignment without justification)

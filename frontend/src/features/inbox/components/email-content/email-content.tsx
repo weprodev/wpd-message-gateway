@@ -27,8 +27,8 @@ function formatFullTime(dateStr: string) {
 export function EmailContent({ message, onDelete, isDeleting = false }: EmailContentProps) {
   const sender = message.email.from_name
     ? `${message.email.from_name} <${message.email.from}>`
-    : message.email.from || "Unknown Sender"
-  
+    : message.email.from || "Unknown sender"
+
   const recipients = (message.email.to || []).join(", ")
   const formattedDate = formatFullTime(message.created_at)
 
@@ -48,7 +48,7 @@ export function EmailContent({ message, onDelete, isDeleting = false }: EmailCon
             {message.email.subject || "(No Subject)"}
           </h2>
           <p className="text-xs text-text-secondary truncate">
-            {sender} • {formattedDate}
+            To: {recipients || "—"} • {formattedDate}
           </p>
         </div>
 

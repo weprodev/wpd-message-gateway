@@ -17,7 +17,7 @@ Use the Message Gateway to capture and verify all messages your app sends during
 ## Architecture
 
 ```
-Your App                 Gateway (memory_only)        Test
+Your App                 Gateway (memory dispatch)        Test
    │                          │                        │
    │  POST /v1/email ─────────▶│ captured in RAM        │
    │  POST /v1/email ─────────▶│ captured in RAM        │
@@ -39,7 +39,7 @@ The inbox is protected. Every request to `/api/v1/workspaces/:wid/inbox/*` must 
 2. **Workspace membership** — user must be a member of the workspace
 3. **Workspace API key** — `X-Api-Client-Id` + `X-Api-Client-Secret` matching the workspace
 
-The **send** endpoint (`POST /v1/*`) uses API key + `X-Workspace-Key` (slug, not UUID).  
+The **send** endpoint (`POST /v1/*`) uses API key + `X-Workspace-Key` (workspace UUID preferred; slug also accepted).  
 The **inbox** endpoint uses the workspace **UUID** in the URL path.
 
 ---
@@ -104,7 +104,7 @@ KEY_JSON=$(curl -sS -X POST "$BASE/workspaces/$WORKSPACE_ID/api-keys" \
 API_CLIENT_ID=$(echo "$KEY_JSON"   | jq -r .client_id)
 API_CLIENT_SECRET=$(echo "$KEY_JSON" | jq -r .client_secret)
 
-# 4) Dispatch mode defaults to memory_only — nothing to configure
+# 4) Dispatch defaults to memory — nothing to configure
 echo "PORTAL_JWT=$PORTAL_JWT"           >> $GITHUB_ENV
 echo "WORKSPACE_ID=$WORKSPACE_ID"      >> $GITHUB_ENV
 echo "WORKSPACE_UK=$UK"                >> $GITHUB_ENV
@@ -303,7 +303,7 @@ func TestSignupEmail(t *testing.T) {
 ```bash
 curl -X POST http://localhost:10101/v1/email \
   -u "client_id:client_secret" \
-  -H "X-Workspace-Key: your_workspace_unique_key" \
+  -H "X-Workspace-Key: <workspace-uuid>" \
   -H "Content-Type: application/json" \
   -d '{"to":["user@example.com"],"subject":"Hello","html":"<p>World</p>"}'
 ```

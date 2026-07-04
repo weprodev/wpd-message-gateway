@@ -10,7 +10,7 @@
 │  go get .../wpd-message-gateway  │  git clone → make start          │
 │  gateway.New(config)             │  POST /v1/email (HTTP)           │
 │  Config lives in your code       │  Config lives in PostgreSQL      │
-│  No DB required                  │  React Portal UI (partial)       │
+│  No DB required                  │  React Portal UI                 │
 └──────────────────────────────────┴──────────────────────────────────┘
 ```
 
@@ -141,22 +141,28 @@ Open **http://localhost:10104** — the Portal UI.
 
 ### First time setup (Portal UI)
 
-The Portal UI currently supports:
+The Portal UI supports:
 
 1. **Register** and **sign in** (email + password)
-2. **Workspaces** — list workspaces you belong to and open one
+2. **Workspaces** — list, create, and join workspaces
 3. **Integrations** — connect, activate, deactivate, or remove messaging providers
 4. **Message logs** — audit trail of gateway send requests (Overview + channel tabs)
-5. **Send test** — send a test message through the gateway for the workspace
+5. **Email inbox** — browse captured outbound emails (memory dispatch or `store_message_content`)
+6. **Email templates** — create and manage reusable email layouts
+7. **Settings** — general workspace settings, API keys, and message dispatch mode
+
+Use the **Get started** dialog on the logs pages for curl examples. Send traffic through the public gateway API (`POST /v1/email`, `POST /v1/sms`, etc.) with a workspace API key.
 
 For local dev with PostgreSQL, run migrations then apply seeds in order (see `database/init-db.sh`): `001_seed_permissions.sql`, `002_seed_providers.sql`, `003_seed_mailgun_config.sql`, and `004_demo_workspace.sql` (optional demo data: `demo@weprodev.com` / `secret`).
 
 ### Sending via HTTP
 
+`X-Workspace-Key` accepts the workspace **UUID** (recommended — copy from Settings or the Get started dialog) or the workspace slug.
+
 ```bash
 curl -X POST http://localhost:10101/v1/email \
   -u "wk_abc123:your-secret" \
-  -H "X-Workspace-Key: myapp" \
+  -H "X-Workspace-Key: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Content-Type: application/json" \
   -d '{
     "to": ["user@example.com"],
@@ -170,7 +176,7 @@ Or with Bearer token:
 ```bash
 curl -X POST http://localhost:10101/v1/email \
   -H "Authorization: Bearer wk_abc123:your-secret" \
-  -H "X-Workspace-Key: myapp" \
+  -H "X-Workspace-Key: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Content-Type: application/json" \
   -d '{"to": ["user@example.com"], "subject": "Hello", "html": "<h1>World</h1>"}'
 ```
@@ -183,7 +189,7 @@ import requests
 response = requests.post(
     "http://localhost:10101/v1/email",
     auth=("wk_abc123", "your-secret"),
-    headers={"X-Workspace-Key": "myapp"},
+    headers={"X-Workspace-Key": "550e8400-e29b-41d4-a716-446655440000"},
     json={
         "to": ["user@example.com"],
         "subject": "Hello from Python",
@@ -200,7 +206,7 @@ const response = await fetch("http://localhost:10101/v1/email", {
   method: "POST",
   headers: {
     "Authorization": "Basic " + btoa("wk_abc123:your-secret"),
-    "X-Workspace-Key": "myapp",
+    "X-Workspace-Key": "550e8400-e29b-41d4-a716-446655440000",
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
@@ -240,10 +246,10 @@ curl -H "Authorization: Bearer <jwt>" http://localhost:10101/api/v1/workspaces
 Use your **workspace API key** credentials:
 ```bash
 # Basic auth
-curl -u "wk_abc123:secret" -H "X-Workspace-Key: myapp" ...
+curl -u "wk_abc123:secret" -H "X-Workspace-Key: <workspace-uuid>" ...
 
 # Bearer (colon-separated)
-curl -H "Authorization: Bearer wk_abc123:secret" -H "X-Workspace-Key: myapp" ...
+curl -H "Authorization: Bearer wk_abc123:secret" -H "X-Workspace-Key: <workspace-uuid>" ...
 ```
 
 ---
@@ -320,7 +326,7 @@ result, err := gw.SendChat(ctx, &contracts.ChatMessage{
 
 ### Portal REST API (JWT auth)
 
-Routes registered in `internal/presentation/router.go`. **Portal UI pages exist only for auth, workspace list, message logs, and send test** — other management routes are REST-only until UI is built.
+Routes registered in `internal/presentation/router.go`. **Portal UI pages exist for auth, workspace list, message logs, email inbox, integrations, and settings** — other management routes are REST-only until UI is built.
 
 #### Auth
 
@@ -337,11 +343,8 @@ Routes registered in `internal/presentation/router.go`. **Portal UI pages exist 
 |--------|----------|:---------:|-------------|
 | GET | `/api/v1/workspaces` | ✓ | List workspaces for the logged-in user |
 | GET | `/api/v1/workspaces/:wid/logs` | ✓ | Message request logs (optionally filter by `channel`) |
-| POST | `/api/v1/workspaces/:wid/send-test/:channel` | ✓ | Send test via gateway (`email` / `sms` / `push` / `chat`) |
 
-#### Workspace provisioning & management (REST only — no Portal UI)
-
-Used by Bruno, curl, and CI bootstrap. Not documented endpoint-by-endpoint here; see `internal/presentation/router.go` and [E2E testing](./e2e-testing.md) for create workspace, API keys, settings, integrations, templates, and members.
+Additional workspace endpoints (create, API keys, settings, templates, members, inbox) are implemented in `internal/presentation/router.go` and covered in [Portal inbox](./portal-inbox.md) and [E2E testing](./e2e-testing.md).
 
 ### Workspace access (portal JWT routes & RBAC)
 
@@ -349,7 +352,7 @@ Workspace-scoped routes require a valid portal JWT and are governed by a Role-Ba
 
 Roles and permissions are defined in [permission.go](../../internal/core/domain/permission.go):
 - **admin**: Full read/write access. The creator of a workspace is automatically assigned this role (as `admin` in both members repository and `gogate`).
-- **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus the ability to send test messages (`send.test`).
+- **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus inbox mutations (`inbox.write`).
 
 To bootstrap roles and permissions, make sure you run the database seeds:
 1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.
@@ -364,9 +367,9 @@ The HTTP server uses two distinct authorization approaches by design:
 - **Inbox SSE API (`/api/v1/workspaces/:wid/inbox/...`)**: Restricts access using JWT tokens combined with a direct database workspace membership check (`RequireWorkspaceMember`) and the workspace API key (`RequireWorkspaceAPIKey`). This decoupled model allows client-side SDKs, SSE event streaming, and automation runners to interact with the simulated inbox without requiring full portal RBAC configuration.
 
 
-### Inbox API (captured messages — REST / Bruno, not Portal UI)
+### Inbox API
 
-The Portal UI shows **request logs** (`/logs`), not the memory **inbox** (`/inbox/*`). Inbox capture, SSE, and internal ingest are documented in [Portal inbox](./portal-inbox.md).
+Captured messages are available through the Portal **Email** page (UI + SSE) and the REST inbox endpoints documented in [Portal inbox](./portal-inbox.md). SMS, push, and chat channels expose request **logs** in the UI; captured-message browsing for those channels is API-only today.
 
 ---
 
@@ -386,8 +389,8 @@ portal:
   ui_port: 10104
 ```
 
-> **Note:** Provider credentials (Mailgun API keys, etc.) are **NOT** in YAML files.
-> They are configured via the Portal REST API and stored encrypted in PostgreSQL.
+> **Note:** Provider credentials (Mailgun API keys, etc.) are **not** in YAML files.
+> Configure them on the Portal **Integrations** page or via `POST /api/v1/workspaces/:wid/integrations`. Values are stored encrypted in PostgreSQL.
 
 ### Environment Variables (Server)
 
@@ -410,27 +413,29 @@ MESSAGE_CONFIG_ENCRYPTION_KEY=your-32-byte-key-here
 
 ---
 
-## Message Dispatch Modes
+## Message Dispatch & Content Storage
 
-Control how messages are handled per workspace. Default is `memory_only`.
+Control how messages are routed and whether bodies are captured in the portal inbox.
 
-Set via REST (no Portal UI page yet):
+Defaults: `message_dispatch_mode=memory`, `store_message_content=false`.
+
+Invalid values for dispatch settings return **400 Bad Request** on PATCH.
+
+Set via Portal **Settings → Message Dispatch** or REST:
 
 ```bash
 PATCH /api/v1/workspaces/:wid/settings
 Authorization: Bearer <portal-jwt>
 Content-Type: application/json
 
-{ "message_dispatch_mode": "provider_only" }
+{ "message_dispatch_mode": "provider", "store_message_content": "true" }
 ```
 
-See [Portal inbox](./portal-inbox.md) for mode behavior.
+Portal UI: select **Memory** or **Provider**, then check **Store message content in inbox** on or off.
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| `memory_only` | In-process RAM only, **not sent** | Development, testing |
-| `provider_only` | Sent to real provider, no local copy | Production |
-| `memory_and_provider` | Both — local copy + real send | Staging, debugging |
+See [Portal inbox](./portal-inbox.md) for routing behavior.
+
+Every send also creates a `message_request_logs` row for operational tracing (correlation via `request_id`).
 
 ---
 
@@ -445,11 +450,11 @@ Using a Mailgun Sandbox Domain:
 
 ### Provider Not Sending
 
-Check workspace `message_dispatch_mode` via `GET /api/v1/workspaces/:wid/settings`. If it is `memory_only`, messages are captured locally — not sent to the provider.
+Check workspace settings via `GET /api/v1/workspaces/:wid/settings`. If `message_dispatch_mode` is `memory`, messages are captured locally — not sent to the provider.
 
 ### API Key Rejected
 
-- Ensure `X-Workspace-Key` matches the workspace's `unique_key` (slug, not UUID)
+- Ensure `X-Workspace-Key` matches the workspace UUID or slug
 - Verify the API key is active (`GET /api/v1/workspaces/:wid/api-keys` with portal JWT)
 - Check `client_id` and `client_secret` — secret is shown once at creation
 
