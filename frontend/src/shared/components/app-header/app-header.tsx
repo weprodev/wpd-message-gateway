@@ -2,8 +2,8 @@ import { useNavigate } from "react-router-dom"
 import { getToken, setToken } from "@/core/api/client"
 import { ROUTES } from "@/core/router/routes"
 import { Icon } from "@/components/ui/icon"
-import { MessageGatewayLogo } from "./message-gateway-logo"
-import { ThemeToggle } from "./theme-toggle"
+import { MessageGatewayLogo } from "../message-gateway-logo"
+import { ThemeToggle } from "../theme-toggle"
 
 function BrandText() {
   return (
