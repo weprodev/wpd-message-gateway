@@ -23,29 +23,9 @@ import (
 	"log/slog"
 
 	pkglogger "github.com/weprodev/go-pkg/logger"
+
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 )
-
-// contextKey is an unexported type for keys stored in context.Context.
-type contextKey string
-
-const (
-	keyWorkspaceID contextKey = "workspace_id"
-	keyAPIKeyID    contextKey = "api_key_id"
-	keyChannel     contextKey = "channel"
-	keyProvider    contextKey = "provider"
-	keyRequestID   contextKey = "request_id"
-)
-
-// WithRequestID returns a context enriched with request_id (correlation ID).
-func WithRequestID(ctx context.Context, requestID string) context.Context {
-	return context.WithValue(ctx, keyRequestID, requestID)
-}
-
-// GetRequestID retrieves the request_id from context.
-func GetRequestID(ctx context.Context) string {
-	v, _ := ctx.Value(keyRequestID).(string)
-	return v
-}
 
 // ContextHandler extracts request context fields and appends them to slog.Record.
 type ContextHandler struct {
@@ -66,7 +46,7 @@ func (h *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 		return h.next.Handle(ctx, r)
 	}
 
-	attrs := Attrs(ctx)
+	attrs := logctx.Attrs(ctx)
 	for i := 0; i < len(attrs); i += 2 {
 		key, ok := attrs[i].(string)
 		if ok {
@@ -99,7 +79,7 @@ func New(env string, extraHandlers ...slog.Handler) (*pkglogger.Logger, error) {
 
 	extractors := []pkglogger.ContextExtractor{
 		func(ctx context.Context) []any {
-			return Attrs(ctx)
+			return logctx.Attrs(ctx)
 		},
 	}
 
@@ -120,43 +100,34 @@ func New(env string, extraHandlers ...slog.Handler) (*pkglogger.Logger, error) {
 	return log, nil
 }
 
+// WithRequestID returns a context enriched with request_id (correlation ID).
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return logctx.WithRequestID(ctx, requestID)
+}
+
+// GetRequestID retrieves the request_id from context.
+func GetRequestID(ctx context.Context) string {
+	return logctx.GetRequestID(ctx)
+}
+
 // WithWorkspace returns a context enriched with workspace and api-key identifiers.
-// Pass this context into handler calls so structured log records carry these fields.
 func WithWorkspace(ctx context.Context, workspaceID, apiKeyID string) context.Context {
-	ctx = context.WithValue(ctx, keyWorkspaceID, workspaceID)
-	ctx = context.WithValue(ctx, keyAPIKeyID, apiKeyID)
-	return ctx
+	return logctx.WithWorkspace(ctx, workspaceID, apiKeyID)
 }
 
 // WithChannel enriches a context with the active message channel (email/sms/push/chat).
 func WithChannel(ctx context.Context, channel string) context.Context {
-	return context.WithValue(ctx, keyChannel, channel)
+	return logctx.WithChannel(ctx, channel)
 }
 
 // WithProvider enriches a context with the resolved provider name.
 func WithProvider(ctx context.Context, provider string) context.Context {
-	return context.WithValue(ctx, keyProvider, provider)
+	return logctx.WithProvider(ctx, provider)
 }
 
 // Attrs extracts gateway correlation fields from ctx for go-pkg ContextExtractors.
 func Attrs(ctx context.Context) []any {
-	attrs := make([]any, 0, 10)
-	if v, _ := ctx.Value(keyWorkspaceID).(string); v != "" {
-		attrs = append(attrs, "workspace_id", v)
-	}
-	if v, _ := ctx.Value(keyAPIKeyID).(string); v != "" {
-		attrs = append(attrs, "api_key_id", v)
-	}
-	if v, _ := ctx.Value(keyChannel).(string); v != "" {
-		attrs = append(attrs, "channel", v)
-	}
-	if v, _ := ctx.Value(keyProvider).(string); v != "" {
-		attrs = append(attrs, "provider", v)
-	}
-	if v, _ := ctx.Value(keyRequestID).(string); v != "" {
-		attrs = append(attrs, "request_id", v)
-	}
-	return attrs
+	return logctx.Attrs(ctx)
 }
 
 func isLocalEnv(env string) bool {

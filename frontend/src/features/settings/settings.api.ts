@@ -1,3 +1,4 @@
+import { fetchWorkspaceApiKeys } from "@/core/api/workspace-api-keys"
 import { apiFetch } from "@/core/api/client"
 
 import { parseWorkspaceSettings } from "./settings.schema"
@@ -33,11 +34,7 @@ export async function patchSettings(workspaceId: string, body: WorkspaceSettings
 }
 
 export async function listApiKeys(workspaceId: string): Promise<ApiKey[]> {
-  const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/api-keys`)
-  if (!res.ok) {
-    throw new Error("Failed to load API keys")
-  }
-  return (await res.json()) as ApiKey[]
+  return fetchWorkspaceApiKeys(workspaceId)
 }
 
 export async function createApiKey(

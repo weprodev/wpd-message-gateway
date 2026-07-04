@@ -16,7 +16,7 @@ describe("GetStartedDialog", () => {
     mockedUseGetStartedContext.mockReturnValue({
       context: {
         workspaceId: "00000000-0000-0000-0000-000000000001",
-        apiKeys: [{ client_id: "demo-client-id" }],
+        apiKeys: [{ client_id: "demo-client-id", name: "Demo", is_active: true }],
       },
       isLoading: false,
       error: null,

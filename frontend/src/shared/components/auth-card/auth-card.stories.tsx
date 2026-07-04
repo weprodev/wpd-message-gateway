@@ -12,10 +12,12 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
-  render: (args) => (
-    <AuthCard {...args}>
-      <h2 className="text-lg font-semibold text-foreground">Sign in</h2>
-      <p className="mt-2 text-sm text-text-secondary">Use your portal credentials.</p>
-    </AuthCard>
-  ),
+  args: {
+    children: (
+      <>
+        <h2 className="text-lg font-semibold text-foreground">Sign in</h2>
+        <p className="mt-2 text-sm text-text-secondary">Use your portal credentials.</p>
+      </>
+    ),
+  },
 }

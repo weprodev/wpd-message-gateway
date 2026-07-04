@@ -15,6 +15,7 @@ export type LogRow = {
   inbox_message_id?: string
   created_at: string
   source_name?: string
+  client_id?: string
 }
 
 export interface StoredEmail {

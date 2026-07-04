@@ -73,7 +73,7 @@ CREATE INDEX idx_workspaces_active_list
 CREATE TABLE roles (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'web',
+    guard_name   TEXT        NOT NULL DEFAULT 'msg_web',
     display_name TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -126,7 +126,9 @@ CREATE UNIQUE INDEX idx_invitations_pending_per_workspace_email
 
 CREATE INDEX idx_invitations_workspace_id ON invitations(workspace_id);
 CREATE INDEX idx_invitations_token_hash   ON invitations(token_hash);
-CREATE INDEX idx_invitations_role_id       ON invitations(role_id);
+CREATE INDEX idx_invitations_workspace_pending
+    ON invitations (workspace_id, status, expires_at)
+    WHERE status = 'pending';
 
 -- ==============================================================================
 -- 6. WORKSPACE_CHANNELS TABLE
@@ -188,6 +190,8 @@ CREATE TABLE provider_config_fields (
 CREATE TRIGGER trg_provider_config_fields_set_updated_at
     BEFORE UPDATE ON provider_config_fields
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_provider_config_fields_provider_id ON provider_config_fields(provider_id);
 
 -- ==============================================================================
 -- 9. INTEGRATIONS TABLE (Workspace ↔ Provider Credentials)
@@ -395,7 +399,7 @@ CREATE INDEX idx_workspace_access_audits_actor_user_id
 CREATE TABLE permissions (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'web',
+    guard_name   TEXT        NOT NULL DEFAULT 'msg_web',
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 

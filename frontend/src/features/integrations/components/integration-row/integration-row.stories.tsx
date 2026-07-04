@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 
-import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 import { IntegrationRow } from "./integration-row"
 
 const mailgunProvider: IntegrationViewModel = {

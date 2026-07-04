@@ -22,12 +22,9 @@ func NewWorkspaceMemberRepository(client *pgsql.PgClient) port.WorkspaceMemberRe
 }
 
 func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID, role string) error {
-	// Look up role ID from the roles table by name
-	var roleID string
-	err := r.client.GetDB(ctx).QueryRowContext(ctx, `SELECT id FROM roles WHERE name = $1`, role).Scan(&roleID)
+	roleID, err := lookupRoleIDByName(ctx, r.client.GetDB(ctx), role)
 	if err != nil {
-		slog.ErrorContext(ctx, "database error: lookup role failed", "error", err, "role", role)
-		return fmt.Errorf("wpd-message-gateway: lookup role %q: %w", role, err)
+		return err
 	}
 
 	_, err = r.client.GetDB(ctx).ExecContext(ctx, `

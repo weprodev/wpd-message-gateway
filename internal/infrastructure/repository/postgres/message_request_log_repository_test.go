@@ -21,11 +21,11 @@ func TestScanMessageRequestLogWithSource_nullInboxMessageID(t *testing.T) {
 	rows := sqlmock.NewRows([]string{
 		"id", "workspace_id", "api_key_id", "channel_type", "http_method", "status_code", "endpoint",
 		"provider_name", "request_id", "duration_ms", "error_message", "inbox_message_id", "created_at",
-		"source_name", "client_id", "total_count",
+		"source_name", "client_id",
 	}).AddRow(
 		"log-1", "ws-1", nil, "email", "POST", 200, "/v1/email",
 		"memory", nil, 12, nil, nil, createdAt,
-		"Demo Key", "demo-client", int64(1),
+		"Demo Key", "demo-client",
 	)
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
@@ -40,7 +40,7 @@ func TestScanMessageRequestLogWithSource_nullInboxMessageID(t *testing.T) {
 		t.Fatal("expected one row")
 	}
 
-	row, total, err := scanMessageRequestLogWithSource(resultRows)
+	row, err := scanMessageRequestLogWithSource(resultRows)
 	if err != nil {
 		t.Fatalf("scanMessageRequestLogWithSource: %v", err)
 	}
@@ -50,9 +50,6 @@ func TestScanMessageRequestLogWithSource_nullInboxMessageID(t *testing.T) {
 	}
 	if row.ProviderName != "memory" {
 		t.Fatalf("ProviderName: got %q", row.ProviderName)
-	}
-	if total != 1 {
-		t.Fatalf("total: got %d", total)
 	}
 }
 
@@ -70,11 +67,11 @@ func TestScanMessageRequestLogWithSource_withInboxMessageID(t *testing.T) {
 	rows := sqlmock.NewRows([]string{
 		"id", "workspace_id", "api_key_id", "channel_type", "http_method", "status_code", "endpoint",
 		"provider_name", "request_id", "duration_ms", "error_message", "inbox_message_id", "created_at",
-		"source_name", "client_id", "total_count",
+		"source_name", "client_id",
 	}).AddRow(
 		"log-2", "ws-1", nil, "email", "POST", 200, "/v1/email",
 		"memory", nil, 12, nil, inboxID, createdAt,
-		"Demo Key", "demo-client", int64(1),
+		"Demo Key", "demo-client",
 	)
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
@@ -89,7 +86,7 @@ func TestScanMessageRequestLogWithSource_withInboxMessageID(t *testing.T) {
 		t.Fatal("expected one row")
 	}
 
-	row, _, err := scanMessageRequestLogWithSource(resultRows)
+	row, err := scanMessageRequestLogWithSource(resultRows)
 	if err != nil {
 		t.Fatalf("scanMessageRequestLogWithSource: %v", err)
 	}

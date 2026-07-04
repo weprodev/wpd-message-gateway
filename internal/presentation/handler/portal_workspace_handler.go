@@ -3,7 +3,6 @@ package handler
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -128,7 +127,7 @@ func (h *PortalWorkspaceHandler) CreateInvitation(c echo.Context) error {
 	if body.Email == "" || body.Role == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "email and role required")
 	}
-	inv := body.ToDomain(wid, time.Now().Add(7*24*time.Hour))
+	inv := h.svc.NewPendingInvitation(wid, body.Email, body.Role)
 	rawToken, err := h.svc.CreateInvitation(c.Request().Context(), inv)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create invitation", "error", err, "workspace_id", wid, "email", body.Email)

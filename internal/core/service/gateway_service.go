@@ -9,8 +9,8 @@ import (
 	"log/slog"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
@@ -169,7 +169,7 @@ func (s *GatewayService) dispatch(
 		integrationID = intg.ID
 		providerName = intg.ProviderName
 
-		providerCtx := applogger.WithProvider(ctx, providerName)
+		providerCtx := logctx.WithProvider(ctx, providerName)
 		provResult, err = sendViaProvider(providerCtx, intg)
 		if err != nil {
 			slog.WarnContext(providerCtx, "provider dispatch failed", "error", err, "integration_id", integrationID)

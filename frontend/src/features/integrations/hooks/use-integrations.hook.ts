@@ -8,20 +8,10 @@ import {
   type IntegrationActionResult,
   type IntegrationChannel,
   type IntegrationStatus,
+  type IntegrationViewModel,
 } from "@/features/integrations/integrations.types"
 
-export interface IntegrationViewModel {
-  id: string
-  name: string
-  description: string
-  icon: string
-  category: IntegrationChannel
-  isAvailable: boolean
-  isComingSoon?: boolean
-  integration?: Integration
-  isConnected: boolean
-  isDeactivated: boolean
-}
+export type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 
 function mergeCatalogWithIntegrations(providers: BackendProvider[], integrations: Integration[]): IntegrationViewModel[] {
   return providers.map((provider) => {

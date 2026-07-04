@@ -6,6 +6,9 @@ const (
 	RoleMember = "member"
 )
 
+// RBACGuardName is the guard_name used for portal roles and permissions in this project.
+const RBACGuardName = "msg_web"
+
 // Permissions in the RBAC system.
 const (
 	// Workspaces

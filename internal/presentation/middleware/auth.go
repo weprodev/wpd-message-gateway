@@ -12,8 +12,8 @@ import (
 	"github.com/weprodev/go-pkg/crypto"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 )
 
 type contextKey string
@@ -93,7 +93,7 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			ctx = context.WithValue(ctx, WorkspaceIDKey, apiKey.WorkspaceID)
 			ctx = context.WithValue(ctx, APIKeyIDKey, apiKey.ID)
 			ctx = context.WithValue(ctx, APIKeyNameKey, apiKey.Name)
-			ctx = applogger.WithWorkspace(ctx, apiKey.WorkspaceID, apiKey.ID)
+			ctx = logctx.WithWorkspace(ctx, apiKey.WorkspaceID, apiKey.ID)
 			c.SetRequest(c.Request().WithContext(ctx))
 			return next(c)
 		}

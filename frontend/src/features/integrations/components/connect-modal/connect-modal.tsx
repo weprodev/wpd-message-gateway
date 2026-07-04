@@ -1,13 +1,13 @@
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Modal } from "@/components/ui/modal"
 import { Spinner } from "@/components/ui/spinner"
 
-import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
-import { fetchProviderConfigFields, type ProviderConfigField } from "@/features/integrations/integrations.api"
+import { useProviderConfigFields } from "@/features/integrations/hooks/use-provider-config-fields.hook"
+import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 import type { IntegrationActionResult } from "@/features/integrations/integrations.types"
 
 interface ConnectModalProps {
@@ -47,39 +47,12 @@ interface ConnectFormProps {
 }
 
 function ConnectForm({ workspaceId, provider, onConnect, onClose }: ConnectFormProps) {
-  const [fields, setFields] = useState<ProviderConfigField[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState<Record<string, string>>({})
+  const { fields, formData, isLoading, error, updateField, setError } = useProviderConfigFields(
+    workspaceId,
+    provider.id,
+    true,
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  useEffect(() => {
-    const loadFields = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const result = await fetchProviderConfigFields(workspaceId, provider.id)
-        setFields(result)
-
-        const defaults: Record<string, string> = {}
-        result.forEach((field) => {
-          defaults[field.key] = field.default_value || ""
-        })
-        setFormData(defaults)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load configuration fields")
-        setFields([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    void loadFields()
-  }, [workspaceId, provider.id])
-
-  function handleInputChange(key: string, value: string) {
-    setFormData((prev) => ({ ...prev, [key]: value }))
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -139,7 +112,7 @@ function ConnectForm({ workspaceId, provider, onConnect, onClose }: ConnectFormP
               type={field.field_type === "password" ? "password" : field.field_type === "email" ? "email" : "text"}
               required={field.required}
               value={formData[field.key] || ""}
-              onChange={(e) => handleInputChange(field.key, e.target.value)}
+              onChange={(e) => updateField(field.key, e.target.value)}
               placeholder={field.description || `Enter ${field.label.toLowerCase()}`}
               className="bg-input"
             />

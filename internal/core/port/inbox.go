@@ -46,6 +46,27 @@ type InboxEmailPage struct {
 	HasMore    bool          `json:"has_more"`
 }
 
+// InboxSMSPage is a paginated slice of captured SMS messages (newest first).
+type InboxSMSPage struct {
+	Items      []StoredSMS `json:"items"`
+	NextCursor string      `json:"next_cursor,omitempty"`
+	HasMore    bool        `json:"has_more"`
+}
+
+// InboxPushPage is a paginated slice of captured push notifications (newest first).
+type InboxPushPage struct {
+	Items      []StoredPush `json:"items"`
+	NextCursor string       `json:"next_cursor,omitempty"`
+	HasMore    bool         `json:"has_more"`
+}
+
+// InboxChatPage is a paginated slice of captured chat messages (newest first).
+type InboxChatPage struct {
+	Items      []StoredChat `json:"items"`
+	NextCursor string       `json:"next_cursor,omitempty"`
+	HasMore    bool         `json:"has_more"`
+}
+
 // InboxReader is the read side of the in-process message capture store.
 type InboxReader interface {
 	StatsForWorkspace(workspaceID string) map[string]int
@@ -53,12 +74,15 @@ type InboxReader interface {
 	ListEmailsForWorkspace(workspaceID string, limit int, cursor string) InboxEmailPage
 	EmailByIDForWorkspace(id, workspaceID string) (StoredEmail, bool)
 	DeleteEmailByIDForWorkspace(id, workspaceID string) bool
+	ListSMSForWorkspace(workspaceID string, limit int, cursor string) InboxSMSPage
 	SMSForWorkspace(workspaceID string) []StoredSMS
 	SMSByIDForWorkspace(id, workspaceID string) (StoredSMS, bool)
 	DeleteSMSByIDForWorkspace(id, workspaceID string) bool
+	ListPushForWorkspace(workspaceID string, limit int, cursor string) InboxPushPage
 	PushForWorkspace(workspaceID string) []StoredPush
 	PushByIDForWorkspace(id, workspaceID string) (StoredPush, bool)
 	DeletePushByIDForWorkspace(id, workspaceID string) bool
+	ListChatForWorkspace(workspaceID string, limit int, cursor string) InboxChatPage
 	ChatForWorkspace(workspaceID string) []StoredChat
 	ChatByIDForWorkspace(id, workspaceID string) (StoredChat, bool)
 	DeleteChatByIDForWorkspace(id, workspaceID string) bool

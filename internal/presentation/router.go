@@ -7,8 +7,8 @@ import (
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
-	applogger "github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/internal/presentation/handler"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 
@@ -68,6 +68,23 @@ func NewRouter(
 	}
 }
 
+// enrichRequestIDContext copies Echo's X-Request-ID into the request context for slog correlation.
+func enrichRequestIDContext() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			reqID := c.Response().Header().Get(echo.HeaderXRequestID)
+			if reqID == "" {
+				reqID = c.Request().Header.Get(echo.HeaderXRequestID)
+			}
+			if reqID != "" {
+				ctx := logctx.WithRequestID(c.Request().Context(), reqID)
+				c.SetRequest(c.Request().WithContext(ctx))
+			}
+			return next(c)
+		}
+	}
+}
+
 // Setup configures Echo with all routes.
 func (rt *Router) Setup() *echo.Echo {
 	e := echo.New()
@@ -77,20 +94,7 @@ func (rt *Router) Setup() *echo.Echo {
 
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.RequestID())
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			reqID := c.Response().Header().Get(echo.HeaderXRequestID)
-			if reqID == "" {
-				reqID = c.Request().Header.Get(echo.HeaderXRequestID)
-			}
-			if reqID != "" {
-				ctx := c.Request().Context()
-				ctx = applogger.WithRequestID(ctx, reqID)
-				c.SetRequest(c.Request().WithContext(ctx))
-			}
-			return next(c)
-		}
-	})
+	e.Use(enrichRequestIDContext())
 	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{
 		LogStatus:   true,
 		LogURI:      true,

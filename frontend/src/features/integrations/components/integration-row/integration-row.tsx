@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 import { IntegrationProviderIcon } from "@/features/integrations/components/integration-provider-icon"
-import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 
 interface IntegrationRowProps {
   provider: IntegrationViewModel

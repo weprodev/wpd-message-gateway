@@ -131,10 +131,47 @@ func (s *Store) DeleteEmailByIDForWorkspace(id, workspaceID string) bool {
 	return false
 }
 
+func paginateByID[T any](all []T, limit int, cursor string, idOf func(T) string) (items []T, nextCursor string, hasMore bool) {
+	limit = clampInboxLimit(limit)
+	start := 0
+	if cursor != "" {
+		for i, item := range all {
+			if idOf(item) == cursor {
+				start = i + 1
+				break
+			}
+		}
+	}
+
+	end := start + limit
+	hasMore = end < len(all)
+	if end > len(all) {
+		end = len(all)
+	}
+
+	items = make([]T, 0, end-start)
+	if start < len(all) {
+		items = append(items, all[start:end]...)
+	}
+	if hasMore && len(items) > 0 {
+		nextCursor = idOf(items[len(items)-1])
+	}
+	return items, nextCursor, hasMore
+}
+
 func (s *Store) SMSForWorkspace(workspaceID string) []port.StoredSMS {
+	page := s.ListSMSForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListSMSForWorkspace(workspaceID string, limit int, cursor string) port.InboxSMSPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]port.StoredSMS(nil), s.sms[workspaceID]...)
+
+	items, nextCursor, hasMore := paginateByID(s.sms[workspaceID], limit, cursor, func(item port.StoredSMS) string {
+		return item.ID
+	})
+	return port.InboxSMSPage{Items: items, NextCursor: nextCursor, HasMore: hasMore}
 }
 
 func (s *Store) SMSByIDForWorkspace(id, workspaceID string) (port.StoredSMS, bool) {
@@ -162,9 +199,18 @@ func (s *Store) DeleteSMSByIDForWorkspace(id, workspaceID string) bool {
 }
 
 func (s *Store) PushForWorkspace(workspaceID string) []port.StoredPush {
+	page := s.ListPushForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListPushForWorkspace(workspaceID string, limit int, cursor string) port.InboxPushPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]port.StoredPush(nil), s.pushes[workspaceID]...)
+
+	items, nextCursor, hasMore := paginateByID(s.pushes[workspaceID], limit, cursor, func(item port.StoredPush) string {
+		return item.ID
+	})
+	return port.InboxPushPage{Items: items, NextCursor: nextCursor, HasMore: hasMore}
 }
 
 func (s *Store) PushByIDForWorkspace(id, workspaceID string) (port.StoredPush, bool) {
@@ -192,9 +238,18 @@ func (s *Store) DeletePushByIDForWorkspace(id, workspaceID string) bool {
 }
 
 func (s *Store) ChatForWorkspace(workspaceID string) []port.StoredChat {
+	page := s.ListChatForWorkspace(workspaceID, 0, "")
+	return page.Items
+}
+
+func (s *Store) ListChatForWorkspace(workspaceID string, limit int, cursor string) port.InboxChatPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]port.StoredChat(nil), s.chats[workspaceID]...)
+
+	items, nextCursor, hasMore := paginateByID(s.chats[workspaceID], limit, cursor, func(item port.StoredChat) string {
+		return item.ID
+	})
+	return port.InboxChatPage{Items: items, NextCursor: nextCursor, HasMore: hasMore}
 }
 
 func (s *Store) ChatByIDForWorkspace(id, workspaceID string) (port.StoredChat, bool) {

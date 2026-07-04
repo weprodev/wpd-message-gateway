@@ -17,9 +17,12 @@ import (
 const testJWTSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 type fakeUserRepo struct {
-	byEmail *domain.User
-	err     error
-	created *domain.User
+	byEmail         *domain.User
+	byID            *domain.User
+	err             error
+	created         *domain.User
+	setVerifiedErr  error
+	verifiedUserIDs []string
 }
 
 func (f *fakeUserRepo) Create(ctx context.Context, u *domain.User) error {
@@ -29,14 +32,24 @@ func (f *fakeUserRepo) Create(ctx context.Context, u *domain.User) error {
 }
 
 func (f *fakeUserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return f.byEmail, f.err
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.byEmail, nil
 }
 
 func (f *fakeUserRepo) GetByID(ctx context.Context, id string) (*domain.User, error) {
+	if f.byID != nil && f.byID.ID.String() == id {
+		return f.byID, nil
+	}
 	return nil, port.ErrNotFound
 }
 
 func (f *fakeUserRepo) SetEmailVerified(ctx context.Context, id string) error {
+	if f.setVerifiedErr != nil {
+		return f.setVerifiedErr
+	}
+	f.verifiedUserIDs = append(f.verifiedUserIDs, id)
 	return nil
 }
 

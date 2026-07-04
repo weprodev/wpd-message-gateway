@@ -559,6 +559,19 @@ func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, k
 	return nil
 }
 
+const invitationTTL = 7 * 24 * time.Hour
+
+// NewPendingInvitation builds a workspace invitation with the standard expiry window.
+func (s *PortalService) NewPendingInvitation(workspaceID, email, role string) *domain.Invitation {
+	return &domain.Invitation{
+		WorkspaceID: workspaceID,
+		Email:       email,
+		Role:        role,
+		ExpiresAt:   time.Now().Add(invitationTTL),
+		Status:      "pending",
+	}
+}
+
 // ListInvitations returns all pending invitations for a workspace.
 func (s *PortalService) ListInvitations(ctx context.Context, workspaceID string) ([]domain.Invitation, error) {
 	return s.invites.ListPendingByWorkspace(ctx, workspaceID)

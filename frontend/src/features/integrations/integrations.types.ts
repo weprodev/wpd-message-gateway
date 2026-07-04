@@ -22,3 +22,16 @@ export interface Integration {
   created_at: string
   updated_at: string
 }
+
+export interface IntegrationViewModel {
+  id: string
+  name: string
+  description: string
+  icon: string
+  category: IntegrationChannel
+  isAvailable: boolean
+  isComingSoon?: boolean
+  integration?: Integration
+  isConnected: boolean
+  isDeactivated: boolean
+}

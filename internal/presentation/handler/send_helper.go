@@ -10,8 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
@@ -38,8 +38,8 @@ func (sh *SendHelper) DispatchAndLog(
 	start := time.Now()
 	ctx := c.Request().Context()
 
-	ctx = logger.WithWorkspace(ctx, workspaceID, apiKeyID)
-	ctx = logger.WithChannel(ctx, channel)
+	ctx = logctx.WithWorkspace(ctx, workspaceID, apiKeyID)
+	ctx = logctx.WithChannel(ctx, channel)
 
 	if workspaceID == "" {
 		slog.WarnContext(ctx, "send rejected: missing workspace context", "endpoint", endpoint)
@@ -58,7 +58,7 @@ func (sh *SendHelper) DispatchAndLog(
 	result, err := send(ctx)
 	providerName := contracts.ProviderNameFromResult(result)
 	if providerName != "" {
-		ctx = logger.WithProvider(ctx, providerName)
+		ctx = logctx.WithProvider(ctx, providerName)
 	}
 
 	if err != nil {
@@ -95,7 +95,7 @@ func (sh *SendHelper) recordLog(
 		StatusCode:   statusCode,
 		Endpoint:     endpoint,
 		ProviderName: providerName,
-		RequestID:    logger.GetRequestID(ctx),
+		RequestID:    logctx.GetRequestID(ctx),
 		DurationMs:   int(time.Since(start).Milliseconds()),
 		ErrorMessage: errMsg,
 	}

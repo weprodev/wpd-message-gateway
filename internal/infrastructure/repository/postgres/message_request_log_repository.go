@@ -76,20 +76,18 @@ func (r *MessageRequestLogRepository) insertPayload(ctx context.Context, log *do
 
 func scanMessageRequestLogWithSource(
 	scanner interface{ Scan(dest ...any) error },
-) (domain.MessageRequestLogWithSource, int64, error) {
+) (domain.MessageRequestLogWithSource, error) {
 	var row domain.MessageRequestLogWithSource
 	var apiKeyID, reqID, errMsg, prov, inboxID sql.NullString
 	var dur sql.NullInt64
-	var totalCount int64
 
 	err := scanner.Scan(
 		&row.ID, &row.WorkspaceID, &apiKeyID, &row.ChannelType, &row.HTTPMethod, &row.StatusCode, &row.Endpoint,
 		&prov, &reqID, &dur, &errMsg, &inboxID, &row.CreatedAt,
 		&row.SourceName, &row.ClientID,
-		&totalCount,
 	)
 	if err != nil {
-		return row, 0, err
+		return row, err
 	}
 
 	row.APIKeyID = optionalStringFromNull(apiKeyID)
@@ -101,7 +99,7 @@ func scanMessageRequestLogWithSource(
 		row.DurationMs = int(dur.Int64)
 	}
 
-	return row, totalCount, nil
+	return row, nil
 }
 
 func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port.MessageLogQuery) ([]domain.MessageRequestLogWithSource, int, error) {
@@ -125,11 +123,18 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	}
 
 	limit, offset := clampLimitOffset(q.Limit, q.Offset)
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM message_request_logs l WHERE %s`, where)
+	var total int
+	if err := db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "database error: failed to count message request logs", "error", err)
+		return nil, 0, err
+	}
+
 	listQuery := fmt.Sprintf(`
 		SELECT l.id, l.workspace_id, l.api_key_id, l.channel_type, l.http_method, l.status_code, l.endpoint,
 			l.provider_name, l.request_id, l.duration_ms, l.error_message, l.inbox_message_id, l.created_at,
-			COALESCE(k.name, ''), COALESCE(k.client_id, ''),
-			COUNT(*) OVER() AS total_count
+			COALESCE(k.name, ''), COALESCE(k.client_id, '')
 		FROM message_request_logs l
 		LEFT JOIN api_keys k ON k.id = l.api_key_id
 		WHERE %s
@@ -144,15 +149,11 @@ func (r *MessageRequestLogRepository) ListWithSource(ctx context.Context, q port
 	defer rows.Close() //nolint:errcheck
 
 	var out []domain.MessageRequestLogWithSource
-	total := 0
 	for rows.Next() {
-		row, totalCount, err := scanMessageRequestLogWithSource(rows)
+		row, err := scanMessageRequestLogWithSource(rows)
 		if err != nil {
 			slog.ErrorContext(ctx, "database error: failed to scan message request log", "error", err)
 			return nil, 0, err
-		}
-		if total == 0 {
-			total = int(totalCount)
 		}
 		out = append(out, row)
 	}

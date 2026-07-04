@@ -42,17 +42,6 @@ type CreateInvitationRequest struct {
 	Role  string `json:"role"`
 }
 
-// ToDomain maps the request to a domain invitation for persistence.
-func (r CreateInvitationRequest) ToDomain(workspaceID string, expiresAt time.Time) *domain.Invitation {
-	return &domain.Invitation{
-		WorkspaceID: workspaceID,
-		Email:       r.Email,
-		Role:        r.Role,
-		ExpiresAt:   expiresAt,
-		Status:      "pending",
-	}
-}
-
 // CreateInvitationResponse is returned once when an invitation is created.
 type CreateInvitationResponse struct {
 	ID        string    `json:"id"`

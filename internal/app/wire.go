@@ -16,6 +16,7 @@ import (
 
 	gogate "github.com/weprodev/wpd-gogate"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/authgate"
 	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/inbox"
@@ -62,7 +63,9 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 	}
 
 	// ── RBAC Gate ───────────────────────────────────────────────────────────
-	gateEngine := gogate.NewGate(pgClient.GetDB(startCtx), nil)
+	gateCfg := gogate.DefaultConfig()
+	gateCfg.DefaultGuardName = domain.RBACGuardName
+	gateEngine := gogate.NewGate(pgClient.GetDB(startCtx), &gateCfg)
 	if err := gateEngine.LoadPolicy(startCtx); err != nil {
 		return nil, fmt.Errorf("load RBAC policies: %w", err)
 	}

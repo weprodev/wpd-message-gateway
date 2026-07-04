@@ -10,22 +10,22 @@ ON CONFLICT (name, guard_name) DO NOTHING;
 -- 2. Insert permissions
 INSERT INTO permissions (id, name, guard_name)
 VALUES
-    (gen_random_uuid(), 'workspaces.read', 'web'),
-    (gen_random_uuid(), 'workspaces.write', 'web'),
-    (gen_random_uuid(), 'members.read', 'web'),
-    (gen_random_uuid(), 'members.write', 'web'),
-    (gen_random_uuid(), 'apikeys.read', 'web'),
-    (gen_random_uuid(), 'apikeys.write', 'web'),
-    (gen_random_uuid(), 'logs.read', 'web'),
-    (gen_random_uuid(), 'integrations.read', 'web'),
-    (gen_random_uuid(), 'integrations.write', 'web'),
-    (gen_random_uuid(), 'templates.read', 'web'),
-    (gen_random_uuid(), 'templates.write', 'web'),
-    (gen_random_uuid(), 'settings.read', 'web'),
-    (gen_random_uuid(), 'settings.write', 'web'),
-    (gen_random_uuid(), 'invitations.read', 'web'),
-    (gen_random_uuid(), 'invitations.write', 'web'),
-    (gen_random_uuid(), 'inbox.write', 'web')
+    (gen_random_uuid(), 'workspaces.read', 'msg_web'),
+    (gen_random_uuid(), 'workspaces.write', 'msg_web'),
+    (gen_random_uuid(), 'members.read', 'msg_web'),
+    (gen_random_uuid(), 'members.write', 'msg_web'),
+    (gen_random_uuid(), 'apikeys.read', 'msg_web'),
+    (gen_random_uuid(), 'apikeys.write', 'msg_web'),
+    (gen_random_uuid(), 'logs.read', 'msg_web'),
+    (gen_random_uuid(), 'integrations.read', 'msg_web'),
+    (gen_random_uuid(), 'integrations.write', 'msg_web'),
+    (gen_random_uuid(), 'templates.read', 'msg_web'),
+    (gen_random_uuid(), 'templates.write', 'msg_web'),
+    (gen_random_uuid(), 'settings.read', 'msg_web'),
+    (gen_random_uuid(), 'settings.write', 'msg_web'),
+    (gen_random_uuid(), 'invitations.read', 'msg_web'),
+    (gen_random_uuid(), 'invitations.write', 'msg_web'),
+    (gen_random_uuid(), 'inbox.write', 'msg_web')
 ON CONFLICT (name, guard_name) DO NOTHING;
 
 -- 3. Bind permissions to 'admin' role

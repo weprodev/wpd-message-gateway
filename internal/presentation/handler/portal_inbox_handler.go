@@ -67,7 +67,10 @@ func (h *PortalInboxHandler) HandleDeleteEmailByID(c echo.Context) error {
 }
 
 func (h *PortalInboxHandler) HandleGetSMS(c echo.Context) error {
-	return c.JSON(http.StatusOK, h.reader.SMSForWorkspace(workspaceIDParam(c)))
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	cursor := c.QueryParam("cursor")
+	page := h.reader.ListSMSForWorkspace(workspaceIDParam(c), limit, cursor)
+	return c.JSON(http.StatusOK, page)
 }
 
 func (h *PortalInboxHandler) HandleGetSMSByID(c echo.Context) error {
@@ -89,7 +92,10 @@ func (h *PortalInboxHandler) HandleDeleteSMSByID(c echo.Context) error {
 }
 
 func (h *PortalInboxHandler) HandleGetPush(c echo.Context) error {
-	return c.JSON(http.StatusOK, h.reader.PushForWorkspace(workspaceIDParam(c)))
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	cursor := c.QueryParam("cursor")
+	page := h.reader.ListPushForWorkspace(workspaceIDParam(c), limit, cursor)
+	return c.JSON(http.StatusOK, page)
 }
 
 func (h *PortalInboxHandler) HandleGetPushByID(c echo.Context) error {
@@ -111,7 +117,10 @@ func (h *PortalInboxHandler) HandleDeletePushByID(c echo.Context) error {
 }
 
 func (h *PortalInboxHandler) HandleGetChat(c echo.Context) error {
-	return c.JSON(http.StatusOK, h.reader.ChatForWorkspace(workspaceIDParam(c)))
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	cursor := c.QueryParam("cursor")
+	page := h.reader.ListChatForWorkspace(workspaceIDParam(c), limit, cursor)
+	return c.JSON(http.StatusOK, page)
 }
 
 func (h *PortalInboxHandler) HandleGetChatByID(c echo.Context) error {

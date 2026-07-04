@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
-import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 import { IntegrationRow } from "./integration-row"
 
 const mailgunProvider: IntegrationViewModel = {

@@ -1,110 +1,114 @@
-# WPD Message Gateway SDK
+# WPD Message Gateway SDK (`pkg/`)
 
-The `pkg` directory contains the core SDK for the WPD Message Gateway. It is fully independent from the portal and backend infrastructure, providing a clean, decoupled interface for 3rd party clients and external systems to integrate with multiple messaging providers (Email, SMS, Push, Chat).
+The `pkg/` tree is the **embedded Go SDK** — fully independent from `internal/`, PostgreSQL, and the HTTP portal. Third-party apps import it to send email, SMS, push, and chat through provider plugins without running the gateway server.
 
-## Architecture & Concepts
+**Iron rule:** `pkg/*` must **never** import `internal/*`. Enforced by `pkg/import_boundary_test.go`.
 
-The SDK adheres to clean architecture, Domain-Driven Design (DDD), and SOLID principles:
+## Packages
 
-- **`contracts/`**: Contains the pure domain interfaces (`EmailSender`, `SMSSender`, etc.) and data models (`Email`, `SMS`, `SendResult`). This acts as the universal language across all providers.
-- **`provider/`**: Contains the concrete implementations of those contracts for specific services (e.g., `mailgun`). It also includes a `memory` provider for mocking, testing, and gateway interception.
-- **`registry/`**: A central factory registry that allows dynamic registration and instantiation of providers based on arbitrary configuration maps.
-- **`gateway/`**: Exposes generic client definitions for REST integrations if needed.
+| Package | Role |
+| ------- | ---- |
+| `contracts/` | Channel message types and sender interfaces (`EmailSender`, `SMSSender`, …) |
+| `registry/` | Provider factory registry (register + resolve by name) |
+| `provider/*` | Concrete providers (`mailgun`, `memory`, …) |
+| `gateway/` | High-level `gateway.New(Config)` facade for in-process use |
 
-## How to Use as a Client
-
-Any external system or 3rd party application can import this package to seamlessly send messages through any supported provider without worrying about the underlying HTTP clients or vendor SDKs.
-
-### 1. Direct Provider Usage
-
-If you know exactly which provider you want to use, you can instantiate it directly using the contract interface:
+## Mode 1 — Embedded SDK (no server, no DB)
 
 ```go
-package main
-
 import (
-	"context"
-	"log"
+    "context"
 
-	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
-	"github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+    "github.com/weprodev/wpd-message-gateway/pkg/gateway"
+    _ "github.com/weprodev/wpd-message-gateway/pkg/provider/memory" // registers "memory"
 )
 
 func main() {
-	// 1. Configure the specific provider
-	sender, err := mailgun.New(mailgun.Config{
-		Domain:    "your-domain.com",
-		APIKey:    "your-api-key",
-		FromEmail: "no-reply@your-domain.com",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
+    gw, err := gateway.New(gateway.Config{
+        DefaultEmailProvider: "memory",
+        EmailProviders: map[string]gateway.EmailConfig{
+            "memory": {},
+        },
+    })
+    if err != nil {
+        panic(err)
+    }
 
-	// 2. Build the standard contract message
-	email := &contracts.Email{
-		To:      []string{"user@example.com"},
-		Subject: "Welcome to WPD",
-		HTML:    "<h1>Hello World</h1>",
-		From:    "no-reply@your-domain.com",
-	}
-
-	// 3. Send using the unified interface
-	result, err := sender.Send(context.Background(), email)
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-	log.Printf("Sent! ID: %s", result.ID)
+    result, err := gw.SendEmail(context.Background(), &contracts.Email{
+        To:      []string{"user@example.com"},
+        Subject: "Hello",
+        HTML:    "<p>Hi</p>",
+    })
+    if err != nil {
+        panic(err)
+    }
+    _ = result.ID
 }
 ```
 
-### 2. Dynamic Provider Resolution (Registry)
+Import only the providers you need via blank import, or use `pkg/gateway` which bundles common providers through `gateway/imports.go`.
 
-For systems that store configurations dynamically (e.g., in a database), you can use the Registry. This allows you to swap providers at runtime without changing your code:
+## Mode 2 — Dynamic resolution via registry
+
+For config loaded from your own store (not this repo's PostgreSQL):
 
 ```go
-package main
-
 import (
-	"context"
-	"log"
+    "encoding/json"
 
-	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
-	"github.com/weprodev/wpd-message-gateway/pkg/registry"
-	_ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun" // Import for side-effects (registration)
+    "github.com/weprodev/wpd-message-gateway/pkg/registry"
+    _ "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
 )
 
 func main() {
-	// Configuration loaded from your DB or Environment
-	config := map[string]interface{}{
-		"domain":  "your-domain.com",
-		"api_key": "your-api-key",
-	}
+    raw := map[string]any{
+        "api_key":    "key-xxx",
+        "domain":     "mg.example.com",
+        "from_email": "noreply@example.com",
+    }
+    b, _ := json.Marshal(raw)
 
-	// Instantiate the provider dynamically by name
-	sender, err := registry.BuildEmailSender("mailgun", config)
-	if err != nil {
-		log.Fatal(err)
-	}
+    factory, err := registry.GetEmailFactory("mailgun")
+    if err != nil {
+        panic(err)
+    }
 
-	email := &contracts.Email{
-		To:      []string{"user@example.com"},
-		Subject: "Dynamic Send",
-		HTML:    "<p>Works perfectly.</p>",
-		From:    "no-reply@your-domain.com",
-	}
+    var cfg registry.EmailConfig
+    if err := json.Unmarshal(b, &cfg); err != nil {
+        panic(err)
+    }
 
-	result, err := sender.Send(context.Background(), email)
-	if err != nil {
-		log.Fatal(err)
-	}
+    sender, err := factory(cfg)
+    if err != nil {
+        panic(err)
+    }
+    _ = sender
 }
 ```
 
-## Creating a New Provider
+## Direct provider usage
 
-To add a new provider (e.g., Twilio for SMS):
-1. Create a new folder in `pkg/provider/twilio`.
-2. Implement the relevant contract (`contracts.SMSSender`).
-3. Add a builder function and register it via `registry.RegisterSMSBuilder("twilio", builderFn)` in an `init()` block.
+```go
+import (
+    "github.com/weprodev/wpd-message-gateway/pkg/contracts"
+    "github.com/weprodev/wpd-message-gateway/pkg/provider/mailgun"
+)
+
+sender, err := mailgun.New(mailgun.Config{
+    Domain:    "mg.example.com",
+    APIKey:    "key-xxx",
+    FromEmail: "noreply@example.com",
+})
+```
+
+## Adding a provider
+
+1. Create `pkg/provider/<name>/`
+2. Implement the relevant `contracts.*Sender` interface
+3. Register in `init()` via `registry.RegisterEmailProvider` (or SMS/push/chat)
+4. Add tests colocated in the provider package
+
+## Relationship to HTTP server
+
+The HTTP server (`cmd/server`, `internal/`) uses the **same** `pkg/contracts` and `pkg/registry` but loads integration config from PostgreSQL. Portal UI and `/v1/*` routes are **not** part of `pkg/`.

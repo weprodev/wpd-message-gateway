@@ -11,9 +11,9 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
-	"github.com/weprodev/wpd-message-gateway/internal/infrastructure/logger"
 	"github.com/weprodev/wpd-message-gateway/pkg/contracts"
 )
 
@@ -41,7 +41,7 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 
 		// Set request ID in context
 		ctx := req.Context()
-		ctx = logger.WithRequestID(ctx, "req-xyz")
+		ctx = logctx.WithRequestID(ctx, "req-xyz")
 		c.SetRequest(req.WithContext(ctx))
 
 		repo := &mockLogRepo{}
