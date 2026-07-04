@@ -5,10 +5,9 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/weprodev/go-pkg/sanitizer"
 
-	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
+	"github.com/weprodev/wpd-message-gateway/internal/presentation/dto"
 )
 
 type PortalTemplateHandler struct {
@@ -17,28 +16,6 @@ type PortalTemplateHandler struct {
 
 func NewPortalTemplateHandler(svc *service.PortalService) *PortalTemplateHandler {
 	return &PortalTemplateHandler{svc: svc}
-}
-
-type templateBody struct {
-	Name        string `json:"name"`
-	UniqueKey   string `json:"unique_key"`
-	ChannelType string `json:"channel_type"`
-	Category    string `json:"category"`
-	Subject     string `json:"subject"`
-	ContentHTML string `json:"content_html"`
-	IsActive    *bool  `json:"is_active"`
-	IsDefault   *bool  `json:"is_default"`
-}
-
-type patchTemplateBody struct {
-	Name        *string `json:"name"`
-	UniqueKey   *string `json:"unique_key"`
-	ChannelType *string `json:"channel_type"`
-	Category    *string `json:"category"`
-	Subject     *string `json:"subject"`
-	ContentHTML *string `json:"content_html"`
-	IsActive    *bool   `json:"is_active"`
-	IsDefault   *bool   `json:"is_default"`
 }
 
 func (h *PortalTemplateHandler) ListTemplates(c echo.Context) error {
@@ -53,31 +30,12 @@ func (h *PortalTemplateHandler) ListTemplates(c echo.Context) error {
 
 func (h *PortalTemplateHandler) CreateTemplate(c echo.Context) error {
 	wid := c.Param("wid")
-	var body templateBody
+	var body dto.CreateTemplateRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind template create body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	t := &domain.Template{
-		WorkspaceID: wid,
-		Name:        body.Name,
-		UniqueKey:   body.UniqueKey,
-		ChannelType: body.ChannelType,
-		Category:    body.Category,
-		Subject:     body.Subject,
-		ContentHTML: sanitizer.SanitizeHTML(body.ContentHTML),
-		IsActive:    true,
-		IsDefault:   false,
-	}
-	if body.IsActive != nil {
-		t.IsActive = *body.IsActive
-	}
-	if body.IsDefault != nil {
-		t.IsDefault = *body.IsDefault
-	}
-	if t.ChannelType == "" {
-		t.ChannelType = "email"
-	}
+	t := body.ToDomain(wid)
 	if err := h.svc.CreateTemplate(c.Request().Context(), t); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create template", "error", err, "workspace_id", wid, "unique_key", body.UniqueKey)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create template")
@@ -88,21 +46,12 @@ func (h *PortalTemplateHandler) CreateTemplate(c echo.Context) error {
 func (h *PortalTemplateHandler) PatchTemplate(c echo.Context) error {
 	wid := c.Param("wid")
 	tid := c.Param("tid")
-	var body patchTemplateBody
+	var body dto.PatchTemplateRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind template patch body", "error", err, "workspace_id", wid, "template_id", tid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	patch := service.TemplatePatch{
-		Name: body.Name, UniqueKey: body.UniqueKey, ChannelType: body.ChannelType,
-		Category: body.Category, Subject: body.Subject, ContentHTML: body.ContentHTML,
-		IsActive: body.IsActive, IsDefault: body.IsDefault,
-	}
-	if body.ContentHTML != nil {
-		clean := sanitizer.SanitizeHTML(*body.ContentHTML)
-		patch.ContentHTML = &clean
-	}
-	if err := h.svc.PatchTemplate(c.Request().Context(), wid, tid, patch); err != nil {
+	if err := h.svc.PatchTemplate(c.Request().Context(), wid, tid, body.ToPatch()); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to patch template", "error", err, "workspace_id", wid, "template_id", tid)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to patch template")
 	}

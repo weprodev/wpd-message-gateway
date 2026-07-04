@@ -14,6 +14,7 @@ const logRowSchema = z.object({
   request_id: z.string().optional(),
   duration_ms: z.number().optional(),
   error_message: z.string().optional(),
+  inbox_message_id: z.string().optional(),
   created_at: z.string(),
   source_name: z.string().optional(),
   client_id: z.string().optional(),

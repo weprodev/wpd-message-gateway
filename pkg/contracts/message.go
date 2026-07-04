@@ -9,8 +9,14 @@ type Attachment struct {
 }
 
 const (
-	MetaKeyProviderName = "provider_name"
-	MetaKeyStoreContent = "store_content"
+	MetaKeyProviderName   = "provider_name"
+	MetaKeyStoreContent   = "store_content"
+	MetaKeyInboxMessageID = "inbox_message_id"
+	MetaKeyDispatchMode   = "dispatch_mode"
+
+	// Dispatch mode values mirror domain.MessageDispatchMode
+	DispatchModeMemory   = "memory"
+	DispatchModeProvider = "provider"
 
 	metaStoreContentTrue  = "true"
 	metaStoreContentFalse = "false"
@@ -32,12 +38,37 @@ func ProviderNameFromResult(r *SendResult) string {
 	return r.Meta[MetaKeyProviderName]
 }
 
+// DispatchModeFromResult returns dispatch_mode from metadata when present.
+func DispatchModeFromResult(r *SendResult) string {
+	if r == nil || r.Meta == nil {
+		return ""
+	}
+	return r.Meta[MetaKeyDispatchMode]
+}
+
 // StoreContentFromResult reports whether dispatch metadata requests persisting request/response bodies.
 func StoreContentFromResult(r *SendResult) bool {
 	if r == nil || r.Meta == nil {
 		return false
 	}
 	return r.Meta[MetaKeyStoreContent] == metaStoreContentTrue
+}
+
+// InboxMessageIDFromResult returns the inbox message ID when dispatch captured content.
+//
+// Provider dispatch stores the inbox UUID in MetaKeyInboxMessageID; SendResult.ID is the provider ID.
+// Memory-only dispatch has no provider result, so SendResult.ID is the inbox UUID.
+func InboxMessageIDFromResult(r *SendResult) string {
+	if r == nil || r.Meta == nil {
+		return ""
+	}
+	if id := r.Meta[MetaKeyInboxMessageID]; id != "" {
+		return id
+	}
+	if r.Meta[MetaKeyDispatchMode] == DispatchModeMemory && r.ID != "" {
+		return r.ID
+	}
+	return ""
 }
 
 // SetStoreContentMeta stamps store_content on r.Meta for downstream logging.
@@ -50,4 +81,12 @@ func SetStoreContentMeta(r *SendResult, storeContent bool) {
 	} else {
 		r.Meta[MetaKeyStoreContent] = metaStoreContentFalse
 	}
+}
+
+// SetDispatchModeMeta stamps dispatch_mode on r.Meta.
+func SetDispatchModeMeta(r *SendResult, mode string) {
+	if r.Meta == nil {
+		r.Meta = make(map[string]string)
+	}
+	r.Meta[MetaKeyDispatchMode] = mode
 }

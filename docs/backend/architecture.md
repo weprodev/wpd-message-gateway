@@ -186,7 +186,7 @@ Portal accounts use **email + password** (passwords are stored hashed). All mana
 The core service layer decouples from `wpd-gogate` by depending on the `port.AuthorizationGate` interface. The implementation adapter lives in `internal/infrastructure/authgate/gate_adapter.go`.
 
 - **admin**: Full read/write access to settings, integrations, templates, API keys, and member removal. Assigned automatically to the creator of a workspace.
-- **member**: Read-only access to workspaces, settings, templates, API keys, plus permission to send test messages (`send.test`).
+- **member**: Read-only access to workspaces, settings, templates, API keys, plus inbox management (`send.test`).
 
 Public workspaces (`is_private = false`) are dynamically accessible to any authenticated user as a `"viewer"` with read-only permissions (i.e. `*.read` operations are bypassed and approved automatically without requiring explicit membership or Casbin checks). All write operations on public workspaces remain strictly restricted to workspace admins.
 
@@ -456,9 +456,9 @@ The **memory provider** captures messages in process RAM. It's always available 
 
 The React Portal runs at `portal.ui_port` (default **10104**) when the server starts.
 
-**Portal UI today:** sign in, list workspaces, manage **integrations**, **settings** (general, API keys, message dispatch), view message logs, send test messages.
+**Portal UI today:** sign in, list workspaces, manage **integrations**, **settings** (general, API keys, message dispatch), view message logs, browse captured **email inbox**.
 
-**REST only (no UI pages yet):** workspace create, templates, members, memory inbox browser.
+**REST only (no UI pages yet):** workspace create, templates, members, SMS/push/chat inbox browser.
 
 ---
 

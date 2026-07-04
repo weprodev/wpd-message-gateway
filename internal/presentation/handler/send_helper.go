@@ -99,6 +99,9 @@ func (sh *SendHelper) recordLog(
 		DurationMs:   int(time.Since(start).Milliseconds()),
 		ErrorMessage: errMsg,
 	}
+	if statusCode == http.StatusOK {
+		entry.InboxMessageID = contracts.InboxMessageIDFromResult(result)
+	}
 
 	if contracts.StoreContentFromResult(result) {
 		var requestBody, responseBody string

@@ -300,7 +300,7 @@ export function SettingsPage() {
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             {apiKeys.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-text-secondary">
-                No API keys yet. Create one to send test requests.
+                No API keys yet. Create one to authenticate gateway requests.
               </p>
             ) : (
               apiKeys.map((key) => (

@@ -184,8 +184,8 @@ func TestGatewayService_SendEmail_memoryOnly(t *testing.T) {
 	if res.ID != "mem-1" {
 		t.Fatalf("got ID %q", res.ID)
 	}
-	if res.Meta["dispatch_mode"] != string(domain.DispatchMemory) {
-		t.Fatalf("dispatch_mode: %v", res.Meta["dispatch_mode"])
+	if res.Meta[contracts.MetaKeyDispatchMode] != string(domain.DispatchMemory) {
+		t.Fatalf("dispatch_mode: %v", res.Meta[contracts.MetaKeyDispatchMode])
 	}
 	if res.Meta["channel"] != "email" {
 		t.Fatalf("channel: %v", res.Meta["channel"])
@@ -361,8 +361,8 @@ func TestGatewayService_SendEmail_providerDatabase_mailgunIntegration(t *testing
 	if res.Meta["provider_name"] != mailgun.ProviderName {
 		t.Fatalf("provider_name: %v", res.Meta["provider_name"])
 	}
-	if res.Meta["inbox_message_id"] != "inbox-1" {
-		t.Fatalf("inbox_message_id: %v", res.Meta["inbox_message_id"])
+	if res.Meta[contracts.MetaKeyInboxMessageID] != "inbox-1" {
+		t.Fatalf("inbox_message_id: %v", res.Meta[contracts.MetaKeyInboxMessageID])
 	}
 }
 

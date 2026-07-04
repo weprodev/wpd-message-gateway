@@ -12,6 +12,7 @@ export type LogRow = {
   request_id?: string
   duration_ms?: number
   error_message?: string
+  inbox_message_id?: string
   created_at: string
   source_name?: string
 }

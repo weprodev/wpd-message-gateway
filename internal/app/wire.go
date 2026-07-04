@@ -147,7 +147,7 @@ func Wire(cfg *Config, sysLogger *pkglogger.Logger) (*Application, error) {
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	// Portal is always enabled — configuration, templates, and inbox require it.
-	portalHandler := handler.NewPortalHandler(portalSvc, gatewaySvc, logRepo)
+	portalHandler := handler.NewPortalHandler(portalSvc)
 	portalAuthHandler := handler.NewPortalAuthHandler(portalSvc, authService)
 	portalWorkspaceHandler := handler.NewPortalWorkspaceHandler(portalSvc)
 	portalIntegrationHandler := handler.NewPortalIntegrationHandler(portalSvc)

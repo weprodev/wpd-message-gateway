@@ -320,7 +320,7 @@ result, err := gw.SendChat(ctx, &contracts.ChatMessage{
 
 ### Portal REST API (JWT auth)
 
-Routes registered in `internal/presentation/router.go`. **Portal UI pages exist only for auth, workspace list, message logs, and send test** — other management routes are REST-only until UI is built.
+Routes registered in `internal/presentation/router.go`. **Portal UI pages exist for auth, workspace list, message logs, email inbox, integrations, and settings** — other management routes are REST-only until UI is built.
 
 #### Auth
 
@@ -337,7 +337,6 @@ Routes registered in `internal/presentation/router.go`. **Portal UI pages exist 
 |--------|----------|:---------:|-------------|
 | GET | `/api/v1/workspaces` | ✓ | List workspaces for the logged-in user |
 | GET | `/api/v1/workspaces/:wid/logs` | ✓ | Message request logs (optionally filter by `channel`) |
-| POST | `/api/v1/workspaces/:wid/send-test/:channel` | ✓ | Send test via gateway (`email` / `sms` / `push` / `chat`) |
 
 #### Workspace provisioning & management (REST only — no Portal UI)
 
@@ -349,7 +348,7 @@ Workspace-scoped routes require a valid portal JWT and are governed by a Role-Ba
 
 Roles and permissions are defined in [permission.go](../../internal/core/domain/permission.go):
 - **admin**: Full read/write access. The creator of a workspace is automatically assigned this role (as `admin` in both members repository and `gogate`).
-- **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus the ability to send test messages (`send.test`).
+- **member**: Read-only access to workspaces, members, API keys, logs, integrations, templates, settings, and invitations, plus inbox management (`send.test`).
 
 To bootstrap roles and permissions, make sure you run the database seeds:
 1. Run `database/seeds/001_seed_permissions.sql` to populate roles (`admin`, `member`), default permissions, and role-to-permission mappings.

@@ -21,7 +21,7 @@ const mockEmail = {
 describe("EmailItem Component", () => {
   it("renders correctly with email properties", () => {
     render(<EmailItem message={mockEmail} isSelected={false} onClick={vi.fn()} />)
-    expect(screen.getByText("John Doe")).toBeInTheDocument()
+    expect(screen.getByText("recipient@example.com")).toBeInTheDocument()
     expect(screen.getByText("Test Subject")).toBeInTheDocument()
     expect(screen.getByText("This is the body snippet of the test email.")).toBeInTheDocument()
   })

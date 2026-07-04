@@ -88,6 +88,66 @@ func TestSendHelper_DispatchAndLog(t *testing.T) {
 		}
 	})
 
+	t.Run("successful dispatch stores inbox message id in memory mode", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{
+				ID: "inbox-msg-1",
+				Meta: map[string]string{
+					contracts.MetaKeyProviderName: "memory",
+					contracts.MetaKeyDispatchMode: contracts.DispatchModeMemory,
+				},
+			}, nil
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(repo.entries) != 1 {
+			t.Fatalf("expected 1 log entry, got %d", len(repo.entries))
+		}
+		if repo.entries[0].InboxMessageID != "inbox-msg-1" {
+			t.Errorf("expected inbox message id inbox-msg-1, got %s", repo.entries[0].InboxMessageID)
+		}
+	})
+
+	t.Run("provider dispatch with inbox capture stores inbox_message_id from meta", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"]}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		repo := &mockLogRepo{}
+		svc := service.NewGatewayService(nil, nil, nil, nil, repo)
+		helper := NewSendHelper(svc)
+
+		var dst contracts.Email
+		err := helper.DispatchAndLog(c, "email", "ws-123", "key-456", "/v1/email", &dst, func(ctx context.Context) (*contracts.SendResult, error) {
+			return &contracts.SendResult{
+				ID: "provider-msg-1",
+				Meta: map[string]string{
+					contracts.MetaKeyProviderName:   "mailgun",
+					contracts.MetaKeyDispatchMode:   contracts.DispatchModeProvider,
+					contracts.MetaKeyInboxMessageID: "inbox-msg-2",
+				},
+			}, nil
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.entries[0].InboxMessageID != "inbox-msg-2" {
+			t.Errorf("expected inbox message id inbox-msg-2, got %s", repo.entries[0].InboxMessageID)
+		}
+	})
+
 	t.Run("store_content persists request and response payloads", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/email", strings.NewReader(`{"to":["test@example.com"],"subject":"hi"}`))
 		rec := httptest.NewRecorder()

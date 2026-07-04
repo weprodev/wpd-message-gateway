@@ -26,8 +26,9 @@ export function EmailList({
   const filtered = messages.filter((msg) => {
     const q = searchQuery.toLowerCase()
     const subject = (msg.email.subject || "").toLowerCase()
+    const recipients = (msg.email.to || []).join(" ").toLowerCase()
     const sender = (msg.email.from_name || msg.email.from || "").toLowerCase()
-    return subject.includes(q) || sender.includes(q)
+    return subject.includes(q) || recipients.includes(q) || sender.includes(q)
   })
 
   return (

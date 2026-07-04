@@ -264,6 +264,7 @@ CREATE TABLE message_request_logs (
     request_id    VARCHAR(64),
     duration_ms   INT          CHECK (duration_ms >= 0),
     error_message TEXT,
+    inbox_message_id UUID,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -280,6 +281,10 @@ CREATE INDEX idx_message_request_logs_workspace_api_created
 
 CREATE INDEX idx_message_request_logs_workspace_channel_created
     ON message_request_logs (workspace_id, channel_type, created_at DESC);
+
+CREATE INDEX idx_message_request_logs_workspace_inbox_message
+    ON message_request_logs (workspace_id, inbox_message_id)
+    WHERE inbox_message_id IS NOT NULL;
 
 -- ==============================================================================
 -- 11.5. MESSAGE_REQUEST_PAYLOADS TABLE (Append-only body storage)

@@ -21,11 +21,11 @@ var _ port.InboxWriter = (*Store)(nil)
 
 // Store implements an in-memory message store indexed by workspace for O(1) bucket lookup.
 type Store struct {
-	mu       sync.RWMutex
-	emails   map[string][]port.StoredEmail
-	sms      map[string][]port.StoredSMS
-	pushes   map[string][]port.StoredPush
-	chats    map[string][]port.StoredChat
+	mu     sync.RWMutex
+	emails map[string][]port.StoredEmail
+	sms    map[string][]port.StoredSMS
+	pushes map[string][]port.StoredPush
+	chats  map[string][]port.StoredChat
 }
 
 // NewStore creates a new in-memory store.

@@ -27,6 +27,59 @@ func TestStoreContentFromResult(t *testing.T) {
 	}
 }
 
+func TestDispatchModeFromResult(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		r    *SendResult
+		want string
+	}{
+		{"nil result", nil, ""},
+		{"memory", &SendResult{Meta: map[string]string{MetaKeyDispatchMode: DispatchModeMemory}}, DispatchModeMemory},
+		{"provider", &SendResult{Meta: map[string]string{MetaKeyDispatchMode: DispatchModeProvider}}, DispatchModeProvider},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := DispatchModeFromResult(tt.r); got != tt.want {
+				t.Fatalf("DispatchModeFromResult() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestInboxMessageIDFromResult(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		r    *SendResult
+		want string
+	}{
+		{"nil result", nil, ""},
+		{"provider without inbox", &SendResult{ID: "prov-1", Meta: map[string]string{MetaKeyDispatchMode: DispatchModeProvider}}, ""},
+		{"memory mode", &SendResult{ID: "inbox-1", Meta: map[string]string{MetaKeyDispatchMode: DispatchModeMemory}}, "inbox-1"},
+		{"provider with inbox meta", &SendResult{
+			ID: "prov-1",
+			Meta: map[string]string{
+				MetaKeyDispatchMode:   DispatchModeProvider,
+				MetaKeyInboxMessageID: "inbox-2",
+			},
+		}, "inbox-2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := InboxMessageIDFromResult(tt.r); got != tt.want {
+				t.Fatalf("InboxMessageIDFromResult() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSetStoreContentMeta(t *testing.T) {
 	t.Parallel()
 
@@ -50,4 +103,23 @@ func TestSetStoreContentMeta(t *testing.T) {
 			t.Fatalf("unexpected meta overwrite")
 		}
 	})
+}
+
+func TestSetDispatchModeMeta(t *testing.T) {
+	t.Parallel()
+
+	r := &SendResult{}
+	SetDispatchModeMeta(r, DispatchModeProvider)
+	if got := DispatchModeFromResult(r); got != DispatchModeProvider {
+		t.Fatalf("dispatch_mode: %q", got)
+	}
+}
+
+func TestDispatchModeValuesMatchDomain(t *testing.T) {
+	t.Parallel()
+
+	// Document the cross-package contract without importing internal/domain.
+	if DispatchModeMemory != "memory" || DispatchModeProvider != "provider" {
+		t.Fatal("dispatch mode constants must stay aligned with domain.MessageDispatchMode")
+	}
 }

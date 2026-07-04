@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
@@ -20,6 +20,8 @@ const PAGE_SIZE = 50
 export function EmailInboxPage() {
   const navigate = useNavigate()
   const { wid } = useParams<{ wid: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const deepLinkMessageId = searchParams.get("message")
 
   const [messages, setMessages] = useState<StoredEmail[]>([])
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
@@ -100,6 +102,34 @@ export function EmailInboxPage() {
       cancelled = true
     }
   }, [wid])
+
+  useEffect(() => {
+    if (!wid || !deepLinkMessageId) return
+
+    let cancelled = false
+    ;(async () => {
+      const result = await fetchInboxEmailById(wid, deepLinkMessageId)
+      if (cancelled) return
+
+      if (result.ok) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === result.item.id)) return prev
+          return [result.item, ...prev]
+        })
+        setSelectedMessageId(deepLinkMessageId)
+      }
+
+      setSearchParams((params) => {
+        const next = new URLSearchParams(params)
+        next.delete("message")
+        return next
+      }, { replace: true })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [wid, deepLinkMessageId, setSearchParams])
 
   useEffect(() => {
     if (!wid) return
@@ -207,7 +237,7 @@ export function EmailInboxPage() {
             Email Inbox
           </h1>
           <p className="text-sm text-text-secondary">
-            Read and test outbound emails captured by the memory provider.
+            Outbound emails captured by the gateway for review and testing.
           </p>
         </div>
 
@@ -245,7 +275,7 @@ export function EmailInboxPage() {
           </div>
           <h3 className="mb-1 text-lg font-bold text-foreground">Inbox is empty</h3>
           <p className="max-w-xs text-sm text-text-secondary">
-            Send a test email or POST to `/v1/email` to see messages captured here in real-time.
+            POST to `/v1/email` with your API key to see captured messages here in real-time.
           </p>
         </div>
       ) : (

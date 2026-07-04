@@ -198,7 +198,7 @@ func (s *GatewayService) dispatch(
 		if finalResult.Meta == nil {
 			finalResult.Meta = make(map[string]string)
 		}
-		finalResult.Meta["inbox_message_id"] = inboxResult.ID
+		finalResult.Meta[contracts.MetaKeyInboxMessageID] = inboxResult.ID
 	}
 
 	return attachMeta(finalResult, effectiveMode, config.StoreMessageContent, channel, integrationID, providerName), nil
@@ -280,6 +280,7 @@ func (s *GatewayService) writeEmailToInbox(ctx context.Context, workspaceID stri
 	if s.inbox == nil {
 		return nil, fmt.Errorf("inbox writer not configured")
 	}
+	email = s.enrichEmailFromIntegration(ctx, workspaceID, email)
 	id, err := s.inbox.WriteEmail(ctx, workspaceID, email)
 	if err != nil {
 		return nil, fmt.Errorf("write email to inbox: %w", err)
@@ -330,7 +331,7 @@ func attachMeta(r *contracts.SendResult, effectiveMode domain.MessageDispatchMod
 	if r.Meta == nil {
 		r.Meta = make(map[string]string, 5)
 	}
-	r.Meta["dispatch_mode"] = string(effectiveMode)
+	contracts.SetDispatchModeMeta(r, string(effectiveMode))
 	contracts.SetStoreContentMeta(r, storeContent)
 	r.Meta["channel"] = channel
 	if integrationID != "" {

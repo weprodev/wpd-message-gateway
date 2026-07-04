@@ -38,13 +38,6 @@ func (r *TemplateRepository) Create(ctx context.Context, template *domain.Templa
 	return nil
 }
 
-func nullIfEmpty(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
 func (r *TemplateRepository) GetByWorkspaceAndKey(ctx context.Context, workspaceID, uniqueKey string) (*domain.Template, error) {
 	query := `
 		SELECT id, workspace_id, name, unique_key, channel_type, category, subject, content, is_active, is_default, created_at, updated_at

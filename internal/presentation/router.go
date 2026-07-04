@@ -176,7 +176,6 @@ func (rt *Router) Setup() *echo.Echo {
 
 	protected.GET("/workspaces/:wid/invitations", pw.ListInvitations, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInvitationsRead))
 	protected.POST("/workspaces/:wid/invitations", pw.CreateInvitation, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionInvitationsWrite))
-	protected.POST("/workspaces/:wid/send-test/:channel", ph.SendTest, customMiddleware.RequirePermission(rt.gate, rt.workspaceRepo, domain.PermissionSendTest))
 
 	// Inbox API — JWT + logs.read (same access model as message logs overview).
 	if rt.memberRepo != nil {
