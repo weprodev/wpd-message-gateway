@@ -39,6 +39,7 @@ type PortalDeps struct {
 	JWTSecret    string
 	JWTTTL       time.Duration
 	Gate         port.AuthorizationGate
+	TxManager    port.TransactionManager
 }
 
 // PortalService handles portal authentication and workspace-scoped operations.
@@ -53,6 +54,7 @@ type PortalService struct {
 	invites      port.InvitationRepository
 	settings     port.WorkspaceSettingsRepository
 	gate         port.AuthorizationGate
+	txManager    port.TransactionManager
 
 	// jwtSecret and jwtTTL are unexported; accessed only within this package.
 	jwtSecret string
@@ -65,6 +67,10 @@ func NewPortalService(deps PortalDeps) *PortalService {
 	if deps.JWTTTL <= 0 {
 		deps.JWTTTL = 24 * time.Hour
 	}
+	txM := deps.TxManager
+	if txM == nil {
+		txM = &nopTxManager{}
+	}
 	return &PortalService{
 		users:        deps.Users,
 		members:      deps.Members,
@@ -76,9 +82,16 @@ func NewPortalService(deps PortalDeps) *PortalService {
 		invites:      deps.Invitations,
 		settings:     deps.Settings,
 		gate:         deps.Gate,
+		txManager:    txM,
 		jwtSecret:    deps.JWTSecret,
 		jwtTTL:       deps.JWTTTL,
 	}
+}
+
+type nopTxManager struct{}
+
+func (m *nopTxManager) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
 }
 
 func (s *PortalService) UserByID(ctx context.Context, id string) (*domain.User, error) {
@@ -124,24 +137,29 @@ func (s *PortalService) CreateWorkspace(ctx context.Context, userID, name, slug,
 		slog.ErrorContext(ctx, "workspace creation failed: user not found", "error", err, "user_id", userID)
 		return nil, err
 	}
-	w := &domain.Workspace{
-		Name:       name,
-		Slug:       slug,
-		AdminEmail: u.Email,
-		Status:     "active",
-		Visibility: "private",
-		IconKey:    strings.TrimSpace(iconKey),
-	}
-	if err := s.workspaces.Create(ctx, w); err != nil {
-		slog.ErrorContext(ctx, "workspace creation failed: database error", "error", err, "user_id", userID)
-		return nil, err
-	}
-	if err := s.members.Add(ctx, w.ID, userID, domain.RoleAdmin); err != nil {
-		slog.ErrorContext(ctx, "workspace creation failed: failed to add member", "error", err, "workspace_id", w.ID, "user_id", userID)
-		return nil, err
-	}
-	if err := s.gate.AssignRole(ctx, "users", userID, w.ID, domain.RoleAdmin); err != nil {
-		slog.ErrorContext(ctx, "workspace creation failed: failed to assign role", "error", err, "workspace_id", w.ID, "user_id", userID)
+	var w *domain.Workspace
+	err = s.txManager.RunInTransaction(ctx, func(txCtx context.Context) error {
+		w = &domain.Workspace{
+			Name:       name,
+			Slug:       slug,
+			AdminEmail: u.Email,
+			Status:     "active",
+			Visibility: "private",
+			IconKey:    strings.TrimSpace(iconKey),
+		}
+		if err := s.workspaces.Create(txCtx, w, userID); err != nil {
+			return err
+		}
+		if err := s.members.Add(txCtx, w.ID, userID, domain.RoleAdmin); err != nil {
+			return err
+		}
+		if err := s.gate.AssignRole(txCtx, "users", userID, w.ID, domain.RoleAdmin); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "workspace creation failed", "error", err, "user_id", userID)
 		return nil, err
 	}
 	slog.InfoContext(ctx, "workspace created successfully", "workspace_id", w.ID, "user_id", userID)
@@ -164,12 +182,17 @@ func (s *PortalService) JoinWorkspaceWithPIN(ctx context.Context, userID, slug, 
 		slog.WarnContext(ctx, "join workspace with PIN failed: invalid PIN", "workspace_id", ws.ID, "user_id", userID)
 		return errors.New("invalid PIN")
 	}
-	if err := s.members.Add(ctx, ws.ID, userID, domain.RoleMember); err != nil {
-		slog.ErrorContext(ctx, "join workspace with PIN failed: failed to add member", "error", err, "workspace_id", ws.ID, "user_id", userID)
-		return err
-	}
-	if err := s.gate.AssignRole(ctx, "users", userID, ws.ID, domain.RoleMember); err != nil {
-		slog.ErrorContext(ctx, "join workspace with PIN failed: failed to assign role", "error", err, "workspace_id", ws.ID, "user_id", userID)
+	err = s.txManager.RunInTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.members.Add(txCtx, ws.ID, userID, domain.RoleMember); err != nil {
+			return err
+		}
+		if err := s.gate.AssignRole(txCtx, "users", userID, ws.ID, domain.RoleMember); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "join workspace with PIN failed: database error", "error", err, "workspace_id", ws.ID, "user_id", userID)
 		return err
 	}
 	slog.InfoContext(ctx, "joined workspace successfully with PIN", "workspace_id", ws.ID, "user_id", userID)
@@ -208,32 +231,30 @@ func (s *PortalService) ListWorkspaces(ctx context.Context, userID string) ([]do
 		return nil, err
 	}
 
+	memberWorkspaceIDs := make([]string, 0, len(workspaces))
 	for i := range workspaces {
 		w := &workspaces[i]
-		// Get role in this workspace
-		role, err := s.members.GetRole(ctx, w.ID, userID)
-		if err != nil {
-			// If not a member, check if it's public
-			if w.Visibility == "public" {
-				w.Role = "viewer"
-				w.Permissions = []string{
-					domain.PermissionWorkspacesRead,
-					domain.PermissionMembersRead,
-					domain.PermissionAPIKeysRead,
-					domain.PermissionLogsRead,
-					domain.PermissionIntegrationsRead,
-					domain.PermissionTemplatesRead,
-					domain.PermissionSettingsRead,
-					domain.PermissionInvitationsRead,
-				}
-			}
+		if w.Role != "" {
+			memberWorkspaceIDs = append(memberWorkspaceIDs, w.ID)
 			continue
 		}
+		if w.Visibility == "public" {
+			w.Role = domain.RoleViewer
+			w.Permissions = append([]string(nil), domain.PublicGuestPermissions...)
+		}
+	}
 
-		w.Role = role
-		// Get permissions from gogate
-		perms, err := s.gate.GetAllPermissions(ctx, "users", userID, w.ID)
-		if err == nil {
+	permsByTeam, err := s.gate.GetPermissionsForTeams(ctx, "users", userID, memberWorkspaceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load workspace permissions: %w", err)
+	}
+
+	for i := range workspaces {
+		w := &workspaces[i]
+		if w.Role == "" {
+			continue
+		}
+		if perms, ok := permsByTeam[w.ID]; ok {
 			w.Permissions = perms
 		}
 	}
@@ -273,26 +294,26 @@ func (s *PortalService) ListMembers(ctx context.Context, workspaceID string) ([]
 	return s.members.ListMembers(ctx, workspaceID)
 }
 
-// RemoveMember removes a user from a workspace and revokes their RBAC role.
-// If the member has no role record in the RBAC gate (ErrNotFound), the gate removal
-// is skipped safely. Any other gate error aborts the operation before DB removal.
 func (s *PortalService) RemoveMember(ctx context.Context, workspaceID, userID string) error {
 	// Fetch current role to remove the exact RBAC assignment.
-	// ErrNotFound means the member was never assigned a role in the gate — skip silently.
 	role, err := s.members.GetRole(ctx, workspaceID, userID)
-	switch {
-	case errors.Is(err, port.ErrNotFound):
-		// No membership record; nothing to remove from RBAC gate.
-	case err != nil:
-		// Unexpected infrastructure error — abort before touching the gate.
-		return fmt.Errorf("wpd-message-gateway: get member role: %w", err)
-	default:
-		if gErr := s.gate.RemoveRole(ctx, "users", userID, workspaceID, role); gErr != nil {
-			return fmt.Errorf("wpd-message-gateway: remove role %s: %w", role, gErr)
+	if err != nil {
+		if errors.Is(err, port.ErrNotFound) {
+			// No membership record; nothing to remove.
+			return nil
 		}
+		return fmt.Errorf("wpd-message-gateway: get member role: %w", err)
 	}
 
-	return s.members.Remove(ctx, workspaceID, userID)
+	return s.txManager.RunInTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.gate.RemoveRole(txCtx, "users", userID, workspaceID, role); err != nil {
+			return fmt.Errorf("remove role %s: %w", role, err)
+		}
+		if err := s.members.Remove(txCtx, workspaceID, userID); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (s *PortalService) ListAPIKeys(ctx context.Context, workspaceID string) ([]domain.APIKey, error) {
@@ -510,12 +531,59 @@ func (s *PortalService) GetSettings(ctx context.Context, workspaceID string) (ma
 }
 
 func (s *PortalService) PatchSettings(ctx context.Context, workspaceID string, kv map[string]string) error {
+	keys := make([]string, 0, len(kv))
+	for k := range kv {
+		keys = append(keys, k)
+	}
+	slog.InfoContext(ctx, "patching workspace settings", "workspace_id", workspaceID, "keys", keys)
+
 	for k, v := range kv {
+		if err := domain.ValidateWorkspaceSettingValue(k, v); err != nil {
+			slog.WarnContext(ctx, "settings patch rejected: invalid value",
+				"workspace_id", workspaceID,
+				"key", k,
+				"error", err,
+			)
+			return fmt.Errorf("%w: %w", port.ErrInvalidInput, err)
+		}
+
+		if k == domain.SettingKeyMessageDispatchMode && v == string(domain.DispatchProvider) {
+			list, err := s.integrations.ListByWorkspace(ctx, workspaceID)
+			if err != nil {
+				return fmt.Errorf("failed to check integrations for provider enablement: %w", err)
+			}
+			hasConnected := false
+			for _, intg := range list {
+				if intg.ProviderName != domain.ProviderNameMemory && intg.Status == domain.IntegrationStatusConnected {
+					hasConnected = true
+					break
+				}
+			}
+			if !hasConnected {
+				return fmt.Errorf("%w: configure a provider in Integrations before switching to provider mode", port.ErrInvalidInput)
+			}
+		}
+
 		if err := s.settings.Set(ctx, workspaceID, k, v); err != nil {
 			return err
 		}
 	}
+
+	slog.InfoContext(ctx, "workspace settings patched successfully", "workspace_id", workspaceID, "keys", keys)
 	return nil
+}
+
+const invitationTTL = 7 * 24 * time.Hour
+
+// NewPendingInvitation builds a workspace invitation with the standard expiry window.
+func (s *PortalService) NewPendingInvitation(workspaceID, email, role string) *domain.Invitation {
+	return &domain.Invitation{
+		WorkspaceID: workspaceID,
+		Email:       strings.ToLower(strings.TrimSpace(email)),
+		Role:        role,
+		ExpiresAt:   time.Now().Add(invitationTTL),
+		Status:      "pending",
+	}
 }
 
 // ListInvitations returns all pending invitations for a workspace.
@@ -526,6 +594,31 @@ func (s *PortalService) ListInvitations(ctx context.Context, workspaceID string)
 // CreateInvitation generates a secure invitation token, stores its hash, and persists the
 // invitation. The returned plaintext token must be sent to the invitee and is never stored.
 func (s *PortalService) CreateInvitation(ctx context.Context, inv *domain.Invitation) (rawToken string, err error) {
+	if !domain.IsWorkspaceRole(inv.Role) {
+		return "", fmt.Errorf("invalid role %q: %w", inv.Role, port.ErrInvalidInput)
+	}
+
+	inv.Email = strings.ToLower(strings.TrimSpace(inv.Email))
+	if inv.Email == "" {
+		return "", fmt.Errorf("email required: %w", port.ErrInvalidInput)
+	}
+
+	isMember, err := s.members.MemberExistsByEmail(ctx, inv.WorkspaceID, inv.Email)
+	if err != nil {
+		return "", err
+	}
+	if isMember {
+		return "", fmt.Errorf("user is already a member of this workspace: %w", port.ErrInvalidInput)
+	}
+
+	hasPending, err := s.invites.PendingInvitationExistsByEmail(ctx, inv.WorkspaceID, inv.Email)
+	if err != nil {
+		return "", err
+	}
+	if hasPending {
+		return "", fmt.Errorf("a pending invitation already exists for this email: %w", port.ErrInvalidInput)
+	}
+
 	// Generate a cryptographically random token from two UUIDs.
 	rawToken = uuid.NewString() + uuid.NewString()
 	sum := sha256.Sum256([]byte(rawToken))

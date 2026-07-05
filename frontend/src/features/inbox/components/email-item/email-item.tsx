@@ -6,10 +6,15 @@ interface EmailItemProps {
   onClick: () => void
 }
 
-function getSenderInitial(nameOrEmail: string) {
-  if (!nameOrEmail) return "?"
-  const cleaned = nameOrEmail.trim()
-  return cleaned[0].toUpperCase()
+function formatRecipients(to: string[] | undefined) {
+  if (!to || to.length === 0) return "Unknown recipient"
+  return to.join(", ")
+}
+
+function getRecipientInitial(recipient: string) {
+  if (!recipient) return "?"
+  const cleaned = recipient.trim()
+  return cleaned[0]?.toUpperCase() ?? "?"
 }
 
 function formatTime(dateStr: string) {
@@ -26,8 +31,8 @@ function formatTime(dateStr: string) {
 }
 
 export function EmailItem({ message, isSelected, onClick }: EmailItemProps) {
-  const senderName = message.email.from_name || message.email.from || "Unknown Sender"
-  const initial = getSenderInitial(senderName)
+  const recipientLabel = formatRecipients(message.email.to)
+  const initial = getRecipientInitial(message.email.to?.[0] ?? recipientLabel)
   const timestamp = formatTime(message.created_at)
   
   const snippet = message.email.plain_text || message.email.html || message.email.subject || ""
@@ -57,7 +62,7 @@ export function EmailItem({ message, isSelected, onClick }: EmailItemProps) {
             {initial}
           </div>
           <span className="text-sm font-semibold text-foreground truncate">
-            {senderName}
+            {recipientLabel}
           </span>
         </div>
         <span className="text-xs text-text-tertiary shrink-0 font-medium">

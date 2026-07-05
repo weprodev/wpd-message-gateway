@@ -29,7 +29,7 @@ Router → Middleware → Handler → Service → Port ← Repository / Provider
 | Port | `internal/core/port/` | domain, `pkg/contracts` | implementations |
 | Service | `internal/core/service/` | port, domain, `pkg/contracts`, `pkg/registry` | SQL, HTTP, Echo |
 | Infrastructure | `internal/infrastructure/` | port, domain | presentation |
-| Presentation | `internal/presentation/` | service, port, domain | direct SQL |
+| Presentation | `internal/presentation/` | service, port, domain, **dto** | direct SQL; **inline HTTP DTOs in handlers**; **passing dto to port/repo** |
 | Public SDK | `pkg/*` | `pkg/*` only | `internal/*` |
 
 Sender interfaces (`EmailSender`, `SMSSender`, …) live in **`pkg/contracts/`**, not `internal/core/port/`.
@@ -42,7 +42,7 @@ Sender interfaces (`EmailSender`, `SMSSender`, …) live in **`pkg/contracts/`**
 2. Register via `init()` in `register.go` → `pkg/registry`
 3. Blank-import in **`internal/app/imports.go`** (server mode only)
 
-Do **not** add providers under `internal/infrastructure/provider/` (deprecated).
+Add providers only under **`pkg/provider/<name>/`** (registered via `pkg/registry`, blank-imported in `internal/app/imports.go`).
 
 ---
 
@@ -60,6 +60,7 @@ Do **not** add providers under `internal/infrastructure/provider/` (deprecated).
 - Wrap with `fmt.Errorf("…: %w", err)`
 - Domain/port sentinels: `port.ErrNotFound`, `port.ErrConflict`, etc.
 - Handlers: generic messages on 500; full error in slog only (`send_helper.go` pattern)
+- **HTTP DTOs:** live in **`internal/presentation/dto/`** — never in handlers. Outbound: **`dto.XFromDomain(domain.Y)`** package funcs. Inbound: **`(r R) ToDomain()`** (→ `domain.*`) or **`ToPatch()`** (→ `service.*Patch`). **Ports/repos use `domain.*` only** — never import or accept `dto.*` (see `docs/backend/code-conventions.md`).
 
 ### Concurrency
 
@@ -106,7 +107,7 @@ wpd-message-gateway/
 │   ├── app/              # wire, imports, config
 │   ├── core/             # domain, port, service
 │   ├── infrastructure/   # postgres repos, logger, inbox store
-│   └── presentation/     # router, handlers, middleware
+│   └── presentation/     # router, handlers, middleware, dto/
 ├── pkg/
 │   ├── contracts/        # message types + sender interfaces
 │   ├── gateway/          # embedded SDK

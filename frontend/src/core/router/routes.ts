@@ -7,6 +7,8 @@ export const ROUTES = {
     pattern: "/workspaces/:wid",
     overview: (workspaceId: string) => `/workspaces/${workspaceId}/overview`,
     email: (workspaceId: string) => `/workspaces/${workspaceId}/email`,
+    emailWithMessage: (workspaceId: string, messageId: string) =>
+      `/workspaces/${workspaceId}/email?message=${encodeURIComponent(messageId)}`,
     emailTemplates: (workspaceId: string) => `/workspaces/${workspaceId}/email/templates`,
     sms: (workspaceId: string) => `/workspaces/${workspaceId}/sms`,
     push: (workspaceId: string) => `/workspaces/${workspaceId}/push`,

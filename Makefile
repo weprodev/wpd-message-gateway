@@ -1,4 +1,4 @@
-.PHONY: it install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync agents agents-kill start stop test audit build clean docker-check dev dev-down seed-demo help ui-install ui ui-build ui-format ui-test ui-lint storybook
+.PHONY: it install upgrade setup specify spec clarify clr plan pln tasks tsk implement impl analyze alyz checklist chk pr sync agents agents-kill start stop test audit build clean docker-check dev dev-down db-init seed-demo help ui-install ui ui-build ui-format ui-test ui-lint storybook
 
 # ============================================================================
 # ANSI Color Codes
@@ -300,11 +300,20 @@ docker-check:
 dev: docker-check
 	@printf "\n"
 	@printf "$(BOLD)$(CYAN)🐳 Starting Gateway, database, and Portal UI via Docker...$(RESET)\n"
-	@docker compose up -d --build
+	@docker compose up -d --build --renew-anon-volumes
 	@printf "$(GREEN)✅ All services started!$(RESET)\n"
 	@printf "\n"
-	@printf "   $(BOLD)Gateway API:$(RESET)  http://localhost:10101\n"
-	@printf "   $(BOLD)Portal UI:$(RESET)    http://localhost:10104\n"
+	@printf "   ╭───────────────────────────────────────────────────╮\n"
+	@printf "   │                                                   │\n"
+	@printf "   │  $(BOLD)Gateway API:$(RESET)  http://localhost:10101             │\n"
+	@printf "   │  $(BOLD)Portal UI:$(RESET)    http://localhost:10104             │\n"
+	@printf "   │                                                   │\n"
+	@printf "   │  $(BOLD)Demo accounts$(RESET) (password: secret)  │\n"
+	@printf "   │  admin:  demo@weprodev.com   (workspace admin)    │\n"
+	@printf "   │  member: member@weprodev.com (workspace member)   │\n"
+	@printf "   │  viewer: viewer@weprodev.com (workspace viewer)   │\n"
+	@printf "   │                                                   │\n"
+	@printf "   ╰───────────────────────────────────────────────────╯\n"
 	@printf "\n"
 
 ## Stop Docker Compose
@@ -314,13 +323,22 @@ dev-down: docker-check
 	@docker compose down
 	@printf "$(GREEN)✅ Stopped!$(RESET)\n"
 
-## Re-apply SQL seeds to the running Postgres container (demo user, RBAC, providers)
+## Apply schema when Postgres volume exists but tables are missing (then restart gateway)
+db-init: docker-check
+	@printf "\n"
+	@printf "$(BOLD)$(CYAN)🗄️  Initializing database schema...$(RESET)\n"
+	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
+		bash /docker-entrypoint-initdb.d/init-db.sh
+	@docker compose restart gateway
+	@printf "$(GREEN)✅ Database ready — gateway will apply seeds on startup (demo accounts: password secret)$(RESET)\n"
+	@printf "\n"
+
+## Re-apply SQL seeds by restarting the gateway (seeds run on every startup)
 seed-demo: docker-check
 	@printf "\n"
-	@printf "$(BOLD)$(CYAN)🌱 Applying database seeds...$(RESET)\n"
-	@docker compose exec -T -e POSTGRES_USER=gateway -e POSTGRES_DB=gateway db \
-		bash /docker-entrypoint-initdb.d/apply-seeds.sh /docker-entrypoint-initdb.d/seeds
-	@printf "$(GREEN)✅ Seeds applied (demo@weprodev.com / secret)$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)🌱 Re-applying database seeds (gateway restart)...$(RESET)\n"
+	@docker compose restart gateway
+	@printf "$(GREEN)✅ Seeds applied on gateway startup (demo accounts: password secret)$(RESET)\n"
 	@printf "\n"
 
 
@@ -368,7 +386,8 @@ help:
 	@printf "$(BOLD)$(GREEN)🐳 Docker$(RESET)\n"
 	@printf "   $(YELLOW)make dev$(RESET)          Start Gateway, DB, and UI via Docker (with hot-reloading)\n"
 	@printf "   $(YELLOW)make dev-down$(RESET)     Stop Docker containers\n"
-	@printf "   $(YELLOW)make seed-demo$(RESET)    Re-apply SQL seeds (demo@weprodev.com / secret)\n"
+	@printf "   $(YELLOW)make db-init$(RESET)      Apply schema if DB volume is empty; gateway seeds on start\n"
+	@printf "   $(YELLOW)make seed-demo$(RESET)    Re-apply seeds via gateway restart\n"
 	@printf "\n"
 
 	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"

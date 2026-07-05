@@ -22,12 +22,9 @@ func NewWorkspaceMemberRepository(client *pgsql.PgClient) port.WorkspaceMemberRe
 }
 
 func (r *WorkspaceMemberRepository) Add(ctx context.Context, workspaceID, userID, role string) error {
-	// Look up role ID from the roles table by name
-	var roleID string
-	err := r.client.GetDB(ctx).QueryRowContext(ctx, `SELECT id FROM roles WHERE name = $1`, role).Scan(&roleID)
+	roleID, err := lookupRoleIDByName(ctx, r.client.GetDB(ctx), role)
 	if err != nil {
-		slog.ErrorContext(ctx, "database error: lookup role failed", "error", err, "role", role)
-		return fmt.Errorf("wpd-message-gateway: lookup role %q: %w", role, err)
+		return err
 	}
 
 	_, err = r.client.GetDB(ctx).ExecContext(ctx, `
@@ -76,7 +73,8 @@ func (r *WorkspaceMemberRepository) GetRole(ctx context.Context, workspaceID, us
 
 func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID string) ([]domain.WorkspaceMember, error) {
 	rows, err := r.client.GetDB(ctx).QueryContext(ctx, `
-		SELECT wm.workspace_id, wm.user_id, r.name, wm.joined_at, u.email, COALESCE(u.display_name, '')
+		SELECT wm.workspace_id, wm.user_id, r.name, wm.joined_at, u.email,
+			COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email)
 		FROM workspace_members wm
 		JOIN roles r ON r.id = wm.role_id
 		INNER JOIN users u ON u.id = wm.user_id
@@ -103,4 +101,20 @@ func (r *WorkspaceMemberRepository) ListMembers(ctx context.Context, workspaceID
 		return nil, err
 	}
 	return out, nil
+}
+
+func (r *WorkspaceMemberRepository) MemberExistsByEmail(ctx context.Context, workspaceID, email string) (bool, error) {
+	var exists bool
+	err := r.client.GetDB(ctx).QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM workspace_members wm
+			INNER JOIN users u ON u.id = wm.user_id
+			WHERE wm.workspace_id = $1 AND lower(u.email) = lower($2)
+		)
+	`, workspaceID, email).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error: failed to check workspace member by email", "error", err, "workspace_id", workspaceID, "email", email)
+	}
+	return exists, err
 }

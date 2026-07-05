@@ -16,7 +16,7 @@ Orchestration note: the **[master-agent](./master-agent.md)** classifies request
 - **Traceability:** Before multi-file edits, state a **short plan** (files/areas + verification). After edits, summarize **what changed** and **how it was verified**.
 - **Bounded retries:** If [verification](./verification.md) fails twice for the **same** mistake class, **stop**, re-read output, and **narrow scope** instead of looping.
 - **No secret material (Data Exposure limits):** Do not echo or commit API keys, JWTs, or pasted credentials. **Hard requirement:** Any code generating secrets must use crypto-safe `crypto/rand`, and secrets must exclusively live in ENV or hashed in Postgres.
-- **Engineering principles (implement time):** Apply **KISS** (smallest correct diff), **DRY** (extract on second duplication), **DDD** (domain constants/types in `internal/core/domain/` + FE `*.types.ts`), **SOLID** (thin handlers, services orchestrate, ports for I/O). Remove dead code and stale comments/docs you touch — do not leave refactor debris.
+- **Engineering principles (implement time):** Apply **KISS**, **DRY**, **DDD**, **SOLID**. Portal HTTP shapes in **`internal/presentation/dto/`**; map to **`domain.*`** before calling services — **never pass DTOs to repositories**.
 - **Comments:** Add only when behavior is non-obvious; delete comments that restate code or became wrong after your edit.
 
 ## 1. Safety & Robustness Pre-Check

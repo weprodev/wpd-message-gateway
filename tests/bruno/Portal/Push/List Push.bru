@@ -22,13 +22,15 @@ tests {
     expect(res.status).to.equal(200);
   });
 
-  test("should return array", function() {
-    expect(res.body).to.be.an("array");
+  test("should return paginated page", function() {
+    expect(res.body).to.be.an("object");
+    expect(res.body.items).to.be.an("array");
+    expect(res.body).to.have.property("has_more");
   });
 
   test("should have push with required fields", function() {
-    if (res.body.length > 0) {
-      const push = res.body[0];
+    if (res.body.items.length > 0) {
+      const push = res.body.items[0];
       expect(push).to.have.property("id");
       expect(push).to.have.property("push");
       expect(push).to.have.property("created_at");

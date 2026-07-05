@@ -62,21 +62,25 @@ CREATE TRIGGER trg_workspaces_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE INDEX idx_workspaces_owner_id ON workspaces(owner_id);
+CREATE INDEX idx_workspaces_active_list
+    ON workspaces (status, is_private, name)
+    WHERE status = 'active';
 
 -- ==============================================================================
--- 3. ROLES TABLE (RBAC)
+-- 3. ROLES TABLE (wpd-gogate RBAC — global role catalog)
 -- ==============================================================================
 
 CREATE TABLE roles (
-    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'web',
-    display_name TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT        NOT NULL,
+    guard_name TEXT        NOT NULL DEFAULT 'msg_web',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT roles_name_guard_unique UNIQUE (name, guard_name)
 );
+
+CREATE INDEX idx_roles_guard_name ON roles (guard_name);
 
 CREATE TRIGGER trg_roles_set_updated_at
     BEFORE UPDATE ON roles
@@ -123,7 +127,9 @@ CREATE UNIQUE INDEX idx_invitations_pending_per_workspace_email
 
 CREATE INDEX idx_invitations_workspace_id ON invitations(workspace_id);
 CREATE INDEX idx_invitations_token_hash   ON invitations(token_hash);
-CREATE INDEX idx_invitations_role_id       ON invitations(role_id);
+CREATE INDEX idx_invitations_workspace_pending
+    ON invitations (workspace_id, status, expires_at)
+    WHERE status = 'pending';
 
 -- ==============================================================================
 -- 6. WORKSPACE_CHANNELS TABLE
@@ -186,6 +192,8 @@ CREATE TRIGGER trg_provider_config_fields_set_updated_at
     BEFORE UPDATE ON provider_config_fields
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+CREATE INDEX idx_provider_config_fields_provider_id ON provider_config_fields(provider_id);
+
 -- ==============================================================================
 -- 9. INTEGRATIONS TABLE (Workspace ↔ Provider Credentials)
 -- ==============================================================================
@@ -217,6 +225,8 @@ CREATE UNIQUE INDEX idx_integrations_default_per_channel
 
 CREATE INDEX idx_integrations_provider_id ON integrations(provider_id);
 CREATE INDEX idx_integrations_workspace_channel ON integrations(workspace_id, channel_type);
+CREATE INDEX idx_integrations_workspace_channel_status
+    ON integrations (workspace_id, channel_type, status, is_default DESC, created_at DESC);
 
 CREATE TRIGGER trg_integrations_set_updated_at
     BEFORE UPDATE ON integrations
@@ -241,6 +251,7 @@ CREATE TABLE api_keys (
 );
 
 CREATE INDEX idx_api_keys_workspace_id ON api_keys(workspace_id);
+CREATE INDEX idx_api_keys_workspace_created ON api_keys (workspace_id, created_at DESC);
 
 -- ==============================================================================
 -- 11. MESSAGE_REQUEST_LOGS TABLE (Append-only)
@@ -258,6 +269,7 @@ CREATE TABLE message_request_logs (
     request_id    VARCHAR(64),
     duration_ms   INT          CHECK (duration_ms >= 0),
     error_message TEXT,
+    inbox_message_id UUID,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -271,6 +283,24 @@ CREATE INDEX idx_message_request_logs_api_key
 CREATE INDEX idx_message_request_logs_workspace_api_created
     ON message_request_logs (workspace_id, api_key_id, created_at DESC)
     WHERE api_key_id IS NOT NULL;
+
+CREATE INDEX idx_message_request_logs_workspace_channel_created
+    ON message_request_logs (workspace_id, channel_type, created_at DESC);
+
+CREATE INDEX idx_message_request_logs_workspace_inbox_message
+    ON message_request_logs (workspace_id, inbox_message_id)
+    WHERE inbox_message_id IS NOT NULL;
+
+-- ==============================================================================
+-- 11.5. MESSAGE_REQUEST_PAYLOADS TABLE (Append-only body storage)
+-- ==============================================================================
+
+CREATE TABLE message_request_payloads (
+    log_id        UUID        PRIMARY KEY REFERENCES message_request_logs(id) ON DELETE CASCADE,
+    request_body  TEXT,
+    response_body TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ==============================================================================
 -- 12. TEMPLATES TABLE
@@ -364,25 +394,27 @@ CREATE INDEX idx_workspace_access_audits_actor_user_id
     WHERE actor_user_id IS NOT NULL;
 
 -- ==============================================================================
--- 16. PERMISSIONS TABLE (RBAC Engine)
+-- 16. PERMISSIONS TABLE (wpd-gogate RBAC)
 -- ==============================================================================
 
 CREATE TABLE permissions (
-    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    name         TEXT        NOT NULL,
-    guard_name   TEXT        NOT NULL DEFAULT 'web',
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT        NOT NULL,
+    guard_name TEXT        NOT NULL DEFAULT 'msg_web',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT permissions_name_guard_unique UNIQUE (name, guard_name)
 );
+
+CREATE INDEX idx_permissions_guard_name ON permissions (guard_name);
 
 CREATE TRIGGER trg_permissions_set_updated_at
     BEFORE UPDATE ON permissions
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==============================================================================
--- 17. ROLE_HAS_PERMISSIONS JOIN TABLE (RBAC Engine)
+-- 17. ROLE_HAS_PERMISSIONS (wpd-gogate RBAC)
 -- ==============================================================================
 
 CREATE TABLE role_has_permissions (
@@ -392,16 +424,18 @@ CREATE TABLE role_has_permissions (
     PRIMARY KEY (permission_id, role_id)
 );
 
+CREATE INDEX idx_role_has_permissions_role_id ON role_has_permissions (role_id);
+
 -- ==============================================================================
--- 18. MODEL_HAS_ROLES TABLE (Polymorphic RBAC mappings)
+-- 18. MODEL_HAS_ROLES (wpd-gogate polymorphic role assignments; team_id = workspace)
 -- ==============================================================================
 
 CREATE TABLE model_has_roles (
-    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    role_id    UUID        NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    model_type TEXT        NOT NULL,
-    model_id   UUID        NOT NULL,
-    team_id    UUID        REFERENCES workspaces(id) ON DELETE CASCADE,
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    role_id    UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    model_type TEXT NOT NULL,
+    model_id   UUID NOT NULL,
+    team_id    UUID REFERENCES workspaces(id) ON DELETE CASCADE,
 
     CONSTRAINT model_has_roles_unique UNIQUE NULLS NOT DISTINCT (role_id, model_id, model_type, team_id)
 );
@@ -409,15 +443,15 @@ CREATE TABLE model_has_roles (
 CREATE INDEX idx_model_has_roles_lookup ON model_has_roles (model_id, model_type, team_id);
 
 -- ==============================================================================
--- 19. MODEL_HAS_PERMISSIONS TABLE (Polymorphic RBAC mappings)
+-- 19. MODEL_HAS_PERMISSIONS (wpd-gogate direct permission overrides; team_id = workspace)
 -- ==============================================================================
 
 CREATE TABLE model_has_permissions (
-    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    permission_id UUID        NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-    model_type    TEXT        NOT NULL,
-    model_id      UUID        NOT NULL,
-    team_id       UUID        REFERENCES workspaces(id) ON DELETE CASCADE,
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+    model_type    TEXT NOT NULL,
+    model_id      UUID NOT NULL,
+    team_id       UUID REFERENCES workspaces(id) ON DELETE CASCADE,
 
     CONSTRAINT model_has_permissions_unique UNIQUE NULLS NOT DISTINCT (permission_id, model_id, model_type, team_id)
 );

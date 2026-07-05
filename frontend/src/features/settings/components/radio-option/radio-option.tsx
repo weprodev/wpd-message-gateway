@@ -7,15 +7,26 @@ interface RadioOptionProps {
   description: string
   checked: boolean
   onChange: () => void
+  disabled?: boolean
 }
 
-export function RadioOption({ id, name, label, description, checked, onChange }: RadioOptionProps) {
+export function RadioOption({
+  id,
+  name,
+  label,
+  description,
+  checked,
+  onChange,
+  disabled = false,
+}: RadioOptionProps) {
   return (
     <label
       htmlFor={id}
       className={cn(
-        "flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors",
-        checked ? "border-primary-brand bg-input" : "border-border hover:bg-muted/40",
+        "flex gap-3 rounded-lg border p-4 transition-colors",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+        checked ? "border-primary-brand bg-input" : "border-border",
+        !disabled && !checked && "hover:bg-muted/40",
       )}
     >
       <input
@@ -24,6 +35,7 @@ export function RadioOption({ id, name, label, description, checked, onChange }:
         name={name}
         checked={checked}
         onChange={onChange}
+        disabled={disabled}
         className="mt-1 accent-primary-brand"
       />
       <div>

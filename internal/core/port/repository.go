@@ -7,7 +7,8 @@ import (
 )
 
 type WorkspaceRepository interface {
-	Create(ctx context.Context, workspace *domain.Workspace) error
+	Create(ctx context.Context, workspace *domain.Workspace, ownerID string) error
+	Delete(ctx context.Context, id string) error
 	GetByID(ctx context.Context, id string) (*domain.Workspace, error)
 	GetBySlug(ctx context.Context, slug string) (*domain.Workspace, error)
 	Update(ctx context.Context, workspace *domain.Workspace) error

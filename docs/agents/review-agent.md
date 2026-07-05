@@ -68,6 +68,7 @@ Derived from [backend-engineer.md](../backend/backend-engineer.md) and [code-con
 - [ ] **Database Schema**: If columns/tables changed, the DB diagram and relative docs must be updated.
 - [ ] **Robustness & Scalability**: No goroutine leaks.
 - [ ] **Tests**: Table-driven tests covering **edge cases** and **expected failures**.
+- [ ] **Presentation DTOs**: Types/mappers in `internal/presentation/dto/`; **`domain.*` only** on port/repo interfaces (`MGW.HANDLER-DTO`, `MGW.DTO-IN-REPO`).
 - [ ] **Principles**: Domain constants for statuses/enums; no handler business rules; no `pkg`→`internal` (`DDD.VALUE-TYPE`, `DDD.LAYER`, `SOLID.DIP`).
 
 ## 4. Frontend review checklist
@@ -87,7 +88,7 @@ Derived from [frontend-engineer.md](../frontend/frontend-engineer.md) and [conve
 
 - [ ] **Architecture Check**: If a new layer or directory was created, does it align with the documented architecture? Are docs updated?
 - [ ] **Anti-patterns**: Ensure new patterns introduced do not conflict with existing boundaries.
-- [ ] **No stale docs**: Portal capability claims match code (remove “REST only” when UI exists).
+- [ ] **No stale docs**: Portal capability claims match code (UI pages, permissions, and API tables stay in sync with `frontend/src/core/router/` and `internal/presentation/router.go`).
 
 ## 6. Severity guidance & Reporting
 

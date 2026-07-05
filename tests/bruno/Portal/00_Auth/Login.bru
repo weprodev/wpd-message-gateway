@@ -23,5 +23,5 @@ tests {
     expect(res.body.token).to.be.a("string");
   });
 
-  bru.setEnvVar("portalJwt", res.body.token);
+  bru.setVar("portalJwt", res.body.token);
 }

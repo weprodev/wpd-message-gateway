@@ -1,0 +1,33 @@
+meta {
+  name: Create Invitation
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/invitations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{portalJwt}}
+}
+
+body:json {
+  {
+    "email": "invitee-{{$timestamp}}@e2e.test",
+    "role": "member"
+  }
+}
+
+tests {
+  test("should create invitation with role", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body).to.have.property("id");
+    expect(res.body.email).to.be.a("string");
+    expect(res.body.role).to.equal("member");
+    expect(res.body.token).to.be.a("string").and.not.empty;
+    expect(res.body.expires_at).to.be.a("string");
+  });
+}

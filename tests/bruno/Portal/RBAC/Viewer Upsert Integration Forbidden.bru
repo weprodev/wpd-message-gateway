@@ -1,0 +1,31 @@
+meta {
+  name: Viewer Upsert Integration Forbidden
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/workspaces/{{workspaceId}}/integrations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{viewerPortalJwt}}
+}
+
+body:json {
+  {
+    "channel_type": "email",
+    "provider_name": "memory",
+    "config": {},
+    "status": "connected",
+    "is_default": true
+  }
+}
+
+tests {
+  test("viewer cannot upsert integrations", function() {
+    expect(res.status).to.equal(403);
+  });
+}

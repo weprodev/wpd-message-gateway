@@ -1,14 +1,16 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
+	"github.com/weprodev/wpd-message-gateway/internal/presentation/dto"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 )
 
@@ -18,28 +20,6 @@ type PortalWorkspaceHandler struct {
 
 func NewPortalWorkspaceHandler(svc *service.PortalService) *PortalWorkspaceHandler {
 	return &PortalWorkspaceHandler{svc: svc}
-}
-
-type createWorkspaceBody struct {
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	IconKey string `json:"icon_key"`
-}
-
-type joinBody struct {
-	Slug string `json:"slug"`
-	PIN  string `json:"pin"`
-}
-
-type patchWorkspaceBody struct {
-	Name       *string `json:"name"`
-	Visibility *string `json:"visibility"`
-	IconKey    *string `json:"icon_key"`
-}
-
-type invitationBody struct {
-	Email string `json:"email"`
-	Role  string `json:"role"`
 }
 
 func (h *PortalWorkspaceHandler) ListWorkspaces(c echo.Context) error {
@@ -54,7 +34,7 @@ func (h *PortalWorkspaceHandler) ListWorkspaces(c echo.Context) error {
 
 func (h *PortalWorkspaceHandler) CreateWorkspace(c echo.Context) error {
 	uid := customMiddleware.GetPortalUserID(c.Request().Context())
-	var body createWorkspaceBody
+	var body dto.CreateWorkspaceRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind workspace create body", "error", err, "user_id", uid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -62,6 +42,9 @@ func (h *PortalWorkspaceHandler) CreateWorkspace(c echo.Context) error {
 	w, err := h.svc.CreateWorkspace(c.Request().Context(), uid, body.Name, body.Slug, body.IconKey)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create workspace", "error", err, "user_id", uid, "name", body.Name)
+		if errors.Is(err, port.ErrConflict) {
+			return echo.NewHTTPError(http.StatusConflict, "workspace slug already exists")
+		}
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create workspace")
 	}
 	return c.JSON(http.StatusCreated, w)
@@ -69,7 +52,7 @@ func (h *PortalWorkspaceHandler) CreateWorkspace(c echo.Context) error {
 
 func (h *PortalWorkspaceHandler) JoinWorkspace(c echo.Context) error {
 	uid := customMiddleware.GetPortalUserID(c.Request().Context())
-	var body joinBody
+	var body dto.JoinWorkspaceRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind workspace join body", "error", err, "user_id", uid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -93,14 +76,12 @@ func (h *PortalWorkspaceHandler) GetWorkspace(c echo.Context) error {
 
 func (h *PortalWorkspaceHandler) PatchWorkspace(c echo.Context) error {
 	wid := c.Param("wid")
-	var body patchWorkspaceBody
+	var body dto.PatchWorkspaceRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind workspace patch body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
 	}
-	if err := h.svc.PatchWorkspace(c.Request().Context(), wid, service.WorkspacePatch{
-		Name: body.Name, Visibility: body.Visibility, IconKey: body.IconKey,
-	}); err != nil {
+	if err := h.svc.PatchWorkspace(c.Request().Context(), wid, body.ToPatch()); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to patch workspace", "error", err, "workspace_id", wid)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to patch workspace")
 	}
@@ -118,6 +99,9 @@ func (h *PortalWorkspaceHandler) ListMembers(c echo.Context) error {
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to list members", "error", err, "workspace_id", wid)
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to list members")
+	}
+	if members == nil {
+		members = []domain.WorkspaceMember{}
 	}
 	return c.JSON(http.StatusOK, members)
 }
@@ -139,12 +123,15 @@ func (h *PortalWorkspaceHandler) ListInvitations(c echo.Context) error {
 		slog.ErrorContext(c.Request().Context(), "failed to list invitations", "error", err, "workspace_id", wid)
 		return safeHTTPError(err, http.StatusInternalServerError, "failed to list invitations")
 	}
+	if list == nil {
+		list = []domain.Invitation{}
+	}
 	return c.JSON(http.StatusOK, list)
 }
 
 func (h *PortalWorkspaceHandler) CreateInvitation(c echo.Context) error {
 	wid := c.Param("wid")
-	var body invitationBody
+	var body dto.CreateInvitationRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind invitation body", "error", err, "workspace_id", wid)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -152,23 +139,11 @@ func (h *PortalWorkspaceHandler) CreateInvitation(c echo.Context) error {
 	if body.Email == "" || body.Role == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "email and role required")
 	}
-	inv := &domain.Invitation{
-		WorkspaceID: wid,
-		Email:       body.Email,
-		Role:        body.Role,
-		ExpiresAt:   time.Now().Add(7 * 24 * time.Hour),
-		Status:      "pending",
-	}
+	inv := h.svc.NewPendingInvitation(wid, body.Email, body.Role)
 	rawToken, err := h.svc.CreateInvitation(c.Request().Context(), inv)
 	if err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to create invitation", "error", err, "workspace_id", wid, "email", body.Email)
 		return safeHTTPError(err, http.StatusBadRequest, "failed to create invitation")
 	}
-	return c.JSON(http.StatusCreated, map[string]any{
-		"id":         inv.ID,
-		"email":      inv.Email,
-		"role":       inv.Role,
-		"expires_at": inv.ExpiresAt,
-		"token":      rawToken,
-	})
+	return c.JSON(http.StatusCreated, dto.CreateInvitationResponseFromDomain(*inv, rawToken))
 }

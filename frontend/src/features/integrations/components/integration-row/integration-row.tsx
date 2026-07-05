@@ -1,9 +1,10 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Permission, useWorkspaceAuthorization } from "@/core/auth"
 import { cn } from "@/lib/utils"
 
 import { IntegrationProviderIcon } from "@/features/integrations/components/integration-provider-icon"
-import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 
 interface IntegrationRowProps {
   provider: IntegrationViewModel
@@ -14,6 +15,8 @@ interface IntegrationRowProps {
 }
 
 export function IntegrationRow({ provider, onConnect, onActivate, onDisconnect, isBusy }: IntegrationRowProps) {
+  const { can } = useWorkspaceAuthorization()
+  const canManageIntegrations = can(Permission.IntegrationsWrite)
   const isDisabled = !provider.isAvailable || isBusy
 
   return (
@@ -41,30 +44,34 @@ export function IntegrationRow({ provider, onConnect, onActivate, onDisconnect, 
         ) : provider.isConnected ? (
           <>
             <Badge className="border-success/30 bg-success-bg text-success">Connected</Badge>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isDisabled}
-              onClick={() => onDisconnect(provider)}
-            >
-              Disconnect
-            </Button>
+            {canManageIntegrations ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isDisabled}
+                onClick={() => onDisconnect(provider)}
+              >
+                Disconnect
+              </Button>
+            ) : null}
           </>
         ) : provider.isDeactivated ? (
           <>
             <Badge variant="secondary">Deactivated</Badge>
-            <Button
-              type="button"
-              size="sm"
-              disabled={isDisabled}
-              className="bg-primary-brand hover:bg-primary-brand-hover"
-              onClick={() => onActivate(provider)}
-            >
-              Activate
-            </Button>
+            {canManageIntegrations ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={isDisabled}
+                className="bg-primary-brand hover:bg-primary-brand-hover"
+                onClick={() => onActivate(provider)}
+              >
+                Activate
+              </Button>
+            ) : null}
           </>
-        ) : (
+        ) : canManageIntegrations ? (
           <Button
             type="button"
             size="sm"
@@ -74,6 +81,8 @@ export function IntegrationRow({ provider, onConnect, onActivate, onDisconnect, 
           >
             Connect
           </Button>
+        ) : (
+          <Badge variant="secondary">Not connected</Badge>
         )}
       </div>
     </div>

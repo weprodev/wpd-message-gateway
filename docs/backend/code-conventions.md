@@ -17,7 +17,8 @@ internal/           # Private application code (HTTP server mode)
 │   ├── logger/     # Structured logging
 │   └── repository/ # Postgres repositories
 └── presentation/   # HTTP layer
-    ├── handler/    # Request handlers
+    ├── dto/          # Request/response shapes + domain→JSON mappers (never in handler/)
+    ├── handler/    # Request handlers (thin: bind DTO → service → DTO)
     └── middleware/ # Auth, JWT, inbox API key
 
 pkg/                # Public packages (embedded SDK + shared contracts)
@@ -212,3 +213,53 @@ import (
 ```
 
 Use `goimports -local github.com/weprodev/wpd-message-gateway` to auto-format.
+
+## HTTP DTOs (presentation layer)
+
+**Never** define request/response structs in `handler/*.go`. HTTP JSON shapes belong in **`internal/presentation/dto/`** — one file per resource (e.g. `api_key.go`, `integration.go`).
+
+| Do | Don't |
+| -- | ----- |
+| `dto.CreateAPIKeyRequest` in handler bind | `type createAPIKeyBody struct` in handler |
+| `dto.IntegrationFromDomain(intg)` | `integrationToJSON` helper in handler |
+| Exported PascalCase names (`LoginRequest`) | Unexported `*Body` suffix types in handler |
+| Pass `domain.*` to services/repositories | Pass `dto.*` to services or repositories |
+
+### Data flow (DTOs stop at the handler boundary)
+
+Repositories and port interfaces speak **domain only** — never presentation DTOs.
+
+```
+Inbound:  JSON → handler.Bind(dto.Request) → req.ToDomain() → domain.* → Service → Port → Repository
+Outbound: Repository → domain.* → Service → handler → dto.XFromDomain(domain.*) → JSON
+Partial:  JSON → dto.PatchRequest → req.ToPatch() → service.*Patch → Service (load domain, apply, save)
+```
+
+| Layer | Types it uses | Maps how |
+| ----- | ------------- | -------- |
+| **Handler** | `dto.*` | Bind JSON; call `ToDomain` / `ToPatch`; call `XFromDomain` before `c.JSON` |
+| **Service** | `domain.*`, `service.*Patch` | Business rules; orchestrates ports |
+| **Port / Repository** | `domain.*` | Postgres adapters scan rows ↔ domain structs |
+| **Infrastructure** | `domain.*` | No `json` tags required; no import of `presentation/dto` |
+
+**Never send DTOs to a repository.** If a handler has a `dto.CreateTemplateRequest`, call `body.ToDomain(wid)` first, then pass the resulting `*domain.Template` to `PortalService.CreateTemplate`, which passes it to the template repository port. The repository interface looks like:
+
+```go
+Create(ctx context.Context, t *domain.Template) error  // port — domain only
+```
+
+Gateway `/v1/*` handlers may bind **`pkg/contracts`** types directly — those are the public SDK message API, not portal DTOs.
+
+### Mapping convention (idiomatic Go)
+
+| Direction | Style | Example |
+| --------- | ----- | ------- |
+| Domain → response DTO | Package func `{Type}FromDomain` | `dto.APIKeyPublicFromDomain(k)` |
+| Request DTO → domain (create/upsert) | Value-receiver method `ToDomain()` | `body.ToDomain(wid)` |
+| Request DTO → partial update | Value-receiver method `ToPatch()` | `body.ToPatch()` → `service.WorkspacePatch` |
+
+Use **`{Type}FromDomain`** package functions for outbound mapping (not methods on a zero-value receiver). Use **`ToDomain()`** on request DTOs when the result is a **`domain.*`** entity for persistence. Use **`ToPatch()`** when the result is a **service patch command** (service loads domain, applies fields, saves via repository).
+
+**Not infrastructure:** DTOs are presentation concerns (JSON field names, omitempty). `internal/infrastructure/` maps DB rows to **domain**, not HTTP.
+
+New or changed portal endpoints: add/update types in `dto/` and colocate mapper tests (`dto/*_test.go`) when mapping logic is non-trivial.

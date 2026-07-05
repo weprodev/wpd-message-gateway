@@ -6,6 +6,7 @@ import { SidebarNav } from "@/components/ui/sidebar-nav"
 import { cn } from "@/lib/utils"
 import { ROUTES } from "@/core/router/routes"
 import { fetchUserProfile, setToken, type UserProfile } from "@/core/api/client"
+import { WorkspaceAuthorizationProvider } from "@/core/auth"
 import { AppFooter } from "@/shared/components/app-footer"
 import { MessageGatewayLogo } from "@/shared/components/message-gateway-logo"
 import { ThemeToggle } from "@/shared/components/theme-toggle"
@@ -47,7 +48,11 @@ export function WorkspaceLayout() {
 
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-sans">
+    <WorkspaceAuthorizationProvider
+      role={activeWorkspace?.role}
+      permissions={activeWorkspace?.permissions}
+    >
+      <div className="flex min-h-screen flex-col bg-background font-sans">
       <header className="sticky top-0 z-40 h-20 w-full border-b border-border bg-card">
         <div className="flex h-full items-center justify-between px-12 py-4">
           <div className="flex items-center gap-3">
@@ -158,5 +163,6 @@ export function WorkspaceLayout() {
 
       <AppFooter variant="dashboard" />
     </div>
+    </WorkspaceAuthorizationProvider>
   )
 }

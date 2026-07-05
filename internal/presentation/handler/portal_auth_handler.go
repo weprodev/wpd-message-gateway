@@ -10,6 +10,7 @@ import (
 	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 	"github.com/weprodev/wpd-message-gateway/internal/core/service"
+	"github.com/weprodev/wpd-message-gateway/internal/presentation/dto"
 	customMiddleware "github.com/weprodev/wpd-message-gateway/internal/presentation/middleware"
 )
 
@@ -22,31 +23,8 @@ func NewPortalAuthHandler(svc *service.PortalService, authSvc *service.AuthServi
 	return &PortalAuthHandler{svc: svc, authSvc: authSvc}
 }
 
-type registerBody struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-}
-
-type loginBody struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type tokenResponse struct {
-	Token      string             `json:"token"`
-	User       *domain.User       `json:"user"`
-	Workspaces []domain.Workspace `json:"workspaces"`
-}
-
-type userProfileResponse struct {
-	*domain.User
-	Workspaces []domain.Workspace `json:"workspaces"`
-}
-
 func (h *PortalAuthHandler) Register(c echo.Context) error {
-	var body registerBody
+	var body dto.RegisterRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind register body", "error", err)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -74,7 +52,7 @@ func (h *PortalAuthHandler) VerifyEmail(c echo.Context) error {
 }
 
 func (h *PortalAuthHandler) Login(c echo.Context) error {
-	var body loginBody
+	var body dto.LoginRequest
 	if err := c.Bind(&body); err != nil {
 		slog.ErrorContext(c.Request().Context(), "failed to bind login body", "error", err)
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON")
@@ -92,7 +70,7 @@ func (h *PortalAuthHandler) Login(c echo.Context) error {
 		workspaces = []domain.Workspace{}
 	}
 
-	return c.JSON(http.StatusOK, tokenResponse{Token: token, User: u, Workspaces: workspaces})
+	return c.JSON(http.StatusOK, dto.LoginResponseFromDomain(token, u, workspaces))
 }
 
 func (h *PortalAuthHandler) Me(c echo.Context) error {
@@ -112,5 +90,5 @@ func (h *PortalAuthHandler) Me(c echo.Context) error {
 		workspaces = []domain.Workspace{}
 	}
 
-	return c.JSON(http.StatusOK, userProfileResponse{User: u, Workspaces: workspaces})
+	return c.JSON(http.StatusOK, dto.UserProfileResponseFromDomain(u, workspaces))
 }

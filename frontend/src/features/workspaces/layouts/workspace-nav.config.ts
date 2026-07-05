@@ -1,6 +1,9 @@
 import { ROUTES } from "@/core/router/routes"
 
-export type WorkspaceNavSegment = Exclude<keyof typeof ROUTES.workspace, "pattern">
+export type WorkspaceNavSegment = Exclude<
+  keyof typeof ROUTES.workspace,
+  "pattern" | "emailWithMessage"
+>
 
 export function workspaceHref(workspaceId: string, segment: WorkspaceNavSegment) {
   return ROUTES.workspace[segment](workspaceId)

@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
+import { Permission, Role, WorkspaceAuthorizationProvider } from "@/core/auth"
+
 import { EmailContent } from "./email-content"
 
 const mockEmail = {
@@ -18,11 +20,27 @@ const mockEmail = {
   },
 }
 
+function renderContent(
+  permissions: string[] = [Permission.InboxWrite],
+) {
+  return render(
+    <WorkspaceAuthorizationProvider role={Role.Member} permissions={permissions}>
+      <EmailContent message={mockEmail} onDelete={vi.fn()} />
+    </WorkspaceAuthorizationProvider>,
+  )
+}
+
 describe("EmailContent Component", () => {
   it("renders correctly with metadata headers", () => {
-    render(<EmailContent message={mockEmail} onDelete={vi.fn()} />)
+    renderContent()
     expect(screen.getByText("Welcome to Message Gateway!")).toBeInTheDocument()
     expect(screen.getAllByText(/John Doe/).length).toBeGreaterThan(0)
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument()
+  })
+
+  it("hides delete action for read-only users", () => {
+    renderContent([Permission.LogsRead])
+
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
   })
 })

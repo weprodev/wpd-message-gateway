@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { AuthCard } from "@/shared/components/auth-card"
-import { signInWithPassword } from "../auth.api"
+import { signInWithPassword } from "../api/auth.api"
 
 export function LoginPage() {
   const navigate = useNavigate()

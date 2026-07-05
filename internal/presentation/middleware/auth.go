@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/weprodev/go-pkg/crypto"
 
+	"github.com/weprodev/wpd-message-gateway/internal/core/domain"
+	"github.com/weprodev/wpd-message-gateway/internal/core/logctx"
 	"github.com/weprodev/wpd-message-gateway/internal/core/port"
 )
 
@@ -22,9 +25,16 @@ const (
 	APIKeyIDKey contextKey = "api_key_id"
 	// APIKeyNameKey is the context key for the API key display name (product/service label).
 	APIKeyNameKey contextKey = "api_key_name"
-	// HeaderWorkspaceKey is the HTTP header carrying the workspace slug.
+	// HeaderWorkspaceKey is the HTTP header carrying the workspace ID or slug.
 	HeaderWorkspaceKey = "X-Workspace-Key"
 )
+
+func resolveWorkspaceByKey(ctx context.Context, repo port.WorkspaceRepository, key string) (*domain.Workspace, error) {
+	if _, err := uuid.Parse(key); err == nil {
+		return repo.GetByID(ctx, key)
+	}
+	return repo.GetBySlug(ctx, key)
+}
 
 // APIKeyAuthMiddleware validates client credentials, optional workspace binding via X-Workspace-Key,
 // and records last_used_at on the API key.
@@ -63,9 +73,9 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			wsKey := strings.TrimSpace(c.Request().Header.Get(HeaderWorkspaceKey))
 			if wsKey == "" {
 				slog.WarnContext(c.Request().Context(), "API key auth failed: missing workspace key header", "client_id", clientID)
-				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace slug)")
+				return echo.NewHTTPError(http.StatusBadRequest, "Missing "+HeaderWorkspaceKey+" (workspace id or slug)")
 			}
-			ws, werr := workspaceRepo.GetBySlug(c.Request().Context(), wsKey)
+			ws, werr := resolveWorkspaceByKey(c.Request().Context(), workspaceRepo, wsKey)
 			if werr != nil || ws == nil {
 				slog.WarnContext(c.Request().Context(), "API key auth failed: unknown workspace key", "client_id", clientID, "workspace_key", wsKey)
 				return echo.NewHTTPError(http.StatusForbidden, "Unknown workspace key")
@@ -76,14 +86,14 @@ func APIKeyAuthMiddleware(apiKeyRepo port.APIKeyRepository, workspaceRepo port.W
 			}
 
 			if err := apiKeyRepo.UpdateLastUsedAt(c.Request().Context(), apiKey.ID); err != nil {
-				// Non-fatal: continue request
-				_ = err
+				slog.WarnContext(c.Request().Context(), "failed to update API key last_used_at", "error", err, "api_key_id", apiKey.ID)
 			}
 
 			ctx := c.Request().Context()
 			ctx = context.WithValue(ctx, WorkspaceIDKey, apiKey.WorkspaceID)
 			ctx = context.WithValue(ctx, APIKeyIDKey, apiKey.ID)
 			ctx = context.WithValue(ctx, APIKeyNameKey, apiKey.Name)
+			ctx = logctx.WithWorkspace(ctx, apiKey.WorkspaceID, apiKey.ID)
 			c.SetRequest(c.Request().WithContext(ctx))
 			return next(c)
 		}

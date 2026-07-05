@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/modal"
 import { Spinner } from "@/components/ui/spinner"
 
 import { IntegrationProviderIcon } from "@/features/integrations/components/integration-provider-icon"
-import type { IntegrationViewModel } from "@/features/integrations/hooks/use-integrations.hook"
+import type { IntegrationViewModel } from "@/features/integrations/integrations.types"
 import type { IntegrationActionResult } from "@/features/integrations/integrations.types"
 
 type DisconnectAction = "deactivate" | "remove"

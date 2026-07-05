@@ -138,7 +138,7 @@ gw.SendEmail(ctx, &contracts.Email{
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │   GatewayService                                         │   │
 │  │   SendEmail() · SendSMS() · SendPush() · SendChat()      │   │
-│  │   Reads dispatch_mode from workspace_settings            │   │
+│  │   Reads message_dispatch_mode from workspace_settings    │   │
 │  │   Reads provider credentials from integrations table     │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -185,10 +185,13 @@ Portal accounts use **email + password** (passwords are stored hashed). All mana
 
 The core service layer decouples from `wpd-gogate` by depending on the `port.AuthorizationGate` interface. The implementation adapter lives in `internal/infrastructure/authgate/gate_adapter.go`.
 
-- **admin**: Full read/write access to settings, integrations, templates, API keys, and member removal. Assigned automatically to the creator of a workspace.
-- **member**: Read-only access to workspaces, settings, templates, API keys, plus permission to send test messages (`send.test`).
+- **admin**: Full access to all portal permissions. Assigned automatically to the workspace creator.
+- **member**: Manage workspace resources (integrations, templates, settings, API keys, inbox) but cannot modify workspace metadata, manage members, or send invitations. See `database/seeds/001_seed_permissions.sql` for the exact permission matrix.
+- **viewer**: Read-only access to workspace resources (`*.read` permissions). Assigned explicitly via membership or invitation.
 
-Public workspaces (`is_private = false`) are dynamically accessible to any authenticated user as a `"viewer"` with read-only permissions (i.e. `*.read` operations are bypassed and approved automatically without requiring explicit membership or Casbin checks). All write operations on public workspaces remain strictly restricted to workspace admins.
+Roles are **global** in the `roles` table (wpd-gogate schema) and scoped per workspace through `workspace_members.role_id` and `model_has_roles.team_id`.
+
+**Public workspace guests** (authenticated users who are not members of a public workspace) receive a narrower guest set — `workspaces.read` and `templates.read` only — via `domain.PublicGuestPermissions`. The RBAC middleware bypasses gogate checks only for those permissions; all other routes still require membership and role-based permissions. Write operations always require explicit membership with sufficient permissions.
 
 ### Send API Auth (Machine-to-Machine)
 
@@ -200,7 +203,7 @@ Authorization: Bearer <workspace-jwt-token>
     OR
 X-Api-Client-Id: wk_abc123
 X-Api-Client-Secret: <secret>
-X-Workspace-Key: <workspace-unique-key>
+X-Workspace-Key: <workspace-id-or-slug>
 ```
 
 ### Dual Authorization Design
@@ -231,26 +234,45 @@ Provider credentials are stored AES-encrypted in the `integrations` table. Confi
 
 ### Portal UI coverage
 
-The React Portal (`frontend/`) currently implements: auth, workspace list, **integrations**, message **logs**, and **send test**. API keys, templates, members, settings, and memory inbox browsing are REST/Bruno only.
+The React Portal (`frontend/`) includes:
+
+| Area | Pages |
+| ---- | ----- |
+| **Auth** | Register, sign in |
+| **Workspaces** | List, create, join |
+| **Logs** | Overview (all channels) + per-channel tabs (SMS, push, chat) |
+| **Email** | Captured inbox browser, templates, Get started curl guide |
+| **Integrations** | Connect and manage providers |
+| **Settings** | General, API keys, message dispatch |
+
+**API-only today:** SMS/push/chat captured-message browsers (email inbox only), internal inbox ingest.
 
 ---
 
-## Message Dispatch Modes
+## Message Dispatch & Content Storage
 
-Each workspace independently controls how outbound messages are handled:
+Each workspace controls outbound routing and inbox content capture with **two orthogonal settings**:
 
-| Mode                  | Behavior                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `memory_only`         | Captured in-process RAM only. No external provider called. Default for development. |
-| `provider_only`       | Sent through the connected integration only. No in-memory copy.                     |
-| `memory_and_provider` | Stored in memory AND sent through the integration.                                  |
+| Setting | Values | Purpose |
+| ------- | ------ | ------- |
+| `message_dispatch_mode` | `memory` (default) \| `provider` | Where the message is routed |
+| `store_message_content` | `false` (default) \| `true` | Whether message bodies are captured in the portal inbox (in-process) |
 
-Configured via `PATCH /api/v1/workspaces/:wid/settings` (REST — no Portal UI page yet):
+Portal **Settings → Message Dispatch** exposes two controls that map directly to these keys:
+
+| UI control | Setting key | Values |
+| ---------- | ----------- | ------ |
+| Dispatch mode (radio) | `message_dispatch_mode` | `memory` \| `provider` |
+| Store message content (checkbox) | `store_message_content` | `false` (off) \| `true` (on) |
+
+Configured via `PATCH /api/v1/workspaces/:wid/settings` (Portal **Settings → Message Dispatch**):
 
 ```
 PATCH /api/v1/workspaces/:wid/settings
-{ "message_dispatch_mode": "provider_only" }
+{ "message_dispatch_mode": "provider", "store_message_content": "true" }
 ```
+
+**Request logs**: Every API send appends a row to `message_request_logs` (operational tracing with correlation `request_id`). Payload bodies are stored in a separate table (`message_request_payloads`) to prevent table bloat and enforce independent data privacy/retention policies.
 
 ---
 
@@ -263,31 +285,31 @@ HTTP Client (your app)
     │
     │ POST /v1/email
     │ Authorization: Bearer <workspace-jwt>
-    │ X-Workspace-Key: myapp
+    │ X-Workspace-Key: <workspace-uuid>
     │ { "to": [...], "subject": "...", "html": "..." }
     ▼
 APIKeyAuthMiddleware
     │ Validates workspace-jwt OR client_id+secret
-    │ Resolves workspace UUID from X-Workspace-Key
+    │ Resolves workspace from X-Workspace-Key (UUID or slug)
     │ Sets workspace_id in request context
     ▼
 GatewayHandler.HandleSendEmail()
     │ Reads workspace_id from context
     ▼
 GatewayService.SendEmail(ctx, workspaceID, email)
-    │ Reads workspace_settings.message_dispatch_mode from DB
+    │ Reads message_dispatch_mode + store_message_content from DB
     │
-    ├── memory_only  → Memory Provider (in-process RAM)
-    │                        │
-    │                        ▼
-    │                  Portal Inbox (SSE + REST)
+    ├── memory  → Memory Provider (in-process RAM)
+    │                  │
+    │                  ▼
+    │            Portal Inbox (SSE + REST)
     │
-    ├── provider_only → reads integrations table for workspace+channel
-    │                  Decrypts AES config
-    │                  Instantiates provider via registry
-    │                  → sends to Mailgun/etc
+    ├── provider → reads integrations table for workspace+channel
+    │             Decrypts AES config
+    │             Instantiates provider via registry
+    │             → sends to Mailgun/etc
     │
-    └── memory_and_provider → both paths above
+    └── store_message_content=true → also persists content via inbox writer
 ```
 
 ### SDK Mode — `gateway.New(config).SendEmail(...)`
@@ -317,12 +339,12 @@ Every entity in the system is scoped to a workspace:
 
 ```text
 Workspace "myapp"
-├── Members (users with roles: admin, member)
+├── Members (users with roles: admin, member, viewer)
 ├── API Keys (for machine-to-machine sends)
 ├── Integrations (provider credentials per channel)
 │   ├── email: mailgun { api_key: "...", domain: "..." }
 │   └── sms: (not configured)
-├── Settings { message_dispatch_mode: "provider_only" }
+├── Settings { message_dispatch_mode: "provider", store_message_content: "false" }
 ├── Templates (email HTML templates)
 └── Message Logs (request audit trail)
 ```
@@ -438,19 +460,19 @@ Only create new files in pkg/provider/<name>/
 
 ### 5. Memory Provider & Dispatch Modes
 
-The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with `dispatch_mode`, you can:
+The **memory provider** captures messages in process RAM. It's always available — no external service needed. Combined with workspace settings, you can:
 
-- Use `memory_only` for local development (captured messages via inbox REST API / Bruno)
-- Use `provider_only` in production (messages go to real provider)
-- Use `memory_and_provider` to keep a local copy AND send to the real provider
+- Use `message_dispatch_mode=memory` for local development (captured messages via inbox REST API / Bruno)
+- Use `message_dispatch_mode=provider` in production (messages go to the real provider)
+- Set `store_message_content=true` to persist message bodies regardless of routing mode
 
 ### 6. Portal (always on)
 
 The React Portal runs at `portal.ui_port` (default **10104**) when the server starts.
 
-**Portal UI today:** sign in, list workspaces, manage **integrations**, view message logs, send test messages.
+**Portal UI:** sign in, manage workspaces, view request logs, browse the **email** captured inbox, manage **email templates**, configure **integrations** and **settings** (general, API keys, message dispatch).
 
-**REST only (no UI pages yet):** workspace create, API keys, templates, members, settings, memory inbox browser.
+**API-only:** team member management, SMS/push/chat captured-message browsers, internal inbox ingest.
 
 ---
 
@@ -459,9 +481,9 @@ The React Portal runs at `portal.ui_port` (default **10104**) when the server st
 To enable robust trace tracking across all layers, the gateway employs an end-to-end correlation ID pipeline:
 
 1. **Correlation Generation**: Echo's `RequestID` middleware generates a unique request UUID for every incoming HTTP request, placing it in the `X-Request-ID` header.
-2. **Context Propagation**: A custom correlation middleware extracts this request ID and injects it into the standard Go `context.Context` (accessible via `logger.GetRequestID(ctx)`).
-3. **Structured slog Hooking**: An application-wide custom `ContextHandler` intercepts all standard `slog.InfoContext` / `slog.ErrorContext` calls. It transparently extracts the `request_id`, `workspace_id`, `api_key_id`, `channel`, and `provider` attributes from the context and automatically appends them to printed log records without requiring manual logging boilerplate.
-4. **Audit Trail Tracking**: The presentation-layer `SendHelper` automatically populates the `request_id` column on the `message_request_logs` PostgreSQL table, linking individual requests directly to database audit trails.
+2. **Context Propagation**: Router middleware copies the request ID into `context.Context` via `logger.WithRequestID`. API key auth also calls `logger.WithWorkspace` so `workspace_id` and `api_key_id` appear on all `/v1/*` logs. Send handlers add `channel` and `provider`.
+3. **Structured slog**: go-pkg `ContextExtractors` append correlation fields to every `slog.*Context` record (`request_id`, `workspace_id`, `api_key_id`, `channel`, `provider`).
+4. **Audit Trail**: `SendHelper` persists `request_id` on every row in `message_request_logs`, linking HTTP requests to the operational audit trail.
 
 ---
 

@@ -26,6 +26,6 @@ describe("EmailList Component", () => {
     expect(screen.getByText("Inbox")).toBeInTheDocument()
     expect(screen.getByText("1")).toBeInTheDocument()
     expect(screen.getByPlaceholderText("Search inbox...")).toBeInTheDocument()
-    expect(screen.getByText("John Doe")).toBeInTheDocument()
+    expect(screen.getByText("recipient@example.com")).toBeInTheDocument()
   })
 })

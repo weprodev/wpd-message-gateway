@@ -39,25 +39,57 @@ type StoredChat struct {
 	Chat        contracts.ChatMessage `json:"chat"`
 }
 
-// InboxReader is the read side of the in-process message capture store.
+// InboxEmailPage is a paginated slice of captured emails (newest first).
+type InboxEmailPage struct {
+	Items      []StoredEmail `json:"items"`
+	NextCursor string        `json:"next_cursor,omitempty"`
+	HasMore    bool          `json:"has_more"`
+}
+
+// InboxSMSPage is a paginated slice of captured SMS messages (newest first).
+type InboxSMSPage struct {
+	Items      []StoredSMS `json:"items"`
+	NextCursor string      `json:"next_cursor,omitempty"`
+	HasMore    bool        `json:"has_more"`
+}
+
+// InboxPushPage is a paginated slice of captured push notifications (newest first).
+type InboxPushPage struct {
+	Items      []StoredPush `json:"items"`
+	NextCursor string       `json:"next_cursor,omitempty"`
+	HasMore    bool         `json:"has_more"`
+}
+
+// InboxChatPage is a paginated slice of captured chat messages (newest first).
+type InboxChatPage struct {
+	Items      []StoredChat `json:"items"`
+	NextCursor string       `json:"next_cursor,omitempty"`
+	HasMore    bool         `json:"has_more"`
+}
+
+// InboxReader is the read side of the message capture store (persisted payloads).
 type InboxReader interface {
 	StatsForWorkspace(workspaceID string) map[string]int
 	EmailsForWorkspace(workspaceID string) []StoredEmail
+	ListEmailsForWorkspace(workspaceID string, limit int, cursor string) InboxEmailPage
 	EmailByIDForWorkspace(id, workspaceID string) (StoredEmail, bool)
 	DeleteEmailByIDForWorkspace(id, workspaceID string) bool
+	ListSMSForWorkspace(workspaceID string, limit int, cursor string) InboxSMSPage
 	SMSForWorkspace(workspaceID string) []StoredSMS
 	SMSByIDForWorkspace(id, workspaceID string) (StoredSMS, bool)
 	DeleteSMSByIDForWorkspace(id, workspaceID string) bool
+	ListPushForWorkspace(workspaceID string, limit int, cursor string) InboxPushPage
 	PushForWorkspace(workspaceID string) []StoredPush
 	PushByIDForWorkspace(id, workspaceID string) (StoredPush, bool)
 	DeletePushByIDForWorkspace(id, workspaceID string) bool
+	ListChatForWorkspace(workspaceID string, limit int, cursor string) InboxChatPage
 	ChatForWorkspace(workspaceID string) []StoredChat
 	ChatByIDForWorkspace(id, workspaceID string) (StoredChat, bool)
 	DeleteChatByIDForWorkspace(id, workspaceID string) bool
 	ClearWorkspace(workspaceID string)
 }
 
-// InboxWriter is the write side of the in-process message capture store.
+// InboxWriter is the write side of the message capture store.
 type InboxWriter interface {
 	WriteEmail(ctx context.Context, workspaceID string, email contracts.Email) (id string, err error)
 	WriteSMS(ctx context.Context, workspaceID string, sms contracts.SMS) (id string, err error)
