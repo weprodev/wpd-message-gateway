@@ -6,7 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/labstack/echo/v4 v4.15.4
+	github.com/labstack/echo/v4 v4.16.2
 	github.com/lib/pq v1.12.3
 	github.com/mailgun/mailgun-go/v4 v4.23.0
 	github.com/weprodev/wpd-gogate v1.2.2
@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 )
 
 require (
@@ -37,8 +37,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/weprodev/go-pkg v1.1.4
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 )
